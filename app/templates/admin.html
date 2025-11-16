@@ -341,7 +341,9 @@
 
         async function fetchMessages() {
           try {
-            const response = await fetch(`/chat/messages?after=${lastMessageId}`);
+            const response = await fetch(`/chat/messages?after=${lastMessageId}`, {
+              cache: "no-store",
+            });
             if (!response.ok) return;
             const data = await response.json();
             if (data.messages && data.messages.length) {
