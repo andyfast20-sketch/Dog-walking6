@@ -3,9 +3,34 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hello</title>
+    <title>Home</title>
+    <style>
+      body {
+        font-family: Arial, Helvetica, sans-serif;
+        margin: 2rem;
+      }
+      h1 {
+        margin-bottom: 1rem;
+      }
+      ul {
+        list-style: none;
+        padding: 0;
+      }
+      li + li {
+        margin-top: 0.5rem;
+      }
+      a {
+        text-decoration: none;
+        color: #1f4ad1;
+      }
+    </style>
   </head>
   <body>
-    <p>Hello from Flask!</p>
+    <h1>hello 1</h1>
+    <ul>
+      {% for link in page_links %}
+      <li><a href="{{ link.href }}">{{ link.label }}</a></li>
+      {% endfor %}
+    </ul>
   </body>
 </html>
