@@ -2,6 +2,7 @@ import json
 import queue
 import threading
 from datetime import datetime
+from typing import Optional
 
 from flask import (
     Flask,
@@ -23,9 +24,9 @@ next_submission_id = 1
 STATUS_OPTIONS = ["New", "In Process", "Finished"]
 visitor_stats = {}
 blocked_ips = set()
-chat_messages = []
+chat_conversations = {}
 next_chat_message_id = 1
-chat_stream_subscribers = set()
+chat_stream_subscribers = []
 chat_subscribers_lock = threading.Lock()
 
 
@@ -83,41 +84,168 @@ def _record_visit(ip_address: str):
     return True
 
 
-def _add_chat_message(sender: str, body: str):
+def _get_conversation(visitor_id: str, create: bool = False, ip_address: Optional[str] = None):
+    if not visitor_id:
+        return None
+    if create:
+        conversation = chat_conversations.setdefault(
+            visitor_id,
+            {
+                "visitor_id": visitor_id,
+                "ip_address": ip_address or _get_client_ip(),
+                "created_at": datetime.utcnow(),
+                "last_message_at": None,
+                "messages": [],
+            },
+        )
+        if ip_address:
+            conversation["ip_address"] = ip_address
+        return conversation
+    return chat_conversations.get(visitor_id)
+
+
+def _serialize_conversation(visitor_id: str):
+    conversation = chat_conversations.get(visitor_id)
+    if not conversation:
+        return None
+    unread = any(
+        message["sender"] == "visitor" and not message.get("seen_by_admin", False)
+        for message in conversation["messages"]
+    )
+    return {
+        "visitor_id": visitor_id,
+        "ip_address": conversation.get("ip_address", "Unknown"),
+        "created_at": conversation.get("created_at", datetime.utcnow()).isoformat(),
+        "unread": unread,
+        "message_count": len(conversation["messages"]),
+    }
+
+
+def _get_conversation_messages(visitor_id: str):
+    conversation = _get_conversation(visitor_id)
+    if not conversation:
+        return []
+    return conversation["messages"]
+
+
+def _all_messages():
+    messages = []
+    for conversation in chat_conversations.values():
+        messages.extend(conversation["messages"])
+    return sorted(messages, key=lambda msg: msg["id"])
+
+
+def _pending_conversation_count() -> int:
+    return sum(
+        1
+        for conversation in chat_conversations.values()
+        if any(
+            message["sender"] == "visitor" and not message.get("seen_by_admin", False)
+            for message in conversation["messages"]
+        )
+    )
+
+
+def _mark_conversation_as_read(visitor_id: Optional[str] = None):
+    targets = []
+    if visitor_id:
+        conversation = chat_conversations.get(visitor_id)
+        if conversation:
+            targets.append(conversation)
+    else:
+        targets.extend(chat_conversations.values())
+    for conversation in targets:
+        for message in conversation["messages"]:
+            if message["sender"] == "visitor":
+                message["seen_by_admin"] = True
+
+
+def _add_chat_message(sender: str, body: str, visitor_id: str, ip_address: Optional[str] = None):
     global next_chat_message_id
+    visitor_id = visitor_id or _get_client_ip()
+    conversation = _get_conversation(visitor_id, create=True, ip_address=ip_address)
     message = {
         "id": next_chat_message_id,
         "sender": sender,
         "body": body,
         "timestamp": datetime.utcnow().isoformat(),
         "seen_by_admin": sender != "visitor",
+        "visitor_id": visitor_id,
+        "visitor_ip": conversation.get("ip_address", "Unknown"),
     }
-    chat_messages.append(message)
+    conversation["messages"].append(message)
+    conversation["last_message_at"] = datetime.utcnow()
     next_chat_message_id += 1
     _broadcast_chat_update({"type": "message", "message": message})
     return message
+
+
+def _delete_conversation(visitor_id: str) -> bool:
+    conversation = chat_conversations.pop(visitor_id, None)
+    if not conversation:
+        return False
+    _broadcast_chat_update({"type": "conversation_deleted", "visitor_id": visitor_id})
+    return True
+
+
+def _filter_payload_for_subscriber(subscriber: dict, payload: dict):
+    role = subscriber["role"]
+    visitor_id = subscriber.get("visitor_id")
+    payload_type = payload.get("type")
+    if payload_type == "message":
+        message = payload.get("message")
+        if not message:
+            return None
+        if role == "admin" or not visitor_id:
+            return payload
+        if message.get("visitor_id") == visitor_id:
+            return payload
+        return None
+    if payload_type == "conversation_deleted":
+        if role == "admin" or payload.get("visitor_id") == visitor_id:
+            return payload
+        return None
+    return payload
 
 
 def _broadcast_chat_update(payload):
     with chat_subscribers_lock:
         subscribers = list(chat_stream_subscribers)
     for subscriber in subscribers:
-        subscriber.put(payload)
+        filtered = _filter_payload_for_subscriber(subscriber, payload)
+        if filtered is None:
+            continue
+        subscriber["queue"].put(filtered)
 
 
 def _format_sse_payload(payload: dict) -> str:
     return f"data: {json.dumps(payload)}\n\n"
 
 
-def _chat_event_stream():
+def _chat_event_stream(role: str, visitor_id: Optional[str] = None):
     subscriber_queue: queue.Queue = queue.Queue()
+    subscriber = {"queue": subscriber_queue, "role": role, "visitor_id": visitor_id}
     with chat_subscribers_lock:
-        chat_stream_subscribers.add(subscriber_queue)
+        chat_stream_subscribers.append(subscriber)
 
     def stream():
         try:
-            if chat_messages:
-                yield _format_sse_payload({"type": "history", "messages": chat_messages})
+            if role == "admin":
+                history_payload = {
+                    "type": "history",
+                    "messages": _all_messages(),
+                    "conversations": [
+                        data for data in (_serialize_conversation(cid) for cid in chat_conversations)
+                        if data is not None
+                    ],
+                }
+            else:
+                history_payload = {
+                    "type": "history",
+                    "visitor_id": visitor_id,
+                    "messages": _get_conversation_messages(visitor_id),
+                }
+            yield _format_sse_payload(history_payload)
             while True:
                 try:
                     payload = subscriber_queue.get(timeout=25)
@@ -126,7 +254,11 @@ def _chat_event_stream():
                 yield _format_sse_payload(payload)
         finally:
             with chat_subscribers_lock:
-                chat_stream_subscribers.discard(subscriber_queue)
+                chat_stream_subscribers[:] = [
+                    existing
+                    for existing in chat_stream_subscribers
+                    if existing.get("queue") is not subscriber_queue
+                ]
 
     return stream_with_context(stream())
 
@@ -197,10 +329,11 @@ def admin_page():
         key=lambda item: item[1]["last_visit"],
         reverse=True,
     )
-    has_unread_chat = any(
-        message["sender"] == "visitor" and not message.get("seen_by_admin", False)
-        for message in chat_messages
-    )
+    conversation_rows = [
+        data for data in (_serialize_conversation(cid) for cid in chat_conversations)
+        if data is not None
+    ]
+    chat_waiting_count = _pending_conversation_count()
     return render_template(
         "admin.html",
         home_url=url_for("index"),
@@ -208,7 +341,10 @@ def admin_page():
         status_options=STATUS_OPTIONS,
         visitors=visitor_rows,
         blocked_ips=blocked_ips,
-        chat_unread=has_unread_chat,
+        chat_unread=chat_waiting_count > 0,
+        chat_waiting_count=chat_waiting_count,
+        chat_conversations=conversation_rows,
+        chat_has_conversations=bool(conversation_rows),
     )
 
 
@@ -284,9 +420,19 @@ def chat_messages_endpoint():
         data = request.get_json(silent=True) or {}
         sender = data.get("sender", "visitor").strip().lower()
         body = (data.get("body") or "").strip()
+        visitor_id = (data.get("visitor_id") or "").strip()
         if sender not in {"visitor", "admin"} or not body:
             return jsonify({"error": "Invalid message"}), 400
-        message = _add_chat_message(sender, body)
+        if sender == "admin" and not visitor_id:
+            return jsonify({"error": "visitor_id is required"}), 400
+        if sender == "visitor" and not visitor_id:
+            visitor_id = request.headers.get("X-Visitor-Id", "").strip()
+        if sender == "visitor" and not visitor_id:
+            visitor_id = _get_client_ip()
+        if not visitor_id:
+            return jsonify({"error": "Unable to determine visitor"}), 400
+        ip_address = _get_client_ip() if sender == "visitor" else None
+        message = _add_chat_message(sender, body, visitor_id, ip_address=ip_address)
         return jsonify(message), 201
 
     after_id_raw = request.args.get("after", "0")
@@ -294,21 +440,55 @@ def chat_messages_endpoint():
         after_id = int(after_id_raw)
     except ValueError:
         after_id = 0
-    messages_to_send = [message for message in chat_messages if message["id"] > after_id]
-    return jsonify({"messages": messages_to_send})
+    role = request.args.get("role", "visitor").strip().lower()
+    visitor_id = (request.args.get("visitor_id", "") or "").strip()
+    if role != "admin" and not visitor_id:
+        visitor_id = request.headers.get("X-Visitor-Id", "").strip()
+    if role != "admin" and not visitor_id:
+        visitor_id = _get_client_ip()
+    if role == "admin" and visitor_id:
+        base_messages = _get_conversation_messages(visitor_id)
+    elif role == "admin":
+        base_messages = _all_messages()
+    else:
+        base_messages = _get_conversation_messages(visitor_id)
+    messages_to_send = [message for message in base_messages if message["id"] > after_id]
+    payload = {"messages": messages_to_send}
+    if role == "admin":
+        payload["conversations"] = [
+            data for data in (_serialize_conversation(cid) for cid in chat_conversations)
+            if data is not None
+        ]
+    else:
+        payload["visitor_id"] = visitor_id
+    return jsonify(payload)
 
 
 @app.route("/admin/chat/read", methods=["POST"])
 def mark_chat_as_read():
-    for message in chat_messages:
-        if message["sender"] == "visitor":
-            message["seen_by_admin"] = True
+    data = request.get_json(silent=True) or {}
+    visitor_id = (data.get("visitor_id") or request.form.get("visitor_id") or "").strip()
+    _mark_conversation_as_read(visitor_id or None)
+    return ("", 204)
+
+
+@app.route("/admin/chat/<path:visitor_id>/delete", methods=["POST"])
+def delete_chat_conversation(visitor_id: str):
+    if not visitor_id:
+        abort(404)
+    _delete_conversation(visitor_id)
     return ("", 204)
 
 
 @app.route("/chat/stream")
 def chat_stream():
-    response = Response(_chat_event_stream(), mimetype="text/event-stream")
+    role = request.args.get("role", "visitor").strip().lower()
+    visitor_id = (request.args.get("visitor_id") or "").strip()
+    if role != "admin" and not visitor_id:
+        visitor_id = request.headers.get("X-Visitor-Id", "").strip()
+    if role != "admin" and not visitor_id:
+        visitor_id = _get_client_ip()
+    response = Response(_chat_event_stream(role=role, visitor_id=visitor_id), mimetype="text/event-stream")
     response.headers["Cache-Control"] = "no-store"
     return response
 
