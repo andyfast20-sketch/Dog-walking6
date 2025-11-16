@@ -27,6 +27,9 @@
         padding: 0.75rem;
         text-align: left;
       }
+      select {
+        padding: 0.35rem 0.5rem;
+      }
       th {
         background: #f4f6fb;
       }
@@ -78,7 +81,24 @@
           <td>{{ submission.email }}</td>
           <td>{{ submission.phone }}</td>
           <td>{{ submission.message }}</td>
-          <td>{{ submission.status or 'New' }}</td>
+          <td>
+            <form
+              class="inline"
+              method="post"
+              action="{{ url_for('update_submission_status', submission_id=submission.id) }}"
+            >
+              <select name="status" onchange="this.form.submit()">
+                {% for option in status_options %}
+                <option value="{{ option }}" {% if option == (submission.status or 'New') %}selected{% endif %}>
+                  {{ option }}
+                </option>
+                {% endfor %}
+              </select>
+              <noscript>
+                <button type="submit">Update</button>
+              </noscript>
+            </form>
+          </td>
           <td>
             <div class="actions">
               <a href="{{ url_for('edit_submission', submission_id=submission.id) }}">Edit</a>
@@ -107,7 +127,24 @@
         <dt>Message</dt>
         <dd>{{ submission.message }}</dd>
         <dt>Status</dt>
-        <dd>{{ submission.status or 'New' }}</dd>
+        <dd>
+          <form
+            class="inline"
+            method="post"
+            action="{{ url_for('update_submission_status', submission_id=submission.id) }}"
+          >
+            <select name="status" onchange="this.form.submit()">
+              {% for option in status_options %}
+              <option value="{{ option }}" {% if option == (submission.status or 'New') %}selected{% endif %}>
+                {{ option }}
+              </option>
+              {% endfor %}
+            </select>
+            <noscript>
+              <button type="submit">Update</button>
+            </noscript>
+          </form>
+        </dd>
       </dl>
       <div class="actions">
         <a href="{{ url_for('edit_submission', submission_id=submission.id) }}">Edit</a>

@@ -116,14 +116,6 @@
           Message
           <textarea name="message" required></textarea>
         </label>
-        <label>
-          Status
-          <select name="status">
-            {% for option in status_options %}
-            <option value="{{ option }}">{{ option }}</option>
-            {% endfor %}
-          </select>
-        </label>
         <button type="submit">Submit</button>
         {% if submission_success %}
         <div class="success">Thanks! Your enquiry has been recorded.</div>

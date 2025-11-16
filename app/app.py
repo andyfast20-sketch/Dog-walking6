@@ -17,17 +17,13 @@ def index():
     global next_submission_id
 
     if request.method == "POST":
-        status = request.form.get("status", STATUS_OPTIONS[0]).strip()
-        if status not in STATUS_OPTIONS:
-            status = STATUS_OPTIONS[0]
-
         submission = {
             "id": next_submission_id,
             "name": request.form.get("name", "").strip(),
             "email": request.form.get("email", "").strip(),
             "phone": request.form.get("phone", "").strip(),
             "message": request.form.get("message", "").strip(),
-            "status": status,
+            "status": STATUS_OPTIONS[0],
         }
         submissions.append(submission)
         next_submission_id += 1
@@ -45,7 +41,6 @@ def index():
         "index.html",
         page_links=page_links,
         form_action=url_for("index"),
-        status_options=STATUS_OPTIONS,
         submission_success=submission_success,
     )
 
@@ -65,7 +60,12 @@ def hello_world_page(page_id: int):
 
 @app.route("/admin")
 def admin_page():
-    return render_template("admin.html", home_url=url_for("index"), submissions=submissions)
+    return render_template(
+        "admin.html",
+        home_url=url_for("index"),
+        submissions=submissions,
+        status_options=STATUS_OPTIONS,
+    )
 
 
 @app.route("/admin/submissions/<int:submission_id>/edit", methods=["GET", "POST"])
@@ -96,6 +96,20 @@ def edit_submission(submission_id: int):
         admin_url=url_for("admin_page"),
         status_options=STATUS_OPTIONS,
     )
+
+
+@app.route("/admin/submissions/<int:submission_id>/status", methods=["POST"])
+def update_submission_status(submission_id: int):
+    submission = _get_submission(submission_id)
+    if submission is None:
+        abort(404)
+
+    status = request.form.get("status", STATUS_OPTIONS[0]).strip()
+    if status not in STATUS_OPTIONS:
+        status = STATUS_OPTIONS[0]
+
+    submission["status"] = status
+    return redirect(url_for("admin_page"))
 
 
 @app.route("/admin/submissions/<int:submission_id>/delete", methods=["POST"])
