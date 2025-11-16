@@ -281,6 +281,7 @@
         let pollingHandle = null;
         let eventSource = null;
         let reconnectTimer = null;
+        const sseSupported = Boolean(window.EventSource);
         let isOpen = false;
 
         function renderMessage(message) {
@@ -364,7 +365,7 @@
           }
         }
 
-        function disconnectStream() {
+        function disconnectStream(enableFallback = false) {
           if (eventSource) {
             eventSource.close();
             eventSource = null;
@@ -373,16 +374,23 @@
             clearTimeout(reconnectTimer);
             reconnectTimer = null;
           }
+          if (enableFallback) {
+            startPolling();
+          }
         }
 
         function connectStream() {
-          if (!window.EventSource) {
+          if (!sseSupported) {
+            startPolling();
             return;
           }
           if (eventSource) {
             return;
           }
           eventSource = new EventSource(`/chat/stream?visitor_id=${encodeURIComponent(visitorId)}`);
+          eventSource.onopen = () => {
+            stopPolling();
+          };
           eventSource.onmessage = (event) => {
             try {
               const payload = JSON.parse(event.data);
@@ -392,7 +400,7 @@
             }
           };
           eventSource.onerror = () => {
-            disconnectStream();
+            disconnectStream(true);
             reconnectTimer = setTimeout(connectStream, 2000);
           };
         }
@@ -414,7 +422,7 @@
         }
 
         connectStream();
-        window.addEventListener("beforeunload", disconnectStream);
+        window.addEventListener("beforeunload", () => disconnectStream(false));
 
         toggle.addEventListener("click", () => setOpen(!isOpen));
         closeBtn.addEventListener("click", () => setOpen(false));
@@ -439,7 +447,7 @@
           }
         });
 
-        if (!window.EventSource) {
+        if (!sseSupported) {
           toggle.addEventListener("click", () => {
             if (!pollingHandle && isOpen) {
               startPolling();
