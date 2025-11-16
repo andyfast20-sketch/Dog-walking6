@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Contact Form</title>
+    <style>
+      body {
+        font-family: Arial, Helvetica, sans-serif;
+        margin: 2rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      form {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        max-width: 420px;
+      }
+      label {
+        display: flex;
+        flex-direction: column;
+        font-weight: 600;
+        gap: 0.35rem;
+      }
+      input,
+      textarea {
+        padding: 0.5rem;
+        border: 1px solid #cbd2d9;
+        border-radius: 4px;
+        font-size: 1rem;
+      }
+      textarea {
+        min-height: 120px;
+        resize: vertical;
+      }
+      button {
+        width: fit-content;
+        padding: 0.5rem 1rem;
+        background: #1f4ad1;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #1739a2;
+      }
+      .links {
+        display: flex;
+        gap: 1rem;
+      }
+      .links a {
+        color: #1f4ad1;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Contact Us</h1>
+    <p>Fill out the form below and we'll get back to you shortly.</p>
+    <form method="post" action="{{ form_action }}">
+      <label>
+        Name
+        <input type="text" name="name" required />
+      </label>
+      <label>
+        Email
+        <input type="email" name="email" required />
+      </label>
+      <label>
+        Phone
+        <input type="tel" name="phone" required />
+      </label>
+      <label>
+        Message
+        <textarea name="message" required></textarea>
+      </label>
+      <button type="submit">Send</button>
+    </form>
+    <div class="links">
+      <a href="{{ home_url }}">Return to Home</a>
+      <a href="{{ url_for('admin_page') }}">Go to Admin</a>
+    </div>
+  </body>
+</html>

@@ -10,18 +10,115 @@
         margin: 2rem;
         display: flex;
         flex-direction: column;
-        gap: 1rem;
+        gap: 1.5rem;
       }
+      a,
       button {
         width: fit-content;
         padding: 0.5rem 1rem;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      th,
+      td {
+        border: 1px solid #cbd2d9;
+        padding: 0.75rem;
+        text-align: left;
+      }
+      th {
+        background: #f4f6fb;
+      }
+      .actions {
+        display: flex;
+        gap: 0.5rem;
+      }
+      .single-entry {
+        border: 1px solid #cbd2d9;
+        border-radius: 6px;
+        padding: 1rem;
+      }
+      .single-entry h2 {
+        margin-top: 0;
+      }
+      .single-entry dl {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 0.5rem 1rem;
+      }
+      .single-entry dt {
+        font-weight: 600;
+      }
+      form.inline {
+        display: inline;
       }
     </style>
   </head>
   <body>
     <h1>Admin Page</h1>
-    <form action="{{ home_url }}">
-      <button type="submit">Return to Home</button>
-    </form>
+    <a href="{{ home_url }}">Return to Home</a>
+    {% if submissions %}
+    {% if submissions|length > 1 %}
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Message</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for submission in submissions %}
+        <tr>
+          <td>{{ submission.name }}</td>
+          <td>{{ submission.email }}</td>
+          <td>{{ submission.phone }}</td>
+          <td>{{ submission.message }}</td>
+          <td>
+            <div class="actions">
+              <a href="{{ url_for('edit_submission', submission_id=submission.id) }}">Edit</a>
+              <form
+                class="inline"
+                method="post"
+                action="{{ url_for('delete_submission', submission_id=submission.id) }}"
+              >
+                <button type="submit">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    {% set submission = submissions[0] %}
+    <div class="single-entry">
+      <h2>{{ submission.name }}</h2>
+      <dl>
+        <dt>Email</dt>
+        <dd>{{ submission.email }}</dd>
+        <dt>Phone</dt>
+        <dd>{{ submission.phone }}</dd>
+        <dt>Message</dt>
+        <dd>{{ submission.message }}</dd>
+      </dl>
+      <div class="actions">
+        <a href="{{ url_for('edit_submission', submission_id=submission.id) }}">Edit</a>
+        <form
+          class="inline"
+          method="post"
+          action="{{ url_for('delete_submission', submission_id=submission.id) }}"
+        >
+          <button type="submit">Delete</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+    {% else %}
+    <p>No submissions yet. Head back to <a href="{{ url_for('hello_world_page', page_id=1) }}">Page 1</a> to create one.</p>
+    {% endif %}
   </body>
 </html>
