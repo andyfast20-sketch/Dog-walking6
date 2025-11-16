@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from flask import Flask, abort, redirect, render_template, request, url_for
 
 app = Flask(__name__)
@@ -6,10 +8,61 @@ app = Flask(__name__)
 submissions = []
 next_submission_id = 1
 STATUS_OPTIONS = ["New", "In Process", "Finished"]
+visitor_stats = {}
+blocked_ips = set()
 
 
 def _get_submission(submission_id: int):
     return next((submission for submission in submissions if submission["id"] == submission_id), None)
+
+
+def _get_client_ip() -> str:
+    forwarded_for = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+    return forwarded_for or request.remote_addr or "Unknown"
+
+
+def _get_location_from_headers() -> str:
+    # These headers are commonly used by reverse proxies/CDNs to expose location data.
+    city = request.headers.get("X-AppEngine-City")
+    country = request.headers.get("CF-IPCountry")
+    region = request.headers.get("X-AppEngine-Region")
+    if city or region or country:
+        location_parts = [part for part in [city, region, country] if part]
+        return ", ".join(location_parts)
+    # Fall back to the Accept-Language header as a best-effort signal.
+    return request.headers.get("Accept-Language", "Unknown")
+
+
+def _record_visit(ip_address: str):
+    visitor = visitor_stats.setdefault(
+        ip_address,
+        {
+            "visits": 0,
+            "first_visit": datetime.utcnow(),
+            "last_visit": datetime.utcnow(),
+            "location": "Unknown",
+            "user_agent": "Unknown",
+            "accept_language": "Unknown",
+        },
+    )
+    visitor["visits"] += 1
+    visitor["last_visit"] = datetime.utcnow()
+    visitor["location"] = _get_location_from_headers() or visitor["location"]
+    visitor["user_agent"] = request.headers.get("User-Agent", visitor["user_agent"])
+    visitor["accept_language"] = request.headers.get("Accept-Language", visitor["accept_language"])
+
+
+@app.before_request
+def track_visitors_and_block():
+    if request.endpoint == "static":
+        return
+    ip_address = _get_client_ip()
+    _record_visit(ip_address)
+    if ip_address in blocked_ips and not request.path.startswith("/admin"):
+        return (
+            render_template("blocked.html", home_url=url_for("index")),
+            403,
+        )
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -60,11 +113,18 @@ def hello_world_page(page_id: int):
 
 @app.route("/admin")
 def admin_page():
+    visitor_rows = sorted(
+        visitor_stats.items(),
+        key=lambda item: item[1]["last_visit"],
+        reverse=True,
+    )
     return render_template(
         "admin.html",
         home_url=url_for("index"),
         submissions=submissions,
         status_options=STATUS_OPTIONS,
+        visitors=visitor_rows,
+        blocked_ips=blocked_ips,
     )
 
 
@@ -119,6 +179,18 @@ def delete_submission(submission_id: int):
         abort(404)
 
     submissions.remove(submission)
+    return redirect(url_for("admin_page"))
+
+
+@app.route("/admin/visitors/<path:ip_address>/block", methods=["POST"])
+def block_visitor(ip_address: str):
+    blocked_ips.add(ip_address)
+    return redirect(url_for("admin_page"))
+
+
+@app.route("/admin/visitors/<path:ip_address>/unblock", methods=["POST"])
+def unblock_visitor(ip_address: str):
+    blocked_ips.discard(ip_address)
     return redirect(url_for("admin_page"))
 
 
