@@ -86,6 +86,101 @@
       .empty-state {
         color: #6b7280;
       }
+      .booking-admin {
+        background: #fff;
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 15px 40px rgba(15, 23, 42, 0.08);
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      .slot-form {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+        align-items: end;
+      }
+      .slot-form label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        font-weight: 600;
+        color: #475569;
+      }
+      .slot-form input[type="date"] {
+        padding: 0.45rem 0.6rem;
+        border-radius: 10px;
+        border: 1px solid #cbd2d9;
+      }
+      .time-picker__options {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+      }
+      .time-button {
+        background: #e2e8f0;
+        color: #0f172a;
+        border-radius: 999px;
+        padding: 0.35rem 0.85rem;
+        cursor: pointer;
+        border: none;
+        font-weight: 600;
+      }
+      .time-button.selected {
+        background: #1f4ad1;
+        color: #fff;
+      }
+      .slot-columns {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1rem;
+      }
+      .slot-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+      }
+      .slot-list li {
+        padding: 0.9rem 1rem;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+      }
+      .slot-list strong {
+        display: block;
+        font-size: 1rem;
+        margin-bottom: 0.2rem;
+      }
+      .muted {
+        color: #64748b;
+        font-size: 0.9rem;
+      }
+      .slots-table {
+        border-collapse: collapse;
+        width: 100%;
+        background: #fff;
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .slots-table th,
+      .slots-table td {
+        border: 1px solid #e2e8f0;
+        padding: 0.75rem;
+        text-align: left;
+      }
+      .slots-table th {
+        background: #f8fafc;
+      }
+      .slot-status-form select {
+        padding: 0.35rem 0.5rem;
+        border-radius: 8px;
+        border: 1px solid #cbd2d9;
+      }
       .chat-panel {
         background: #fff;
         border-radius: 16px;
@@ -320,6 +415,125 @@
       </p>
       {% endif %}
     </section>
+
+    <section class="booking-admin">
+      <div>
+        <h2>Appointment slots</h2>
+        <p style="margin: 0; color: #475569">Publish dates and times visitors can book instantly.</p>
+      </div>
+      <form class="slot-form" method="post" action="{{ url_for('create_appointment_slot') }}">
+        <label>
+          Pick a date
+          <input type="date" name="date" min="{{ today }}" required />
+        </label>
+        <div>
+          <span style="font-weight: 600; color: #475569">Choose a time</span>
+          <input
+            type="hidden"
+            name="time"
+            id="slotTimeInput"
+            value="{{ time_choices[0] if time_choices else '' }}"
+            required
+          />
+          <div class="time-picker__options">
+            {% for option in time_choices %}
+            <button
+              type="button"
+              class="time-button {% if loop.first %}selected{% endif %}"
+              data-time-option="{{ option }}"
+            >
+              {{ option }}
+            </button>
+            {% endfor %}
+          </div>
+        </div>
+        <button type="submit">Add slot</button>
+      </form>
+      <div class="slot-columns">
+        <div>
+          <h3>Available slots</h3>
+          {% if available_slots %}
+          <ul class="slot-list">
+            {% for slot in available_slots %}
+            <li>
+              <strong>{{ slot.long_date_label }}</strong>
+              <span class="muted">{{ slot.time_label }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="empty-state">No open slots at the moment.</p>
+          {% endif %}
+        </div>
+        <div>
+          <h3>Booked slots</h3>
+          {% if booked_slots %}
+          <table class="slots-table">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Visitor</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for slot in booked_slots %}
+              <tr>
+                <td>
+                  <strong>{{ slot.long_date_label }}</strong>
+                  <div class="muted">{{ slot.time_label }}</div>
+                </td>
+                <td>
+                  <div>{{ slot.visitor_name or '—' }}</div>
+                  <div class="muted">{{ slot.visitor_email or '—' }}</div>
+                </td>
+                <td>
+                  <form
+                    class="slot-status-form"
+                    method="post"
+                    action="{{ url_for('update_slot_status', slot_id=slot.id) }}"
+                  >
+                    <select name="status" onchange="this.form.submit()">
+                      {% for option in booking_status_options %}
+                      <option value="{{ option }}" {% if option == (slot.workflow_status or 'New') %}selected{% endif %}>
+                        {{ option }}
+                      </option>
+                      {% endfor %}
+                    </select>
+                    <noscript><button type="submit">Update</button></noscript>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <p class="empty-state">Booked slots will appear here as visitors reserve them.</p>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+
+    <script>
+      (function () {
+        const timeButtons = document.querySelectorAll("[data-time-option]");
+        const timeInput = document.getElementById("slotTimeInput");
+        if (!timeInput || !timeButtons.length) {
+          return;
+        }
+        function select(button) {
+          timeButtons.forEach((btn) => btn.classList.toggle("selected", btn === button));
+          timeInput.value = button.dataset.timeOption || "";
+        }
+        const defaultButton = Array.from(timeButtons).find((btn) => btn.dataset.timeOption);
+        if (defaultButton) {
+          select(defaultButton);
+        }
+        timeButtons.forEach((button) => {
+          button.addEventListener("click", () => select(button));
+        });
+      })();
+    </script>
 
     <section>
       <h2>Visitor Insights</h2>
