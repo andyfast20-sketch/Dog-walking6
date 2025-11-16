@@ -101,6 +101,11 @@
         align-items: center;
         gap: 1rem;
       }
+      .chat-panel__actions {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
       .chat-indicator {
         padding: 0.35rem 0.75rem;
         border-radius: 999px;
@@ -125,6 +130,14 @@
         100% {
           transform: scale(1);
         }
+      }
+      .chat-panel__close {
+        background: #e2e8f0;
+        color: #0f172a;
+      }
+      .chat-panel__close:hover {
+        background: #cbd2d9;
+        color: #0f172a;
       }
       .chat-panel__body {
         max-height: 380px;
@@ -179,6 +192,23 @@
       }
       .hidden {
         display: none;
+      }
+      .chat-alert.flash {
+        animation: flashBg 1s steps(2, jump-start) infinite;
+      }
+      @keyframes flashBg {
+        0% {
+          box-shadow: 0 0 0 rgba(249, 115, 22, 0.3);
+          background: #fff7ed;
+        }
+        50% {
+          box-shadow: 0 0 25px rgba(249, 115, 22, 0.45);
+          background: #ffedd5;
+        }
+        100% {
+          box-shadow: 0 0 0 rgba(249, 115, 22, 0.3);
+          background: #fff7ed;
+        }
       }
     </style>
   </head>
@@ -313,9 +343,12 @@
           <h2>Live Visitor Chat</h2>
           <p style="margin: 0; color: #475569">Reply in real time to site visitors.</p>
         </div>
-        <span id="chatIndicator" class="chat-indicator {% if chat_unread %}active{% endif %}">
-          {% if chat_unread %}New message{% else %}All caught up{% endif %}
-        </span>
+        <div class="chat-panel__actions">
+          <span id="chatIndicator" class="chat-indicator {% if chat_unread %}active{% endif %}">
+            {% if chat_unread %}New message{% else %}All caught up{% endif %}
+          </span>
+          <button type="button" class="chat-panel__close" id="closeChatButton">Close</button>
+        </div>
       </div>
       <div class="chat-panel__body" id="adminChatMessages" aria-live="polite"></div>
       <form class="chat-panel__form" id="adminChatForm">
@@ -338,6 +371,11 @@
         const panel = document.getElementById("chatPanel");
         const statusMessage = document.getElementById("chatStatusMessage");
         const openButton = document.getElementById("openChatButton");
+        const closeButton = document.getElementById("closeChatButton");
+        const chatAlert = document.querySelector(".chat-alert");
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+        let audioUnlocked = false;
         if (!messagesEl || !form) {
           return;
         }
@@ -356,6 +394,60 @@
           indicator.textContent = state ? "New message" : "All caught up";
         }
 
+        function setFlash(state) {
+          if (!chatAlert) return;
+          if (state && !chatWindowOpen) {
+            chatAlert.classList.add("flash");
+          } else {
+            chatAlert.classList.remove("flash");
+          }
+        }
+
+        function ensureAudioContext() {
+          if (audioCtx || !AudioContext) {
+            return !!audioCtx;
+          }
+          try {
+            audioCtx = new AudioContext();
+          } catch (error) {
+            console.warn("Unable to initialize audio context", error);
+          }
+          return !!audioCtx;
+        }
+
+        function unlockAudioContext() {
+          if (audioUnlocked || !ensureAudioContext()) {
+            return;
+          }
+          if (audioCtx.state === "suspended") {
+            audioCtx.resume();
+          }
+          audioUnlocked = true;
+        }
+
+        function playNotificationSound() {
+          if (!ensureAudioContext()) return;
+          if (audioCtx.state === "suspended" && audioUnlocked) {
+            audioCtx.resume();
+          }
+          try {
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.type = "sine";
+            oscillator.frequency.value = 880;
+            gainNode.gain.value = 0.0001;
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+            gainNode.gain.exponentialRampToValueAtTime(0.15, now + 0.02);
+            gainNode.gain.exponentialRampToValueAtTime(0.00001, now + 0.35);
+            oscillator.start(now);
+            oscillator.stop(now + 0.4);
+          } catch (error) {
+            console.warn("Unable to play notification sound", error);
+          }
+        }
+
         function updateChatStatus(waiting) {
           if (statusMessage) {
             if (waiting) {
@@ -366,11 +458,16 @@
               statusMessage.textContent = "No visitors are currently waiting.";
             }
           }
-          if (openButton && !chatWindowOpen) {
-            openButton.disabled = !waiting;
-          } else if (openButton && chatWindowOpen) {
-            openButton.disabled = true;
+          if (openButton) {
+            if (chatWindowOpen) {
+              openButton.disabled = true;
+              openButton.textContent = "Chat window open";
+            } else {
+              openButton.disabled = false;
+              openButton.textContent = waiting ? "Respond to visitor" : "Open chat window";
+            }
           }
+          setFlash(waiting);
         }
 
         updateChatStatus(needsAttention);
@@ -438,6 +535,7 @@
             renderMessage(message);
           }
           if (message.sender === "visitor") {
+            playNotificationSound();
             if (chatWindowOpen) {
               shouldStickToBottom = true;
               markAsRead();
@@ -527,17 +625,41 @@
           if (!panel) return;
           chatWindowOpen = true;
           panel.classList.remove("hidden");
-          if (openButton) {
-            openButton.disabled = true;
-            openButton.textContent = "Chat window open";
-          }
+          updateChatStatus(false);
+          setFlash(false);
           shouldStickToBottom = true;
           renderAllMessages();
           markAsRead(true);
         }
 
+        function closeChatWindow() {
+          if (!panel) return;
+          chatWindowOpen = false;
+          panel.classList.add("hidden");
+          updateChatStatus(needsAttention);
+        }
+
+        const unlockEvents = [openButton, closeButton, form];
+        unlockEvents.forEach((element) => {
+          if (!element) return;
+          const eventName = element === form ? "submit" : "click";
+          element.addEventListener(eventName, unlockAudioContext, { once: true });
+        });
+
+        window.addEventListener(
+          "pointerdown",
+          () => {
+            unlockAudioContext();
+          },
+          { once: true }
+        );
+
         if (openButton) {
           openButton.addEventListener("click", openChatWindow);
+        }
+
+        if (closeButton) {
+          closeButton.addEventListener("click", closeChatWindow);
         }
 
         form.addEventListener("submit", async (event) => {
