@@ -33,6 +33,9 @@ chat_stream_subscribers = []
 chat_subscribers_lock = threading.Lock()
 appointment_slots = []
 next_slot_id = 1
+dog_breeds = []
+next_dog_breed_id = 1
+breed_ai_suggestions = None
 BOOKING_WORKFLOW_STATUSES = ["New", "In Progress", "Dealt With"]
 DEFAULT_TIME_CHOICES = [
     "08:00",
@@ -75,6 +78,22 @@ def _get_slot(slot_id: int):
     return next((slot for slot in appointment_slots if slot["id"] == slot_id), None)
 
 
+def _get_breed(breed_id: int):
+    return next((breed for breed in dog_breeds if breed["id"] == breed_id), None)
+
+
+def _normalize_breed_name(name: str) -> str:
+    return " ".join(name.split())
+
+
+def _breed_name_exists(name: str) -> bool:
+    return any(breed["name"].lower() == name.lower() for breed in dog_breeds)
+
+
+def _sorted_breeds():
+    return sorted(dog_breeds, key=lambda breed: breed["name"].lower())
+
+
 def _serialize_slot(slot: dict):
     date_label = slot["start"].strftime("%a %d %b")
     long_date_label = slot["start"].strftime("%A %d %B")
@@ -90,6 +109,7 @@ def _serialize_slot(slot: dict):
         "workflow_status": slot.get("workflow_status", ""),
         "visitor_name": slot.get("visitor_name") or "",
         "visitor_email": slot.get("visitor_email") or "",
+        "visitor_dog_breed": slot.get("visitor_dog_breed") or "",
     }
 
 
@@ -472,6 +492,7 @@ def index():
         form_action=url_for("index"),
         submission_success=submission_success,
         booking_slots=slot_rows,
+        dog_breeds=_sorted_breeds(),
     )
 
 
@@ -524,6 +545,8 @@ def admin_page():
         business_in_a_box=business_in_a_box,
         autopilot_model=AUTOPILOT_MODEL_NAME,
         autopilot_api_key_missing=_get_deepseek_api_key() is None,
+        dog_breeds=_sorted_breeds(),
+        breed_ai_suggestions=breed_ai_suggestions,
     )
 
 
@@ -549,6 +572,125 @@ def update_business_profile():
     return redirect(url_for("admin_page"))
 
 
+@app.route("/admin/dog-breeds", methods=["POST"])
+def add_dog_breed():
+    global next_dog_breed_id
+    name = (request.form.get("breed_name") or "").strip()
+    normalized = _normalize_breed_name(name)
+    if normalized and not _breed_name_exists(normalized):
+        dog_breeds.append({"id": next_dog_breed_id, "name": normalized})
+        next_dog_breed_id += 1
+    return redirect(url_for("admin_page"))
+
+
+@app.route("/admin/dog-breeds/<int:breed_id>/delete", methods=["POST"])
+def delete_dog_breed(breed_id: int):
+    global dog_breeds
+    dog_breeds = [breed for breed in dog_breeds if breed["id"] != breed_id]
+    return redirect(url_for("admin_page"))
+
+
+def _extract_json_object(payload: str):
+    try:
+        return json.loads(payload)
+    except json.JSONDecodeError:
+        start = payload.find("{")
+        end = payload.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            try:
+                return json.loads(payload[start : end + 1])
+            except json.JSONDecodeError:
+                pass
+    raise ValueError("Unable to parse JSON from DeepSeek response")
+
+
+@app.route("/admin/dog-breeds/ai", methods=["POST"])
+def request_breed_ai():
+    global breed_ai_suggestions
+    prompt = (request.form.get("breed_prompt") or "").strip()
+    if not prompt:
+        breed_ai_suggestions = None
+        return redirect(url_for("admin_page"))
+    breed_ai_suggestions = {
+        "prompt": prompt,
+        "add": [],
+        "remove": [],
+        "error": None,
+    }
+    existing_list = ", ".join(breed["name"] for breed in _sorted_breeds()) or "none"
+    system_message = (
+        "You help a dog walking service curate a list of breeds. Respond ONLY with JSON "
+        "matching this schema: {\"add\": [<breed>...], \"remove\": [<breed>...]}."
+        " Breeds must be well-known, single-line names in Title Case. Never duplicate entries. "
+        "Use \"add\" for breeds that match the request and \"remove\" for breeds that should be "
+        "taken off the list."
+    )
+    user_message = (
+        "Existing breeds: "
+        f"{existing_list}\nInstruction: {prompt}\nReturn JSON only without commentary."
+    )
+    try:
+        reply = _call_deepseek_chat_completion(
+            [
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": user_message},
+            ]
+        )
+        data = _extract_json_object(reply)
+    except Exception as exc:  # pylint: disable=broad-except
+        breed_ai_suggestions["error"] = str(exc)
+        return redirect(url_for("admin_page"))
+    add_items = []
+    remove_items = []
+    for key, target in (("add", add_items), ("remove", remove_items)):
+        for value in data.get(key, []):
+            value_str = _normalize_breed_name(str(value))
+            if value_str and value_str not in target:
+                target.append(value_str)
+    breed_ai_suggestions.update({"add": add_items, "remove": remove_items})
+    return redirect(url_for("admin_page"))
+
+
+@app.route("/admin/dog-breeds/ai/apply", methods=["POST"])
+def apply_breed_ai_suggestions():
+    global breed_ai_suggestions, dog_breeds, next_dog_breed_id
+    action = (request.form.get("action") or "").strip()
+    selected = []
+    for raw_name in request.form.getlist("breed"):
+        normalized = _normalize_breed_name(raw_name)
+        if normalized:
+            selected.append(normalized)
+    if not selected or action not in {"add", "remove"}:
+        return redirect(url_for("admin_page"))
+    if action == "add":
+        for name in selected:
+            if not _breed_name_exists(name):
+                dog_breeds.append({"id": next_dog_breed_id, "name": name})
+                next_dog_breed_id += 1
+    elif action == "remove":
+        target_names = {name.lower() for name in selected}
+        dog_breeds = [breed for breed in dog_breeds if breed["name"].lower() not in target_names]
+    if breed_ai_suggestions:
+        if action == "add":
+            breed_ai_suggestions["add"] = [
+                name for name in breed_ai_suggestions.get("add", []) if name not in selected
+            ]
+        else:
+            breed_ai_suggestions["remove"] = [
+                name for name in breed_ai_suggestions.get("remove", []) if name not in selected
+            ]
+        if not breed_ai_suggestions["add"] and not breed_ai_suggestions["remove"]:
+            breed_ai_suggestions = None
+    return redirect(url_for("admin_page"))
+
+
+@app.route("/admin/dog-breeds/ai/clear", methods=["POST"])
+def clear_breed_ai_suggestions():
+    global breed_ai_suggestions
+    breed_ai_suggestions = None
+    return redirect(url_for("admin_page"))
+
+
 @app.route("/admin/slots", methods=["POST"])
 def create_appointment_slot():
     global next_slot_id
@@ -567,6 +709,7 @@ def create_appointment_slot():
         "workflow_status": "",
         "visitor_name": None,
         "visitor_email": None,
+        "visitor_dog_breed": None,
     }
     appointment_slots.append(slot)
     appointment_slots.sort(key=lambda entry: entry["start"])
@@ -596,13 +739,25 @@ def book_appointment_slot(slot_id: int):
     payload = request.get_json(silent=True) or {}
     name = (payload.get("name") or request.form.get("name") or "").strip()
     email = (payload.get("email") or request.form.get("email") or "").strip()
+    breed_id_value = (payload.get("breed_id") or request.form.get("breed_id") or "").strip()
+    breed = None
+    if breed_id_value:
+        try:
+            breed_id = int(breed_id_value)
+        except (TypeError, ValueError):
+            breed_id = None
+        if breed_id is not None:
+            breed = _get_breed(breed_id)
     if not name or not email:
         return jsonify({"error": "Name and email are required"}), 400
+    if not breed:
+        return jsonify({"error": "Please select your dog's breed"}), 400
     slot.update(
         {
             "is_booked": True,
             "visitor_name": name,
             "visitor_email": email,
+            "visitor_dog_breed": breed["name"],
             "workflow_status": BOOKING_WORKFLOW_STATUSES[0],
             "booked_at": datetime.utcnow(),
         }

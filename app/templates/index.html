@@ -200,6 +200,11 @@
         color: #b91c1c;
         border: 1px solid #fecaca;
       }
+      .booking-modal__note {
+        font-size: 0.9rem;
+        color: #b91c1c;
+        margin: 0;
+      }
       body.modal-open {
         overflow: hidden;
       }
@@ -397,8 +402,24 @@
             Email address
             <input type="email" id="bookingEmail" required />
           </label>
+          {% set breeds_available = dog_breeds|length > 0 %}
+          {% if breeds_available %}
+          <label>
+            Dog breed
+            <select id="bookingBreed" required>
+              <option value="" disabled selected>Select a breed</option>
+              {% for breed in dog_breeds %}
+              <option value="{{ breed.id }}">{{ breed.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          {% else %}
+          <p class="booking-modal__note">
+            Add dog breeds from the admin page to enable bookings.
+          </p>
+          {% endif %}
           <div class="booking-modal__error hidden" id="bookingModalError"></div>
-          <button type="submit">Book this slot</button>
+          <button type="submit" {% if not breeds_available %}disabled{% endif %}>Book this slot</button>
         </form>
       </div>
     </div>
@@ -432,6 +453,7 @@
           const bookingSlotIdInput = document.getElementById("bookingSlotId");
           const bookingNameInput = document.getElementById("bookingName");
           const bookingEmailInput = document.getElementById("bookingEmail");
+          const bookingBreedInput = document.getElementById("bookingBreed");
           const bookingSlotSummary = document.getElementById("bookingSlotSummary");
           const bookingModalClose = document.getElementById("bookingModalClose");
           const bookingModalError = document.getElementById("bookingModalError");
@@ -509,6 +531,9 @@
               name: bookingNameInput.value.trim(),
               email: bookingEmailInput.value.trim(),
             };
+            if (bookingBreedInput) {
+              payload.breed_id = bookingBreedInput.value;
+            }
             const visitorName = payload.name || "there";
             if (bookingSubmit) {
               bookingSubmit.disabled = true;

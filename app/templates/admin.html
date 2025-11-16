@@ -316,6 +316,129 @@
         color: #6b7280;
         padding: 1.5rem 0.5rem;
       }
+      .breed-admin {
+        background: #fff;
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 12px 36px rgba(15, 23, 42, 0.08);
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      .breed-admin__grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 1.25rem;
+      }
+      .breed-admin form label {
+        font-weight: 600;
+        color: #475569;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+      .breed-admin form input[type="text"] {
+        padding: 0.45rem 0.6rem;
+        border-radius: 10px;
+        border: 1px solid #cbd2d9;
+      }
+      .breed-list-wrapper h3 {
+        margin: 0 0 0.35rem;
+      }
+      .breed-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 0.4rem 0.75rem;
+        font-size: 0.85rem;
+      }
+      @media (min-width: 900px) {
+        .breed-list {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+      .breed-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.35rem;
+        background: #f1f5f9;
+        padding: 0.35rem 0.6rem;
+        border-radius: 999px;
+      }
+      .breed-item form {
+        margin: 0;
+      }
+      .breed-remove-btn {
+        background: transparent;
+        color: #ef4444;
+        padding: 0;
+        width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        border: none;
+        font-size: 1rem;
+      }
+      .breed-remove-btn:hover {
+        background: rgba(239, 68, 68, 0.12);
+      }
+      .breed-ai-panel {
+        border-top: 1px solid #e2e8f0;
+        padding-top: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .breed-ai-panel__form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .breed-ai-panel__form input[type="text"] {
+        padding: 0.5rem 0.65rem;
+        border: 1px solid #cbd2d9;
+        border-radius: 10px;
+      }
+      .breed-ai-results {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1rem;
+      }
+      .breed-ai-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 0.85rem 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .breed-ai-card__list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        max-height: 220px;
+        overflow-y: auto;
+      }
+      .breed-ai-card__list label {
+        display: flex;
+        gap: 0.35rem;
+        font-size: 0.9rem;
+        align-items: center;
+      }
+      .breed-ai-panel__error {
+        color: #b91c1c;
+        background: #fee2e2;
+        border: 1px solid #fecaca;
+        padding: 0.65rem 0.85rem;
+        border-radius: 10px;
+        font-weight: 600;
+      }
+      .breed-ai-panel__dismiss {
+        display: flex;
+        justify-content: flex-end;
+      }
       .hidden {
         display: none;
       }
@@ -542,6 +665,94 @@
         <button type="submit">Save playbook</button>
       </form>
     </section>
+    <section class="breed-admin">
+      <div>
+        <h2>Dog breeds</h2>
+        <p style="margin: 0; color: #475569">
+          Curate the breed list shown to visitors during booking.
+        </p>
+      </div>
+      <div class="breed-admin__grid">
+        <form method="post" action="{{ url_for('add_dog_breed') }}">
+          <label>
+            Add a breed
+            <input type="text" name="breed_name" placeholder="e.g. Cavalier King Charles Spaniel" required />
+          </label>
+          <button type="submit">Add breed</button>
+        </form>
+        <div class="breed-list-wrapper">
+          <h3>Active breeds</h3>
+          {% if dog_breeds %}
+          <ul class="breed-list">
+            {% for breed in dog_breeds %}
+            <li class="breed-item">
+              <span>{{ breed.name }}</span>
+              <form method="post" action="{{ url_for('delete_dog_breed', breed_id=breed.id) }}">
+                <button class="breed-remove-btn" type="submit" aria-label="Remove {{ breed.name }}">&times;</button>
+              </form>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="empty-state" style="font-size: 0.9rem">No breeds have been added yet.</p>
+          {% endif %}
+        </div>
+      </div>
+      <div class="breed-ai-panel">
+        <h3>Ask AI for help</h3>
+        <p class="muted" style="margin: 0">
+          DeepSeek will suggest breeds to add or remove. Describe what you need and review the results before applying them.
+        </p>
+        <form class="breed-ai-panel__form" method="post" action="{{ url_for('request_breed_ai') }}">
+          <label>
+            Prompt
+            <input type="text" name="breed_prompt" placeholder="e.g. Add 10 small friendly breeds" required />
+          </label>
+          <button type="submit">Ask AI</button>
+        </form>
+        {% if breed_ai_suggestions %}
+        {% if breed_ai_suggestions.error %}
+        <p class="breed-ai-panel__error">{{ breed_ai_suggestions.error }}</p>
+        {% else %}
+        <div class="breed-ai-results">
+          {% if breed_ai_suggestions.add %}
+          <form class="breed-ai-card" method="post" action="{{ url_for('apply_breed_ai_suggestions') }}">
+            <input type="hidden" name="action" value="add" />
+            <strong>Add these breeds?</strong>
+            <div class="breed-ai-card__list">
+              {% for name in breed_ai_suggestions.add %}
+              <label>
+                <input type="checkbox" name="breed" value="{{ name }}" checked />
+                {{ name }}
+              </label>
+              {% endfor %}
+            </div>
+            <button type="submit">Add selected</button>
+          </form>
+          {% endif %}
+          {% if breed_ai_suggestions.remove %}
+          <form class="breed-ai-card" method="post" action="{{ url_for('apply_breed_ai_suggestions') }}">
+            <input type="hidden" name="action" value="remove" />
+            <strong>Remove these breeds?</strong>
+            <div class="breed-ai-card__list">
+              {% for name in breed_ai_suggestions.remove %}
+              <label>
+                <input type="checkbox" name="breed" value="{{ name }}" checked />
+                {{ name }}
+              </label>
+              {% endfor %}
+            </div>
+            <button type="submit">Remove selected</button>
+          </form>
+          {% endif %}
+        </div>
+        {% endif %}
+        <form class="breed-ai-panel__dismiss" method="post" action="{{ url_for('clear_breed_ai_suggestions') }}">
+          <button type="submit">Dismiss suggestions</button>
+        </form>
+        {% endif %}
+      </div>
+    </section>
     <section>
       <h2>Enquiries</h2>
       {% if submissions %}
@@ -674,6 +885,9 @@
                 <td>
                   <div>{{ slot.visitor_name or '—' }}</div>
                   <div class="muted">{{ slot.visitor_email or '—' }}</div>
+                  {% if slot.visitor_dog_breed %}
+                  <div class="muted">Breed: {{ slot.visitor_dog_breed }}</div>
+                  {% endif %}
                 </td>
                 <td>
                   <form
