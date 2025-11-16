@@ -11,15 +11,35 @@
         display: flex;
         flex-direction: column;
         gap: 1.5rem;
+        background: #f8fafc;
       }
       a,
       button {
         width: fit-content;
         padding: 0.5rem 1rem;
+        border-radius: 999px;
+        border: none;
+        background: #1f4ad1;
+        color: #fff;
+        cursor: pointer;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+      }
+      a:hover,
+      button:hover {
+        background: #1739a2;
       }
       table {
         border-collapse: collapse;
         width: 100%;
+        background: #fff;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 10px 40px rgba(15, 23, 42, 0.08);
       }
       th,
       td {
@@ -50,6 +70,96 @@
       }
       .empty-state {
         color: #6b7280;
+      }
+      .chat-panel {
+        background: #fff;
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      .chat-panel__header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+      }
+      .chat-indicator {
+        padding: 0.35rem 0.75rem;
+        border-radius: 999px;
+        background: #e2e8f0;
+        color: #1f2937;
+        font-size: 0.85rem;
+        font-weight: 600;
+        transition: transform 0.2s ease, background 0.2s ease;
+      }
+      .chat-indicator.active {
+        background: #f97316;
+        color: #fff;
+        animation: pulse 1s infinite;
+      }
+      @keyframes pulse {
+        0% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.08);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+      .chat-panel__body {
+        max-height: 380px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1rem;
+        background: #f8fafc;
+      }
+      .chat-row {
+        display: flex;
+      }
+      .chat-row.admin {
+        justify-content: flex-end;
+      }
+      .chat-row .bubble {
+        padding: 0.6rem 0.85rem;
+        border-radius: 12px;
+        max-width: 70%;
+        font-size: 0.95rem;
+      }
+      .chat-row.admin .bubble {
+        background: #1f4ad1;
+        color: #fff;
+        border-bottom-right-radius: 4px;
+      }
+      .chat-row.visitor .bubble {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        color: #0f172a;
+        border-bottom-left-radius: 4px;
+      }
+      .chat-panel__form {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+      }
+      .chat-panel__form input {
+        flex: 1;
+        padding: 0.55rem 0.9rem;
+        border-radius: 999px;
+        border: 1px solid #cbd2d9;
+        font-size: 1rem;
+      }
+      .chat-panel__form button {
+        margin: 0;
+        border-radius: 999px;
       }
     </style>
   </head>
@@ -113,8 +223,7 @@
       </table>
       {% else %}
       <p class="empty-state">
-        No submissions yet. Head back to the <a href="{{ home_url }}">home page</a> to create
-        one.
+        No submissions yet. Head back to the <a href="{{ home_url }}">home page</a> to create one.
       </p>
       {% endif %}
     </section>
@@ -147,19 +256,11 @@
             <td>{{ details.accept_language }}</td>
             <td>
               {% if ip in blocked_ips %}
-              <form
-                class="inline"
-                method="post"
-                action="{{ url_for('unblock_visitor', ip_address=ip) }}"
-              >
+              <form class="inline" method="post" action="{{ url_for('unblock_visitor', ip_address=ip) }}">
                 <button type="submit">Unblock</button>
               </form>
               {% else %}
-              <form
-                class="inline"
-                method="post"
-                action="{{ url_for('block_visitor', ip_address=ip) }}"
-              >
+              <form class="inline" method="post" action="{{ url_for('block_visitor', ip_address=ip) }}">
                 <button type="submit">Block</button>
               </form>
               {% endif %}
@@ -172,5 +273,119 @@
       <p class="empty-state">No visitor data collected yet.</p>
       {% endif %}
     </section>
+
+    <section class="chat-panel" id="chatPanel">
+      <div class="chat-panel__header">
+        <div>
+          <h2>Live Visitor Chat</h2>
+          <p style="margin: 0; color: #475569">Reply in real time to site visitors.</p>
+        </div>
+        <span id="chatIndicator" class="chat-indicator {% if chat_unread %}active{% endif %}">
+          {% if chat_unread %}New message{% else %}All caught up{% endif %}
+        </span>
+      </div>
+      <div class="chat-panel__body" id="adminChatMessages" aria-live="polite"></div>
+      <form class="chat-panel__form" id="adminChatForm">
+        <input
+          type="text"
+          id="adminChatInput"
+          autocomplete="off"
+          placeholder="Write a friendly reply..."
+          required
+        />
+        <button type="submit">Send</button>
+      </form>
+    </section>
+    <script>
+      (function () {
+        const messagesEl = document.getElementById("adminChatMessages");
+        const form = document.getElementById("adminChatForm");
+        const input = document.getElementById("adminChatInput");
+        const indicator = document.getElementById("chatIndicator");
+        const panel = document.getElementById("chatPanel");
+        if (!messagesEl || !form) {
+          return;
+        }
+        let lastMessageId = 0;
+        let needsAttention = indicator && indicator.classList.contains("active");
+
+        function setIndicator(state) {
+          if (!indicator) return;
+          indicator.classList.toggle("active", state);
+          indicator.textContent = state ? "New message" : "All caught up";
+        }
+
+        function renderMessage(message) {
+          const row = document.createElement("div");
+          row.className = `chat-row ${message.sender}`;
+          const bubble = document.createElement("div");
+          bubble.className = "bubble";
+          bubble.textContent = message.body;
+          row.appendChild(bubble);
+          messagesEl.appendChild(row);
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        async function fetchMessages() {
+          try {
+            const response = await fetch(`/chat/messages?after=${lastMessageId}`);
+            if (!response.ok) return;
+            const data = await response.json();
+            if (data.messages && data.messages.length) {
+              data.messages.forEach((msg) => {
+                renderMessage(msg);
+                lastMessageId = Math.max(lastMessageId, msg.id);
+              });
+              if (data.messages.some((msg) => msg.sender === "visitor")) {
+                needsAttention = true;
+                setIndicator(true);
+              }
+            }
+          } catch (error) {
+            console.error("Unable to load chat messages", error);
+          }
+        }
+
+        async function markAsRead() {
+          if (!needsAttention) return;
+          needsAttention = false;
+          setIndicator(false);
+          try {
+            await fetch("/admin/chat/read", { method: "POST" });
+          } catch (error) {
+            console.error("Unable to mark chat as read", error);
+          }
+        }
+
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const value = input.value.trim();
+          if (!value) return;
+          try {
+            const response = await fetch("/chat/messages", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ sender: "admin", body: value }),
+            });
+            if (response.ok) {
+              input.value = "";
+              await fetchMessages();
+              markAsRead();
+            }
+          } catch (error) {
+            console.error("Unable to send chat response", error);
+          }
+        });
+
+        setInterval(fetchMessages, 4000);
+        fetchMessages();
+        panel.addEventListener("click", markAsRead);
+        panel.addEventListener("mouseenter", markAsRead);
+        window.addEventListener("focus", () => {
+          fetchMessages();
+          markAsRead();
+        });
+      })();
+    </script>
   </body>
 </html>

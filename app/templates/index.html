@@ -14,6 +14,7 @@
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
         gap: 2rem;
+        min-height: 100vh;
       }
       h1 {
         margin-bottom: 0.5rem;
@@ -84,6 +85,104 @@
         color: #027a48;
         border: 1px solid #a6f4c5;
       }
+      .chat-toggle {
+        position: fixed;
+        bottom: 1.5rem;
+        right: 1.5rem;
+        border-radius: 999px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.2);
+        z-index: 5;
+      }
+      .chat-widget {
+        position: fixed;
+        bottom: 5rem;
+        right: 1.5rem;
+        width: min(360px, 90vw);
+        background: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 25px 60px rgba(15, 23, 42, 0.15);
+        display: flex;
+        flex-direction: column;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        overflow: hidden;
+        z-index: 10;
+      }
+      .chat-widget.hidden {
+        display: none;
+      }
+      .chat-header {
+        background: linear-gradient(135deg, #1f4ad1, #5b7cfa);
+        color: #fff;
+        padding: 1rem 1.25rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 0.75rem;
+      }
+      .chat-header strong {
+        font-size: 1rem;
+      }
+      .chat-header p {
+        margin: 0.15rem 0 0;
+        font-size: 0.85rem;
+        opacity: 0.8;
+      }
+      .chat-close {
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 999px;
+        width: 32px;
+        height: 32px;
+        border: none;
+        color: #fff;
+        font-size: 1.2rem;
+        cursor: pointer;
+      }
+      .chat-messages {
+        max-height: 320px;
+        overflow-y: auto;
+        padding: 1rem;
+        background: #f8fafc;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .chat-message {
+        display: flex;
+      }
+      .chat-message.visitor {
+        justify-content: flex-end;
+      }
+      .chat-message .bubble {
+        padding: 0.65rem 0.9rem;
+        border-radius: 16px;
+        max-width: 80%;
+        font-size: 0.95rem;
+      }
+      .chat-message.visitor .bubble {
+        background: #1f4ad1;
+        color: #fff;
+        border-bottom-right-radius: 4px;
+      }
+      .chat-message.admin .bubble {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        color: #0f172a;
+        border-bottom-left-radius: 4px;
+      }
+      .chat-form {
+        display: flex;
+        padding: 0.85rem 1rem 1.1rem;
+        gap: 0.5rem;
+        border-top: 1px solid #e2e8f0;
+      }
+      .chat-form input {
+        flex: 1;
+        border-radius: 999px;
+        padding: 0.5rem 0.9rem;
+      }
+      .chat-form button {
+        border-radius: 999px;
+      }
     </style>
   </head>
   <body>
@@ -122,5 +221,119 @@
         {% endif %}
       </form>
     </section>
+    <button class="chat-toggle" id="chatToggle" aria-expanded="false">Live Chat</button>
+    <div class="chat-widget hidden" id="chatWidget" role="dialog" aria-label="Live chat">
+      <div class="chat-header">
+        <div>
+          <strong>Chat with us</strong>
+          <p>We're online and happy to help.</p>
+        </div>
+        <button class="chat-close" id="chatClose" aria-label="Close chat">&times;</button>
+      </div>
+      <div class="chat-messages" id="chatMessages" aria-live="polite"></div>
+      <form class="chat-form" id="chatForm">
+        <input
+          type="text"
+          id="chatInput"
+          autocomplete="off"
+          placeholder="Type your message..."
+          required
+        />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+    <script>
+      (function () {
+        const widget = document.getElementById("chatWidget");
+        const toggle = document.getElementById("chatToggle");
+        const closeBtn = document.getElementById("chatClose");
+        const form = document.getElementById("chatForm");
+        const input = document.getElementById("chatInput");
+        const messagesEl = document.getElementById("chatMessages");
+        let lastMessageId = 0;
+        let pollingHandle = null;
+        let isOpen = false;
+
+        function renderMessage(message) {
+          const wrapper = document.createElement("div");
+          wrapper.className = `chat-message ${message.sender}`;
+          const bubble = document.createElement("div");
+          bubble.className = "bubble";
+          bubble.textContent = message.body;
+          wrapper.appendChild(bubble);
+          messagesEl.appendChild(wrapper);
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        async function loadMessages() {
+          try {
+            const response = await fetch(`/chat/messages?after=${lastMessageId}`);
+            if (!response.ok) return;
+            const data = await response.json();
+            if (data.messages && data.messages.length) {
+              data.messages.forEach((msg) => {
+                renderMessage(msg);
+                lastMessageId = Math.max(lastMessageId, msg.id);
+              });
+            }
+          } catch (error) {
+            console.error("Unable to load chat messages", error);
+          }
+        }
+
+        function startPolling() {
+          if (pollingHandle) return;
+          loadMessages();
+          pollingHandle = setInterval(loadMessages, 4000);
+        }
+
+        function stopPolling() {
+          if (pollingHandle) {
+            clearInterval(pollingHandle);
+            pollingHandle = null;
+          }
+        }
+
+        function setOpen(state) {
+          isOpen = state;
+          widget.classList.toggle("hidden", !state);
+          toggle.setAttribute("aria-expanded", state ? "true" : "false");
+          if (state) {
+            startPolling();
+            setTimeout(() => input.focus(), 100);
+          } else {
+            stopPolling();
+          }
+        }
+
+        toggle.addEventListener("click", () => setOpen(!isOpen));
+        closeBtn.addEventListener("click", () => setOpen(false));
+
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const value = input.value.trim();
+          if (!value) return;
+          try {
+            const response = await fetch("/chat/messages", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ sender: "visitor", body: value }),
+            });
+            if (response.ok) {
+              input.value = "";
+              loadMessages();
+            }
+          } catch (error) {
+            console.error("Unable to send message", error);
+          }
+        });
+
+        window.addEventListener("focus", () => {
+          if (isOpen) {
+            loadMessages();
+          }
+        });
+      })();
+    </script>
   </body>
 </html>
