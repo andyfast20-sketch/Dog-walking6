@@ -1,6 +1,9 @@
 import json
+import os
 import queue
 import threading
+import urllib.error
+import urllib.request
 from datetime import datetime
 from typing import Optional
 
@@ -44,6 +47,24 @@ DEFAULT_TIME_CHOICES = [
 
 
 IGNORED_USER_AGENT_KEYWORDS = ["vercel-screenshot"]
+
+AUTOPILOT_MODEL_NAME = "deepseek-chat"
+BUSINESS_BOX_DEFAULT = (
+    "Happy Trails Dog Walking is a turnkey business-in-a-box that provides daily dog walks, "
+    "vacation pet sitting, and concierge-style updates for busy pet parents in town. We focus "
+    "on reliable scheduling, GPS-tracked adventures, photo journals, and easy online booking. "
+    "Let visitors know how we onboard pets, what areas we cover, pricing cues (premium yet "
+    "friendly), and how to move from a chat to a booked meet-and-greet."
+)
+business_in_a_box = BUSINESS_BOX_DEFAULT
+autopilot_enabled = False
+autopilot_status = {
+    "state": "off",
+    "last_run": None,
+    "last_error": None,
+    "last_reply_preview": None,
+    "last_visitor_id": None,
+}
 
 
 def _get_submission(submission_id: int):
@@ -98,6 +119,99 @@ def _should_ignore_user_agent(user_agent: str) -> bool:
         return False
     ua = user_agent.lower()
     return any(keyword in ua for keyword in IGNORED_USER_AGENT_KEYWORDS)
+
+
+def _get_deepseek_api_key() -> Optional[str]:
+    return os.environ.get("DEEPSEEK_API_KEY")
+
+
+def _build_autopilot_messages(conversation: dict):
+    global business_in_a_box
+    history = conversation.get("messages", [])
+    trimmed_history = history[-12:]
+    system_prompt = (
+        "You are Autopilot, a professional concierge for a dog walking and pet-care service. "
+        "Respond with warmth, actionable next steps, and remind visitors they can book a meet-"
+        "and-greet or slot from the site. Keep replies under 4 short paragraphs. Reference the "
+        "business-in-a-box brief below. If a question falls outside the brief, politely offer to "
+        "connect them with a human."
+        f"\n\nBusiness-in-a-box brief:\n{business_in_a_box.strip()}"
+    )
+    messages = [{"role": "system", "content": system_prompt}]
+    for message in trimmed_history:
+        sender = message.get("sender", "visitor")
+        role = "assistant" if sender != "visitor" else "user"
+        body = message.get("body", "")
+        if not body:
+            continue
+        messages.append({"role": role, "content": body})
+    return messages
+
+
+def _call_deepseek_chat_completion(messages):
+    api_key = _get_deepseek_api_key()
+    if not api_key:
+        raise RuntimeError("Missing DEEPSEEK_API_KEY environment variable")
+    payload = json.dumps(
+        {
+            "model": AUTOPILOT_MODEL_NAME,
+            "messages": messages,
+            "temperature": 0.6,
+            "max_tokens": 600,
+        }
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        "https://api.deepseek.com/v1/chat/completions",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:  # nosec B310
+            raw_body = response.read().decode("utf-8")
+    except urllib.error.HTTPError as exc:
+        error_body = exc.read().decode("utf-8") if exc.fp else exc.reason
+        raise RuntimeError(f"DeepSeek error {exc.code}: {error_body}") from exc
+    except urllib.error.URLError as exc:  # pragma: no cover - network failures
+        raise RuntimeError(f"DeepSeek network error: {exc.reason}") from exc
+    payload = json.loads(raw_body)
+    choices = payload.get("choices") or []
+    if not choices:
+        raise RuntimeError("DeepSeek response did not include choices")
+    content = choices[0].get("message", {}).get("content", "")
+    return content.strip()
+
+
+def _run_autopilot_if_needed(visitor_id: str):
+    global autopilot_status
+    if not autopilot_enabled or not visitor_id:
+        return
+    conversation = _get_conversation(visitor_id)
+    if not conversation or not conversation.get("messages"):
+        return
+    autopilot_status.update(
+        {
+            "state": "responding",
+            "last_run": datetime.utcnow().isoformat(),
+            "last_error": None,
+            "last_reply_preview": None,
+            "last_visitor_id": visitor_id,
+        }
+    )
+    try:
+        messages = _build_autopilot_messages(conversation)
+        reply = _call_deepseek_chat_completion(messages)
+    except Exception as exc:  # pylint: disable=broad-except
+        autopilot_status.update({"state": "error", "last_error": str(exc)})
+        return
+    if not reply:
+        autopilot_status.update({"state": "no_reply", "last_reply_preview": None})
+        return
+    autopilot_status.update({"state": "answered", "last_reply_preview": reply[:200].strip()})
+    _add_chat_message("admin", reply, visitor_id, trigger_autopilot=False)
 
 
 def _record_visit(ip_address: str):
@@ -199,7 +313,13 @@ def _mark_conversation_as_read(visitor_id: Optional[str] = None):
                 message["seen_by_admin"] = True
 
 
-def _add_chat_message(sender: str, body: str, visitor_id: str, ip_address: Optional[str] = None):
+def _add_chat_message(
+    sender: str,
+    body: str,
+    visitor_id: str,
+    ip_address: Optional[str] = None,
+    trigger_autopilot: bool = True,
+):
     global next_chat_message_id
     visitor_id = visitor_id or _get_client_ip()
     conversation = _get_conversation(visitor_id, create=True, ip_address=ip_address)
@@ -216,6 +336,8 @@ def _add_chat_message(sender: str, body: str, visitor_id: str, ip_address: Optio
     conversation["last_message_at"] = datetime.utcnow()
     next_chat_message_id += 1
     _broadcast_chat_update({"type": "message", "message": message})
+    if trigger_autopilot and sender == "visitor":
+        _run_autopilot_if_needed(visitor_id)
     return message
 
 
@@ -394,7 +516,34 @@ def admin_page():
         booking_status_options=BOOKING_WORKFLOW_STATUSES,
         time_choices=DEFAULT_TIME_CHOICES,
         today=datetime.utcnow().strftime("%Y-%m-%d"),
+        autopilot_enabled=autopilot_enabled,
+        autopilot_status=autopilot_status,
+        business_in_a_box=business_in_a_box,
+        autopilot_model=AUTOPILOT_MODEL_NAME,
+        autopilot_api_key_missing=_get_deepseek_api_key() is None,
     )
+
+
+@app.route("/admin/autopilot", methods=["POST"])
+def toggle_autopilot():
+    global autopilot_enabled, autopilot_status
+    enabled_value = request.form.get("enabled", "0")
+    autopilot_enabled = enabled_value == "1"
+    autopilot_status.update(
+        {
+            "state": "on" if autopilot_enabled else "off",
+            "last_error": None if autopilot_enabled else autopilot_status.get("last_error"),
+        }
+    )
+    return redirect(url_for("admin_page"))
+
+
+@app.route("/admin/business-profile", methods=["POST"])
+def update_business_profile():
+    global business_in_a_box
+    description = (request.form.get("business_box") or "").strip()
+    business_in_a_box = description or BUSINESS_BOX_DEFAULT
+    return redirect(url_for("admin_page"))
 
 
 @app.route("/admin/slots", methods=["POST"])
