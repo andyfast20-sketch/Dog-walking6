@@ -315,6 +315,16 @@
           indicator.textContent = state ? "New message" : "All caught up";
         }
 
+        let shouldStickToBottom = true;
+
+        function updateStickToBottom() {
+          const { scrollTop, scrollHeight, clientHeight } = messagesEl;
+          const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
+          shouldStickToBottom = distanceFromBottom <= 40;
+        }
+
+        messagesEl.addEventListener("scroll", updateStickToBottom);
+
         function renderMessage(message) {
           const row = document.createElement("div");
           row.className = `chat-row ${message.sender}`;
@@ -323,7 +333,9 @@
           bubble.textContent = message.body;
           row.appendChild(bubble);
           messagesEl.appendChild(row);
-          messagesEl.scrollTop = messagesEl.scrollHeight;
+          if (shouldStickToBottom) {
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+          }
         }
 
         async function fetchMessages() {
@@ -369,6 +381,7 @@
             });
             if (response.ok) {
               input.value = "";
+              shouldStickToBottom = true;
               await fetchMessages();
               markAsRead();
             }
