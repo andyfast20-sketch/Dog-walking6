@@ -341,11 +341,14 @@
         if (!messagesEl || !form) {
           return;
         }
-        let lastMessageId = 0;
-        let statusLastMessageId = 0;
         let needsAttention = indicator && indicator.classList.contains("active");
         let chatWindowOpen = false;
         const cachedMessages = [];
+        const messageIds = new Set();
+        let legacyLastMessageId = 0;
+        let shouldStickToBottom = true;
+        let eventSource = null;
+        let reconnectTimer = null;
 
         function setIndicator(state) {
           if (!indicator) return;
@@ -354,22 +357,23 @@
         }
 
         function updateChatStatus(waiting) {
-          if (!statusMessage || !openButton) return;
-          if (waiting) {
-            statusMessage.textContent = "A visitor is waiting to chat.";
-          } else if (chatWindowOpen) {
-            statusMessage.textContent = "Chat window is open.";
-          } else {
-            statusMessage.textContent = "No visitors are currently waiting.";
+          if (statusMessage) {
+            if (waiting) {
+              statusMessage.textContent = "A visitor is waiting to chat.";
+            } else if (chatWindowOpen) {
+              statusMessage.textContent = "Chat window is open.";
+            } else {
+              statusMessage.textContent = "No visitors are currently waiting.";
+            }
           }
-          if (!chatWindowOpen) {
+          if (openButton && !chatWindowOpen) {
             openButton.disabled = !waiting;
+          } else if (openButton && chatWindowOpen) {
+            openButton.disabled = true;
           }
         }
 
         updateChatStatus(needsAttention);
-
-        let shouldStickToBottom = true;
 
         function updateStickToBottom() {
           const { scrollTop, scrollHeight, clientHeight } = messagesEl;
@@ -392,38 +396,21 @@
           }
         }
 
-        function renderCachedMessages() {
+        function renderAllMessages() {
           messagesEl.innerHTML = "";
-          cachedMessages.forEach((msg) => renderMessage(msg));
+          cachedMessages
+            .slice()
+            .sort((a, b) => a.id - b.id)
+            .forEach((msg) => renderMessage(msg));
           messagesEl.scrollTop = messagesEl.scrollHeight;
         }
 
-        async function fetchMessages() {
-          try {
-            const response = await fetch(`/chat/messages?after=${statusLastMessageId}`, {
-              cache: "no-store",
-            });
-            if (!response.ok) return;
-            const data = await response.json();
-            if (data.messages && data.messages.length) {
-              const hasVisitorMessage = data.messages.some((msg) => msg.sender === "visitor");
-              data.messages.forEach((msg) => {
-                cachedMessages.push(msg);
-                statusLastMessageId = Math.max(statusLastMessageId, msg.id);
-                if (chatWindowOpen) {
-                  renderMessage(msg);
-                  lastMessageId = Math.max(lastMessageId, msg.id);
-                }
-              });
-              if (hasVisitorMessage) {
-                needsAttention = true;
-                setIndicator(true);
-                updateChatStatus(true);
-              }
+        function markCachedMessagesAsRead() {
+          cachedMessages.forEach((msg) => {
+            if (msg.sender === "visitor") {
+              msg.seen_by_admin = true;
             }
-          } catch (error) {
-            console.error("Unable to load chat messages", error);
-          }
+          });
         }
 
         async function markAsRead(force = false) {
@@ -431,11 +418,109 @@
           needsAttention = false;
           setIndicator(false);
           updateChatStatus(false);
+          markCachedMessagesAsRead();
           try {
             await fetch("/admin/chat/read", { method: "POST" });
           } catch (error) {
             console.error("Unable to mark chat as read", error);
           }
+        }
+
+        function handleNewMessage(message, fromHistory = false) {
+          if (!message || messageIds.has(message.id)) {
+            return;
+          }
+          messageIds.add(message.id);
+          cachedMessages.push(message);
+          cachedMessages.sort((a, b) => a.id - b.id);
+          legacyLastMessageId = Math.max(legacyLastMessageId, message.id || 0);
+          if (chatWindowOpen) {
+            renderMessage(message);
+          }
+          if (message.sender === "visitor") {
+            if (chatWindowOpen) {
+              shouldStickToBottom = true;
+              markAsRead();
+            } else if (!fromHistory) {
+              needsAttention = true;
+              setIndicator(true);
+              updateChatStatus(true);
+            }
+          }
+        }
+
+        function handleHistory(messages) {
+          cachedMessages.length = 0;
+          messageIds.clear();
+          let hasUnreadVisitorMessage = false;
+          messages
+            .slice()
+            .sort((a, b) => a.id - b.id)
+            .forEach((msg) => {
+              cachedMessages.push(msg);
+              messageIds.add(msg.id);
+              legacyLastMessageId = Math.max(legacyLastMessageId, msg.id || 0);
+              if (msg.sender === "visitor" && !msg.seen_by_admin) {
+                hasUnreadVisitorMessage = true;
+              }
+            });
+          if (chatWindowOpen) {
+            renderAllMessages();
+          }
+          if (hasUnreadVisitorMessage && !chatWindowOpen) {
+            needsAttention = true;
+            setIndicator(true);
+            updateChatStatus(true);
+          } else if (!hasUnreadVisitorMessage) {
+            needsAttention = false;
+            setIndicator(false);
+            updateChatStatus(false);
+          }
+        }
+
+        function handleStreamPayload(payload) {
+          if (!payload) return;
+          if (payload.type === "ping") {
+            return;
+          }
+          if (payload.type === "history" && Array.isArray(payload.messages)) {
+            handleHistory(payload.messages);
+          } else if (payload.type === "message" && payload.message) {
+            handleNewMessage(payload.message);
+          }
+        }
+
+        function disconnectStream() {
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+          }
+        }
+
+        function connectStream() {
+          if (!window.EventSource) {
+            return;
+          }
+          if (eventSource) {
+            return;
+          }
+          eventSource = new EventSource("/chat/stream");
+          eventSource.onmessage = (event) => {
+            try {
+              const payload = JSON.parse(event.data);
+              handleStreamPayload(payload);
+            } catch (error) {
+              console.error("Unable to parse chat update", error);
+            }
+          };
+          eventSource.onerror = () => {
+            disconnectStream();
+            reconnectTimer = setTimeout(connectStream, 2000);
+          };
         }
 
         function openChatWindow() {
@@ -447,8 +532,7 @@
             openButton.textContent = "Chat window open";
           }
           shouldStickToBottom = true;
-          renderCachedMessages();
-          lastMessageId = statusLastMessageId;
+          renderAllMessages();
           markAsRead(true);
         }
 
@@ -470,16 +554,7 @@
               const message = await response.json();
               input.value = "";
               shouldStickToBottom = true;
-              if (message && message.id) {
-                cachedMessages.push(message);
-                statusLastMessageId = Math.max(statusLastMessageId, message.id);
-                if (chatWindowOpen) {
-                  renderMessage(message);
-                  lastMessageId = Math.max(lastMessageId, message.id);
-                }
-              } else {
-                await fetchMessages();
-              }
+              handleNewMessage(message);
               markAsRead();
             }
           } catch (error) {
@@ -487,18 +562,49 @@
           }
         });
 
-        setInterval(fetchMessages, 4000);
-        fetchMessages();
         if (panel) {
           panel.addEventListener("click", () => markAsRead());
           panel.addEventListener("mouseenter", () => markAsRead());
         }
-        window.addEventListener("focus", () => {
-          fetchMessages();
-          if (chatWindowOpen) {
-            markAsRead();
+
+        async function loadInitialHistory() {
+          try {
+            const response = await fetch(`/chat/messages`, { cache: "no-store" });
+            if (!response.ok) return;
+            const data = await response.json();
+            if (Array.isArray(data.messages)) {
+              handleHistory(data.messages);
+            }
+          } catch (error) {
+            console.error("Unable to load chat messages", error);
           }
-        });
+        }
+
+        async function legacyPoll() {
+          try {
+            const response = await fetch(`/chat/messages?after=${legacyLastMessageId}`, {
+              cache: "no-store",
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            if (Array.isArray(data.messages)) {
+              data.messages.forEach((msg) => handleNewMessage(msg));
+            }
+          } catch (error) {
+            console.error("Unable to load chat messages", error);
+          }
+        }
+
+        if (window.EventSource) {
+          connectStream();
+          window.addEventListener("beforeunload", disconnectStream);
+        } else {
+          console.warn("EventSource not available; using fallback polling");
+          loadInitialHistory().finally(() => {
+            legacyPoll();
+            setInterval(legacyPoll, 4000);
+          });
+        }
       })();
     </script>
   </body>
