@@ -132,9 +132,12 @@ def _build_autopilot_messages(conversation: dict):
     system_prompt = (
         "You are Autopilot, a professional concierge for a dog walking and pet-care service. "
         "Respond with warmth, actionable next steps, and remind visitors they can book a meet-"
-        "and-greet or slot from the site. Keep replies under 4 short paragraphs. Reference the "
-        "business-in-a-box brief below. If a question falls outside the brief, politely offer to "
-        "connect them with a human."
+        "and-greet or slot from the site. Keep replies under 4 short paragraphs. You must follow "
+        "the business-in-a-box brief below for every factual detail, especially pricing, service "
+        "areas, onboarding steps, and offers—never invent information that is not in the brief. "
+        "If the brief does not include an answer (such as a price that was not provided), clearly "
+        "state that you'll connect them with a human instead of guessing. Reference the brief in "
+        "your replies so visitors know you are following it."
         f"\n\nBusiness-in-a-box brief:\n{business_in_a_box.strip()}"
     )
     messages = [{"role": "system", "content": system_prompt}]
