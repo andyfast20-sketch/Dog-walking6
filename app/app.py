@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from flask import Flask, abort, redirect, render_template, request, url_for
+from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
 
 app = Flask(__name__)
 
@@ -10,6 +10,8 @@ next_submission_id = 1
 STATUS_OPTIONS = ["New", "In Process", "Finished"]
 visitor_stats = {}
 blocked_ips = set()
+chat_messages = []
+next_chat_message_id = 1
 
 
 IGNORED_USER_AGENT_KEYWORDS = ["vercel-screenshot"]
@@ -64,6 +66,20 @@ def _record_visit(ip_address: str):
     visitor["user_agent"] = user_agent or visitor["user_agent"]
     visitor["accept_language"] = request.headers.get("Accept-Language", visitor["accept_language"])
     return True
+
+
+def _add_chat_message(sender: str, body: str):
+    global next_chat_message_id
+    message = {
+        "id": next_chat_message_id,
+        "sender": sender,
+        "body": body,
+        "timestamp": datetime.utcnow().isoformat(),
+        "seen_by_admin": sender != "visitor",
+    }
+    chat_messages.append(message)
+    next_chat_message_id += 1
+    return message
 
 
 @app.before_request
@@ -132,6 +148,10 @@ def admin_page():
         key=lambda item: item[1]["last_visit"],
         reverse=True,
     )
+    has_unread_chat = any(
+        message["sender"] == "visitor" and not message.get("seen_by_admin", False)
+        for message in chat_messages
+    )
     return render_template(
         "admin.html",
         home_url=url_for("index"),
@@ -139,6 +159,7 @@ def admin_page():
         status_options=STATUS_OPTIONS,
         visitors=visitor_rows,
         blocked_ips=blocked_ips,
+        chat_unread=has_unread_chat,
     )
 
 
@@ -206,6 +227,34 @@ def block_visitor(ip_address: str):
 def unblock_visitor(ip_address: str):
     blocked_ips.discard(ip_address)
     return redirect(url_for("admin_page"))
+
+
+@app.route("/chat/messages", methods=["GET", "POST"])
+def chat_messages_endpoint():
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        sender = data.get("sender", "visitor").strip().lower()
+        body = (data.get("body") or "").strip()
+        if sender not in {"visitor", "admin"} or not body:
+            return jsonify({"error": "Invalid message"}), 400
+        message = _add_chat_message(sender, body)
+        return jsonify(message), 201
+
+    after_id_raw = request.args.get("after", "0")
+    try:
+        after_id = int(after_id_raw)
+    except ValueError:
+        after_id = 0
+    messages_to_send = [message for message in chat_messages if message["id"] > after_id]
+    return jsonify({"messages": messages_to_send})
+
+
+@app.route("/admin/chat/read", methods=["POST"])
+def mark_chat_as_read():
+    for message in chat_messages:
+        if message["sender"] == "visitor":
+            message["seen_by_admin"] = True
+    return ("", 204)
 
 
 if __name__ == "__main__":
