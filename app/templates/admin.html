@@ -67,6 +67,7 @@
           <th>Email</th>
           <th>Phone</th>
           <th>Message</th>
+          <th>Status</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -77,6 +78,7 @@
           <td>{{ submission.email }}</td>
           <td>{{ submission.phone }}</td>
           <td>{{ submission.message }}</td>
+          <td>{{ submission.status or 'New' }}</td>
           <td>
             <div class="actions">
               <a href="{{ url_for('edit_submission', submission_id=submission.id) }}">Edit</a>
@@ -104,6 +106,8 @@
         <dd>{{ submission.phone }}</dd>
         <dt>Message</dt>
         <dd>{{ submission.message }}</dd>
+        <dt>Status</dt>
+        <dd>{{ submission.status or 'New' }}</dd>
       </dl>
       <div class="actions">
         <a href="{{ url_for('edit_submission', submission_id=submission.id) }}">Edit</a>
@@ -118,7 +122,7 @@
     </div>
     {% endif %}
     {% else %}
-    <p>No submissions yet. Head back to <a href="{{ url_for('hello_world_page', page_id=1) }}">Page 1</a> to create one.</p>
+    <p>No submissions yet. Head back to the <a href="{{ home_url }}">home page</a> to create one.</p>
     {% endif %}
   </body>
 </html>
