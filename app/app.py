@@ -28,6 +28,19 @@ chat_conversations = {}
 next_chat_message_id = 1
 chat_stream_subscribers = []
 chat_subscribers_lock = threading.Lock()
+appointment_slots = []
+next_slot_id = 1
+BOOKING_WORKFLOW_STATUSES = ["New", "In Progress", "Dealt With"]
+DEFAULT_TIME_CHOICES = [
+    "08:00",
+    "09:00",
+    "10:00",
+    "11:00",
+    "13:00",
+    "14:00",
+    "15:00",
+    "16:00",
+]
 
 
 IGNORED_USER_AGENT_KEYWORDS = ["vercel-screenshot"]
@@ -35,6 +48,32 @@ IGNORED_USER_AGENT_KEYWORDS = ["vercel-screenshot"]
 
 def _get_submission(submission_id: int):
     return next((submission for submission in submissions if submission["id"] == submission_id), None)
+
+
+def _get_slot(slot_id: int):
+    return next((slot for slot in appointment_slots if slot["id"] == slot_id), None)
+
+
+def _serialize_slot(slot: dict):
+    date_label = slot["start"].strftime("%a %d %b")
+    long_date_label = slot["start"].strftime("%A %d %B")
+    time_label = slot["start"].strftime("%I:%M %p").lstrip("0")
+    return {
+        "id": slot["id"],
+        "start_iso": slot["start"].isoformat(),
+        "date_label": date_label,
+        "long_date_label": long_date_label,
+        "time_label": time_label,
+        "friendly_label": f"{long_date_label} at {time_label}",
+        "is_booked": slot.get("is_booked", False),
+        "workflow_status": slot.get("workflow_status", ""),
+        "visitor_name": slot.get("visitor_name") or "",
+        "visitor_email": slot.get("visitor_email") or "",
+    }
+
+
+def _sorted_slots():
+    return sorted(appointment_slots, key=lambda slot: slot["start"])
 
 
 def _get_client_ip() -> str:
@@ -301,11 +340,13 @@ def index():
         {"label": "Admin Page", "href": url_for("admin_page")},
     ]
     submission_success = request.args.get("submitted") == "1"
+    slot_rows = [_serialize_slot(slot) for slot in _sorted_slots()]
     return render_template(
         "index.html",
         page_links=page_links,
         form_action=url_for("index"),
         submission_success=submission_success,
+        booking_slots=slot_rows,
     )
 
 
@@ -334,6 +375,9 @@ def admin_page():
         if data is not None
     ]
     chat_waiting_count = _pending_conversation_count()
+    slot_rows = [_serialize_slot(slot) for slot in _sorted_slots()]
+    available_slots = [slot for slot in slot_rows if not slot["is_booked"]]
+    booked_slots = [slot for slot in slot_rows if slot["is_booked"]]
     return render_template(
         "admin.html",
         home_url=url_for("index"),
@@ -345,7 +389,74 @@ def admin_page():
         chat_waiting_count=chat_waiting_count,
         chat_conversations=conversation_rows,
         chat_has_conversations=bool(conversation_rows),
+        available_slots=available_slots,
+        booked_slots=booked_slots,
+        booking_status_options=BOOKING_WORKFLOW_STATUSES,
+        time_choices=DEFAULT_TIME_CHOICES,
+        today=datetime.utcnow().strftime("%Y-%m-%d"),
     )
+
+
+@app.route("/admin/slots", methods=["POST"])
+def create_appointment_slot():
+    global next_slot_id
+    date_value = (request.form.get("date") or "").strip()
+    time_value = (request.form.get("time") or "").strip()
+    if not date_value or not time_value:
+        return redirect(url_for("admin_page"))
+    try:
+        start = datetime.strptime(f"{date_value} {time_value}", "%Y-%m-%d %H:%M")
+    except ValueError:
+        return redirect(url_for("admin_page"))
+    slot = {
+        "id": next_slot_id,
+        "start": start,
+        "is_booked": False,
+        "workflow_status": "",
+        "visitor_name": None,
+        "visitor_email": None,
+    }
+    appointment_slots.append(slot)
+    appointment_slots.sort(key=lambda entry: entry["start"])
+    next_slot_id += 1
+    return redirect(url_for("admin_page"))
+
+
+@app.route("/admin/slots/<int:slot_id>/status", methods=["POST"])
+def update_slot_status(slot_id: int):
+    slot = _get_slot(slot_id)
+    if slot is None or not slot.get("is_booked"):
+        abort(404)
+    status = (request.form.get("status") or BOOKING_WORKFLOW_STATUSES[0]).strip()
+    if status not in BOOKING_WORKFLOW_STATUSES:
+        status = BOOKING_WORKFLOW_STATUSES[0]
+    slot["workflow_status"] = status
+    return redirect(url_for("admin_page"))
+
+
+@app.route("/bookings/slots/<int:slot_id>", methods=["POST"])
+def book_appointment_slot(slot_id: int):
+    slot = _get_slot(slot_id)
+    if slot is None:
+        return jsonify({"error": "Slot not found"}), 404
+    if slot.get("is_booked"):
+        return jsonify({"error": "This slot has already been booked"}), 400
+    payload = request.get_json(silent=True) or {}
+    name = (payload.get("name") or request.form.get("name") or "").strip()
+    email = (payload.get("email") or request.form.get("email") or "").strip()
+    if not name or not email:
+        return jsonify({"error": "Name and email are required"}), 400
+    slot.update(
+        {
+            "is_booked": True,
+            "visitor_name": name,
+            "visitor_email": email,
+            "workflow_status": BOOKING_WORKFLOW_STATUSES[0],
+            "booked_at": datetime.utcnow(),
+        }
+    )
+    serialized_slot = _serialize_slot(slot)
+    return jsonify({"slot": serialized_slot})
 
 
 @app.route("/admin/submissions/<int:submission_id>/edit", methods=["GET", "POST"])
