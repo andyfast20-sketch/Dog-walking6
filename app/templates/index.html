@@ -245,6 +245,31 @@
     </div>
     <script>
       (function () {
+        const VISITOR_STORAGE_KEY = "liveChatVisitorId";
+        function generateVisitorId() {
+          if (window.crypto && window.crypto.randomUUID) {
+            return window.crypto.randomUUID();
+          }
+          return Math.random().toString(36).slice(2, 12);
+        }
+        function getVisitorId() {
+          let stored = null;
+          try {
+            stored = window.localStorage.getItem(VISITOR_STORAGE_KEY);
+          } catch (error) {
+            stored = null;
+          }
+          if (!stored) {
+            stored = generateVisitorId();
+            try {
+              window.localStorage.setItem(VISITOR_STORAGE_KEY, stored);
+            } catch (error) {
+              /* ignore storage errors */
+            }
+          }
+          return stored;
+        }
+        const visitorId = getVisitorId();
         const widget = document.getElementById("chatWidget");
         const toggle = document.getElementById("chatToggle");
         const closeBtn = document.getElementById("chatClose");
@@ -289,9 +314,10 @@
 
         async function pollOnce() {
           try {
-            const response = await fetch(`/chat/messages?after=${lastMessageId}`, {
-              cache: "no-store",
-            });
+            const response = await fetch(
+              `/chat/messages?visitor_id=${encodeURIComponent(visitorId)}&after=${lastMessageId}`,
+              { cache: "no-store" }
+            );
             if (!response.ok) return;
             const data = await response.json();
             if (Array.isArray(data.messages)) {
@@ -321,9 +347,20 @@
             return;
           }
           if (payload.type === "history" && Array.isArray(payload.messages)) {
+            if (payload.visitor_id && payload.visitor_id !== visitorId) {
+              return;
+            }
             renderHistory(payload.messages);
           } else if (payload.type === "message" && payload.message) {
-            addMessage(payload.message);
+            if (!payload.message.visitor_id || payload.message.visitor_id === visitorId) {
+              addMessage(payload.message);
+            }
+          } else if (payload.type === "conversation_deleted") {
+            if (!payload.visitor_id || payload.visitor_id === visitorId) {
+              renderedIds.clear();
+              lastMessageId = 0;
+              messagesEl.innerHTML = "";
+            }
           }
         }
 
@@ -345,7 +382,7 @@
           if (eventSource) {
             return;
           }
-          eventSource = new EventSource("/chat/stream");
+          eventSource = new EventSource(`/chat/stream?visitor_id=${encodeURIComponent(visitorId)}`);
           eventSource.onmessage = (event) => {
             try {
               const payload = JSON.parse(event.data);
@@ -390,7 +427,7 @@
             const response = await fetch("/chat/messages", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ sender: "visitor", body: value }),
+              body: JSON.stringify({ sender: "visitor", body: value, visitor_id: visitorId }),
             });
             if (response.ok) {
               const message = await response.json();

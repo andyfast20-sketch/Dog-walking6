@@ -103,8 +103,33 @@
       }
       .chat-panel__actions {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+      .chat-panel__selection-group {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        align-items: flex-end;
+      }
+      .chat-panel__selection {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        min-width: 220px;
+      }
+      .chat-panel__selection label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #475569;
+      }
+      .chat-panel__selection select {
+        padding: 0.4rem 0.5rem;
+        border-radius: 8px;
+        border: 1px solid #cbd2d9;
+        font-size: 0.95rem;
+        min-height: 2.25rem;
       }
       .chat-indicator {
         padding: 0.35rem 0.75rem;
@@ -190,11 +215,30 @@
         margin: 0;
         border-radius: 999px;
       }
+      .chat-empty-state {
+        width: 100%;
+        text-align: center;
+        color: #6b7280;
+        padding: 1.5rem 0.5rem;
+      }
       .hidden {
         display: none;
       }
       .chat-alert.flash {
         animation: flashBg 1s steps(2, jump-start) infinite;
+      }
+      .chat-panel__delete {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+      .chat-panel__delete:hover {
+        background: #fecaca;
+        color: #7f1d1d;
+      }
+      .chat-panel__delete:disabled {
+        background: #e2e8f0;
+        color: #475569;
+        cursor: not-allowed;
       }
       @keyframes flashBg {
         0% {
@@ -327,14 +371,20 @@
       <div>
         <h2>Live Visitor Chat</h2>
         <p id="chatStatusMessage" style="margin: 0; color: #475569">
-          {% if chat_unread %}
+          {% if chat_waiting_count > 1 %}
+          There are {{ chat_waiting_count }} visitors waiting to chat.
+          {% elif chat_waiting_count == 1 %}
           A visitor is waiting to chat.
-          {% else %}
+          {% elif chat_has_conversations %}
           No visitors are currently waiting.
+          {% else %}
+          No live conversations yet.
           {% endif %}
         </p>
       </div>
-      <button id="openChatButton" {% if not chat_unread %}disabled{% endif %}>Open chat window</button>
+      <button id="openChatButton" {% if not chat_has_conversations %}disabled{% endif %}>
+        Open chat window
+      </button>
     </section>
 
     <section class="chat-panel hidden" id="chatPanel">
@@ -344,6 +394,24 @@
           <p style="margin: 0; color: #475569">Reply in real time to site visitors.</p>
         </div>
         <div class="chat-panel__actions">
+          <div class="chat-panel__selection-group">
+            <div class="chat-panel__selection">
+              <label for="chatVisitorSelect">Visitor conversation</label>
+              <select id="chatVisitorSelect" {% if not chat_has_conversations %}disabled{% endif %}>
+                <option value="">
+                  {% if chat_has_conversations %}Select a visitor{% else %}No conversations yet{% endif %}
+                </option>
+              </select>
+            </div>
+            <button
+              type="button"
+              class="chat-panel__delete"
+              id="deleteConversationButton"
+              {% if not chat_has_conversations %}disabled{% endif %}
+            >
+              Delete conversation
+            </button>
+          </div>
           <span id="chatIndicator" class="chat-indicator {% if chat_unread %}active{% endif %}">
             {% if chat_unread %}New message{% else %}All caught up{% endif %}
           </span>
@@ -363,45 +431,36 @@
       </form>
     </section>
     <script>
+      const initialConversations = {{ chat_conversations | tojson }};
       (function () {
         const messagesEl = document.getElementById("adminChatMessages");
         const form = document.getElementById("adminChatForm");
         const input = document.getElementById("adminChatInput");
+        const submitButton = form ? form.querySelector("button[type='submit']") : null;
         const indicator = document.getElementById("chatIndicator");
         const panel = document.getElementById("chatPanel");
         const statusMessage = document.getElementById("chatStatusMessage");
         const openButton = document.getElementById("openChatButton");
         const closeButton = document.getElementById("closeChatButton");
         const chatAlert = document.querySelector(".chat-alert");
+        const conversationSelect = document.getElementById("chatVisitorSelect");
+        const deleteButton = document.getElementById("deleteConversationButton");
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         let audioCtx = null;
         let audioUnlocked = false;
         if (!messagesEl || !form) {
           return;
         }
-        let needsAttention = indicator && indicator.classList.contains("active");
-        let chatWindowOpen = false;
-        const cachedMessages = [];
+        const conversationMap = new Map();
+        const cachedMessages = new Map();
         const messageIds = new Set();
-        let legacyLastMessageId = 0;
+        const unreadVisitors = new Set();
+        let activeVisitorId = null;
+        let chatWindowOpen = false;
         let shouldStickToBottom = true;
         let eventSource = null;
         let reconnectTimer = null;
-
-        function setIndicator(state) {
-          if (!indicator) return;
-          indicator.classList.toggle("active", state);
-          indicator.textContent = state ? "New message" : "All caught up";
-        }
-
-        function setFlash(state) {
-          if (!chatAlert) return;
-          if (state && !chatWindowOpen) {
-            chatAlert.classList.add("flash");
-          } else {
-            chatAlert.classList.remove("flash");
-          }
-        }
+        let legacyLastMessageId = 0;
 
         function ensureAudioContext() {
           if (audioCtx || !AudioContext) {
@@ -448,37 +507,81 @@
           }
         }
 
-        function updateChatStatus(waiting) {
-          if (statusMessage) {
-            if (waiting) {
-              statusMessage.textContent = "A visitor is waiting to chat.";
-            } else if (chatWindowOpen) {
-              statusMessage.textContent = "Chat window is open.";
-            } else {
-              statusMessage.textContent = "No visitors are currently waiting.";
-            }
+        function formatConversationLabel(meta) {
+          if (!meta || !meta.visitor_id) {
+            return "Unknown visitor";
           }
-          if (openButton) {
-            if (chatWindowOpen) {
-              openButton.disabled = true;
-              openButton.textContent = "Chat window open";
-            } else {
-              openButton.disabled = false;
-              openButton.textContent = waiting ? "Respond to visitor" : "Open chat window";
-            }
-          }
-          setFlash(waiting);
+          const shortId = meta.visitor_id.slice(0, 6).toUpperCase();
+          const ip = meta.ip_address && meta.ip_address !== "Unknown" ? meta.ip_address : null;
+          return ip ? `${ip} (${shortId})` : `Visitor ${shortId}`;
         }
 
-        updateChatStatus(needsAttention);
-
-        function updateStickToBottom() {
-          const { scrollTop, scrollHeight, clientHeight } = messagesEl;
-          const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
-          shouldStickToBottom = distanceFromBottom <= 40;
+        function updateConversationSelect() {
+          if (!conversationSelect) return;
+          const previousValue = conversationSelect.value;
+          conversationSelect.innerHTML = "";
+          if (!conversationMap.size) {
+            const option = document.createElement("option");
+            option.value = "";
+            option.textContent = "No conversations yet";
+            conversationSelect.appendChild(option);
+            conversationSelect.disabled = true;
+          } else {
+            conversationSelect.disabled = false;
+            Array.from(conversationMap.values())
+              .sort((a, b) => {
+                const aDate = new Date(a.created_at || 0).getTime();
+                const bDate = new Date(b.created_at || 0).getTime();
+                return bDate - aDate;
+              })
+              .forEach((meta) => {
+                if (!meta || !meta.visitor_id) return;
+                const option = document.createElement("option");
+                option.value = meta.visitor_id;
+                option.textContent = formatConversationLabel(meta);
+                if (unreadVisitors.has(meta.visitor_id)) {
+                  option.textContent += " • New";
+                }
+                conversationSelect.appendChild(option);
+              });
+          }
+          if (previousValue && conversationMap.has(previousValue)) {
+            conversationSelect.value = previousValue;
+          } else if (activeVisitorId) {
+            conversationSelect.value = activeVisitorId;
+          } else {
+            conversationSelect.value = "";
+          }
         }
 
-        messagesEl.addEventListener("scroll", updateStickToBottom);
+        function ensureConversationMeta(visitorId, ipAddress) {
+          if (!visitorId) return;
+          const existing = conversationMap.get(visitorId) || {};
+          const merged = Object.assign({}, existing, {
+            visitor_id: visitorId,
+            ip_address: ipAddress || existing.ip_address || "Unknown",
+          });
+          merged.created_at = merged.created_at || new Date().toISOString();
+          merged.message_count = (cachedMessages.get(visitorId) || []).length;
+          conversationMap.set(visitorId, merged);
+        }
+
+        function markCachedMessagesAsRead(visitorId) {
+          const messages = cachedMessages.get(visitorId);
+          if (!messages) return;
+          messages.forEach((msg) => {
+            if (msg.sender === "visitor") {
+              msg.seen_by_admin = true;
+            }
+          });
+        }
+
+        function renderPlaceholder(text) {
+          const placeholder = document.createElement("div");
+          placeholder.className = "chat-empty-state";
+          placeholder.textContent = text;
+          messagesEl.appendChild(placeholder);
+        }
 
         function renderMessage(message) {
           const row = document.createElement("div");
@@ -495,84 +598,204 @@
 
         function renderAllMessages() {
           messagesEl.innerHTML = "";
-          cachedMessages
-            .slice()
-            .sort((a, b) => a.id - b.id)
-            .forEach((msg) => renderMessage(msg));
+          if (!activeVisitorId || !cachedMessages.has(activeVisitorId)) {
+            renderPlaceholder("Select a visitor conversation to get started.");
+            return;
+          }
+          const messages = cachedMessages.get(activeVisitorId).slice().sort((a, b) => a.id - b.id);
+          if (!messages.length) {
+            renderPlaceholder("No messages yet. Say hello to the visitor!");
+            return;
+          }
+          messages.forEach((msg) => renderMessage(msg));
           messagesEl.scrollTop = messagesEl.scrollHeight;
         }
 
-        function markCachedMessagesAsRead() {
-          cachedMessages.forEach((msg) => {
-            if (msg.sender === "visitor") {
-              msg.seen_by_admin = true;
-            }
-          });
+        function updateStickToBottom() {
+          const { scrollTop, scrollHeight, clientHeight } = messagesEl;
+          const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
+          shouldStickToBottom = distanceFromBottom <= 40;
         }
 
-        async function markAsRead(force = false) {
-          if (!needsAttention && !force) return;
-          needsAttention = false;
-          setIndicator(false);
-          updateChatStatus(false);
-          markCachedMessagesAsRead();
-          try {
-            await fetch("/admin/chat/read", { method: "POST" });
-          } catch (error) {
-            console.error("Unable to mark chat as read", error);
+        messagesEl.addEventListener("scroll", updateStickToBottom);
+
+        function setIndicator(state, waitingCount = unreadVisitors.size) {
+          if (!indicator) return;
+          indicator.classList.toggle("active", state);
+          if (!state) {
+            indicator.textContent = "All caught up";
+          } else if (waitingCount === 1) {
+            indicator.textContent = "1 visitor waiting";
+          } else {
+            indicator.textContent = `${waitingCount} visitors waiting`;
           }
         }
 
-        function handleNewMessage(message, fromHistory = false) {
+        function setFlash(state) {
+          if (!chatAlert) return;
+          if (state && !chatWindowOpen) {
+            chatAlert.classList.add("flash");
+          } else {
+            chatAlert.classList.remove("flash");
+          }
+        }
+
+        function updateChatStatus(waitingCount) {
+          if (statusMessage) {
+            if (!conversationMap.size) {
+              statusMessage.textContent = "No live conversations yet.";
+            } else if (waitingCount > 1) {
+              statusMessage.textContent = `There are ${waitingCount} visitors waiting to chat.`;
+            } else if (waitingCount === 1) {
+              statusMessage.textContent = "A visitor is waiting to chat.";
+            } else if (chatWindowOpen) {
+              statusMessage.textContent = "Chat window is open.";
+            } else {
+              statusMessage.textContent = "No visitors are currently waiting.";
+            }
+          }
+          if (openButton) {
+            if (!conversationMap.size) {
+              openButton.disabled = true;
+              openButton.textContent = "Open chat window";
+            } else if (chatWindowOpen) {
+              openButton.disabled = true;
+              openButton.textContent = "Chat window open";
+            } else {
+              openButton.disabled = false;
+              openButton.textContent = waitingCount ? "Respond to visitor" : "Open chat window";
+            }
+          }
+          setFlash(waitingCount > 0);
+        }
+
+        function updateWaitingState() {
+          const waitingCount = unreadVisitors.size;
+          setIndicator(waitingCount > 0, waitingCount);
+          updateChatStatus(waitingCount);
+          updateConversationSelect();
+        }
+
+        function updateFormState() {
+          const hasActive = !!activeVisitorId && conversationMap.has(activeVisitorId);
+          if (input) {
+            input.disabled = !hasActive;
+          }
+          if (submitButton) {
+            submitButton.disabled = !hasActive;
+          }
+          if (deleteButton) {
+            deleteButton.disabled = !hasActive;
+          }
+        }
+
+        function addMessageToCache(message, fromHistory = false) {
           if (!message || messageIds.has(message.id)) {
             return;
           }
-          messageIds.add(message.id);
-          cachedMessages.push(message);
-          cachedMessages.sort((a, b) => a.id - b.id);
-          legacyLastMessageId = Math.max(legacyLastMessageId, message.id || 0);
-          if (chatWindowOpen) {
-            renderMessage(message);
+          const visitorId = message.visitor_id;
+          if (!cachedMessages.has(visitorId)) {
+            cachedMessages.set(visitorId, []);
           }
-          if (message.sender === "visitor") {
-            playNotificationSound();
-            if (chatWindowOpen) {
-              shouldStickToBottom = true;
-              markAsRead();
-            } else if (!fromHistory) {
-              needsAttention = true;
-              setIndicator(true);
-              updateChatStatus(true);
+          cachedMessages.get(visitorId).push(message);
+          messageIds.add(message.id);
+          legacyLastMessageId = Math.max(legacyLastMessageId, message.id);
+          ensureConversationMeta(visitorId, message.visitor_ip);
+          if (!fromHistory && message.sender === "visitor" && !message.seen_by_admin) {
+            unreadVisitors.add(visitorId);
+            if (!chatWindowOpen || visitorId !== activeVisitorId) {
+              playNotificationSound();
             }
+          }
+          if (chatWindowOpen && visitorId === activeVisitorId && !fromHistory) {
+            renderMessage(message);
           }
         }
 
-        function handleHistory(messages) {
-          cachedMessages.length = 0;
+        function handleNewMessage(message) {
+          addMessageToCache(message);
+          if (!activeVisitorId) {
+            activeVisitorId = message.visitor_id;
+            updateFormState();
+            renderAllMessages();
+          } else if (chatWindowOpen && message.visitor_id === activeVisitorId) {
+            shouldStickToBottom = true;
+          }
+          if (chatWindowOpen && message.visitor_id === activeVisitorId) {
+            markAsRead();
+          }
+          updateWaitingState();
+        }
+
+        function handleHistory(payload) {
+          const messages = Array.isArray(payload.messages) ? payload.messages : [];
+          cachedMessages.clear();
           messageIds.clear();
-          let hasUnreadVisitorMessage = false;
           messages
             .slice()
             .sort((a, b) => a.id - b.id)
-            .forEach((msg) => {
-              cachedMessages.push(msg);
-              messageIds.add(msg.id);
-              legacyLastMessageId = Math.max(legacyLastMessageId, msg.id || 0);
-              if (msg.sender === "visitor" && !msg.seen_by_admin) {
-                hasUnreadVisitorMessage = true;
+            .forEach((msg) => addMessageToCache(msg, true));
+          if (Array.isArray(payload.conversations)) {
+            conversationMap.clear();
+            unreadVisitors.clear();
+            payload.conversations.forEach((conversation) => {
+              if (!conversation || !conversation.visitor_id) return;
+              conversationMap.set(conversation.visitor_id, conversation);
+              if (conversation.unread) {
+                unreadVisitors.add(conversation.visitor_id);
               }
             });
-          if (chatWindowOpen) {
-            renderAllMessages();
           }
-          if (hasUnreadVisitorMessage && !chatWindowOpen) {
-            needsAttention = true;
-            setIndicator(true);
-            updateChatStatus(true);
-          } else if (!hasUnreadVisitorMessage) {
-            needsAttention = false;
-            setIndicator(false);
-            updateChatStatus(false);
+          if (!activeVisitorId) {
+            const firstUnread = unreadVisitors.values().next().value;
+            if (firstUnread) {
+              activeVisitorId = firstUnread;
+            } else {
+              const firstConversation = conversationMap.keys().next().value;
+              activeVisitorId = firstConversation || null;
+            }
+          }
+          renderAllMessages();
+          updateFormState();
+          updateWaitingState();
+        }
+
+        function removeConversationFromState(visitorId) {
+          if (!visitorId) return;
+          cachedMessages.delete(visitorId);
+          conversationMap.delete(visitorId);
+          unreadVisitors.delete(visitorId);
+          if (activeVisitorId === visitorId) {
+            activeVisitorId = conversationMap.keys().next().value || null;
+          }
+          if (!conversationMap.size) {
+            closeChatWindow();
+          }
+          updateFormState();
+          renderAllMessages();
+          updateWaitingState();
+        }
+
+        function handleConversationDeleted(visitorId) {
+          removeConversationFromState(visitorId);
+        }
+
+        async function markAsRead(force = false) {
+          if (!activeVisitorId) return;
+          if (!unreadVisitors.has(activeVisitorId) && !force) {
+            return;
+          }
+          unreadVisitors.delete(activeVisitorId);
+          markCachedMessagesAsRead(activeVisitorId);
+          updateWaitingState();
+          try {
+            await fetch("/admin/chat/read", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ visitor_id: activeVisitorId }),
+            });
+          } catch (error) {
+            console.error("Unable to mark chat as read", error);
           }
         }
 
@@ -581,10 +804,16 @@
           if (payload.type === "ping") {
             return;
           }
-          if (payload.type === "history" && Array.isArray(payload.messages)) {
-            handleHistory(payload.messages);
-          } else if (payload.type === "message" && payload.message) {
+          if (payload.type === "history") {
+            handleHistory(payload);
+            return;
+          }
+          if (payload.type === "message" && payload.message) {
             handleNewMessage(payload.message);
+            return;
+          }
+          if (payload.type === "conversation_deleted") {
+            handleConversationDeleted(payload.visitor_id);
           }
         }
 
@@ -600,13 +829,10 @@
         }
 
         function connectStream() {
-          if (!window.EventSource) {
+          if (!window.EventSource || eventSource) {
             return;
           }
-          if (eventSource) {
-            return;
-          }
-          eventSource = new EventSource("/chat/stream");
+          eventSource = new EventSource("/chat/stream?role=admin");
           eventSource.onmessage = (event) => {
             try {
               const payload = JSON.parse(event.data);
@@ -621,14 +847,24 @@
           };
         }
 
+        function getDefaultVisitor() {
+          const firstUnread = unreadVisitors.values().next().value;
+          if (firstUnread) return firstUnread;
+          return conversationMap.keys().next().value || null;
+        }
+
         function openChatWindow() {
-          if (!panel) return;
+          if (!panel || !conversationMap.size) return;
           chatWindowOpen = true;
           panel.classList.remove("hidden");
-          updateChatStatus(false);
-          setFlash(false);
+          if (!activeVisitorId) {
+            activeVisitorId = getDefaultVisitor();
+          }
           shouldStickToBottom = true;
           renderAllMessages();
+          updateFormState();
+          updateWaitingState();
+          setFlash(false);
           markAsRead(true);
         }
 
@@ -636,7 +872,7 @@
           if (!panel) return;
           chatWindowOpen = false;
           panel.classList.add("hidden");
-          updateChatStatus(needsAttention);
+          updateWaitingState();
         }
 
         const unlockEvents = [openButton, closeButton, form];
@@ -662,15 +898,45 @@
           closeButton.addEventListener("click", closeChatWindow);
         }
 
+        if (conversationSelect) {
+          conversationSelect.addEventListener("change", (event) => {
+            const value = event.target.value;
+            activeVisitorId = value || null;
+            shouldStickToBottom = true;
+            renderAllMessages();
+            updateFormState();
+            if (chatWindowOpen) {
+              markAsRead();
+            }
+          });
+        }
+
+        if (deleteButton) {
+          deleteButton.addEventListener("click", async () => {
+            if (!activeVisitorId) return;
+            const confirmed = window.confirm("Delete this conversation? This cannot be undone.");
+            if (!confirmed) return;
+            try {
+              await fetch(`/admin/chat/${encodeURIComponent(activeVisitorId)}/delete`, {
+                method: "POST",
+              });
+            } catch (error) {
+              console.error("Unable to delete conversation", error);
+            }
+            removeConversationFromState(activeVisitorId);
+          });
+        }
+
         form.addEventListener("submit", async (event) => {
           event.preventDefault();
+          if (!activeVisitorId) return;
           const value = input.value.trim();
           if (!value) return;
           try {
             const response = await fetch("/chat/messages", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ sender: "admin", body: value }),
+              body: JSON.stringify({ sender: "admin", body: value, visitor_id: activeVisitorId }),
             });
             if (response.ok) {
               const message = await response.json();
@@ -691,12 +957,10 @@
 
         async function loadInitialHistory() {
           try {
-            const response = await fetch(`/chat/messages`, { cache: "no-store" });
+            const response = await fetch(`/chat/messages?role=admin`, { cache: "no-store" });
             if (!response.ok) return;
             const data = await response.json();
-            if (Array.isArray(data.messages)) {
-              handleHistory(data.messages);
-            }
+            handleHistory(data);
           } catch (error) {
             console.error("Unable to load chat messages", error);
           }
@@ -704,7 +968,7 @@
 
         async function legacyPoll() {
           try {
-            const response = await fetch(`/chat/messages?after=${legacyLastMessageId}`, {
+            const response = await fetch(`/chat/messages?role=admin&after=${legacyLastMessageId}`, {
               cache: "no-store",
             });
             if (!response.ok) return;
@@ -716,6 +980,23 @@
             console.error("Unable to load chat messages", error);
           }
         }
+
+        function bootstrapConversations() {
+          if (Array.isArray(initialConversations)) {
+            initialConversations.forEach((conversation) => {
+              if (!conversation || !conversation.visitor_id) return;
+              conversationMap.set(conversation.visitor_id, conversation);
+              if (conversation.unread) {
+                unreadVisitors.add(conversation.visitor_id);
+              }
+            });
+          }
+          activeVisitorId = getDefaultVisitor();
+          updateFormState();
+          updateWaitingState();
+        }
+
+        bootstrapConversations();
 
         if (window.EventSource) {
           connectStream();
@@ -729,5 +1010,6 @@
         }
       })();
     </script>
+
   </body>
 </html>
