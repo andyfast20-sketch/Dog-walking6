@@ -64,6 +64,14 @@
         Message
         <textarea name="message" required>{{ submission.message }}</textarea>
       </label>
+      <label>
+        Status
+        <select name="status">
+          {% for option in status_options %}
+          <option value="{{ option }}" {% if submission.status == option %}selected{% endif %}>{{ option }}</option>
+          {% endfor %}
+        </select>
+      </label>
       <button type="submit">Save Changes</button>
     </form>
     <div class="links">
