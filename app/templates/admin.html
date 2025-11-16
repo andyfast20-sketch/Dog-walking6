@@ -380,9 +380,15 @@
               body: JSON.stringify({ sender: "admin", body: value }),
             });
             if (response.ok) {
+              const message = await response.json();
               input.value = "";
               shouldStickToBottom = true;
-              await fetchMessages();
+              if (message && message.id) {
+                renderMessage(message);
+                lastMessageId = Math.max(lastMessageId, message.id);
+              } else {
+                await fetchMessages();
+              }
               markAsRead();
             }
           } catch (error) {
