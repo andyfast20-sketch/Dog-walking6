@@ -351,11 +351,57 @@
         gap: 1rem;
         flex-wrap: wrap;
       }
-      .autopilot-card__toggle.is-on {
+      .autopilot-card__toggle-form {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .toggle-switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        cursor: pointer;
+        font-weight: 600;
+        color: #475569;
+      }
+      .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+        position: absolute;
+      }
+      .toggle-slider {
+        width: 48px;
+        height: 26px;
+        border-radius: 999px;
+        background: #cbd2d9;
+        position: relative;
+        transition: background 0.2s ease;
+      }
+      .toggle-slider::after {
+        content: "";
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #fff;
+        top: 3px;
+        left: 3px;
+        box-shadow: 0 2px 4px rgba(15, 23, 42, 0.2);
+        transition: transform 0.2s ease;
+      }
+      .toggle-switch input:checked + .toggle-slider {
         background: #0f9d58;
       }
-      .autopilot-card__toggle.is-on:hover {
-        background: #0c7a43;
+      .toggle-switch input:checked + .toggle-slider::after {
+        transform: translateX(22px);
+      }
+      .toggle-state {
+        font-size: 0.95rem;
+        color: #0f172a;
+      }
+      .autopilot-card__toggle-form noscript button {
+        background: #1f4ad1;
       }
       .autopilot-status-grid {
         display: grid;
@@ -431,14 +477,28 @@
             DeepSeek can jump into any chat using your saved business-in-a-box script.
           </p>
         </div>
-        <form method="post" action="{{ url_for('toggle_autopilot') }}">
-          <input type="hidden" name="enabled" value="{{ 0 if autopilot_enabled else 1 }}" />
-          <button
-            type="submit"
-            class="autopilot-card__toggle {% if autopilot_enabled %}is-on{% endif %}"
-          >
-            {{ 'Disable' if autopilot_enabled else 'Enable' }} Autopilot
-          </button>
+        <form
+          method="post"
+          action="{{ url_for('toggle_autopilot') }}"
+          class="autopilot-card__toggle-form"
+        >
+          <label class="toggle-switch">
+            <input
+              type="checkbox"
+              name="enabled"
+              value="1"
+              {% if autopilot_enabled %}checked{% endif %}
+              onchange="this.form.submit()"
+              aria-label="Toggle Autopilot"
+            />
+            <span class="toggle-slider" aria-hidden="true"></span>
+            <span class="toggle-state">{{ 'On' if autopilot_enabled else 'Off' }}</span>
+          </label>
+          <noscript>
+            <button type="submit" name="enabled" value="{{ 0 if autopilot_enabled else 1 }}">
+              {{ 'Disable' if autopilot_enabled else 'Enable' }} Autopilot
+            </button>
+          </noscript>
         </form>
       </div>
       <div class="autopilot-status-grid">
