@@ -12,6 +12,9 @@ visitor_stats = {}
 blocked_ips = set()
 
 
+IGNORED_USER_AGENT_KEYWORDS = ["vercel-screenshot"]
+
+
 def _get_submission(submission_id: int):
     return next((submission for submission in submissions if submission["id"] == submission_id), None)
 
@@ -33,7 +36,17 @@ def _get_location_from_headers() -> str:
     return request.headers.get("Accept-Language", "Unknown")
 
 
+def _should_ignore_user_agent(user_agent: str) -> bool:
+    if not user_agent:
+        return False
+    ua = user_agent.lower()
+    return any(keyword in ua for keyword in IGNORED_USER_AGENT_KEYWORDS)
+
+
 def _record_visit(ip_address: str):
+    user_agent = request.headers.get("User-Agent", "Unknown")
+    if _should_ignore_user_agent(user_agent):
+        return False
     visitor = visitor_stats.setdefault(
         ip_address,
         {
@@ -48,8 +61,9 @@ def _record_visit(ip_address: str):
     visitor["visits"] += 1
     visitor["last_visit"] = datetime.utcnow()
     visitor["location"] = _get_location_from_headers() or visitor["location"]
-    visitor["user_agent"] = request.headers.get("User-Agent", visitor["user_agent"])
+    visitor["user_agent"] = user_agent or visitor["user_agent"]
     visitor["accept_language"] = request.headers.get("Accept-Language", visitor["accept_language"])
+    return True
 
 
 @app.before_request
