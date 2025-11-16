@@ -37,129 +37,140 @@
         display: flex;
         gap: 0.5rem;
       }
-      .single-entry {
-        border: 1px solid #cbd2d9;
-        border-radius: 6px;
-        padding: 1rem;
-      }
-      .single-entry h2 {
-        margin-top: 0;
-      }
-      .single-entry dl {
-        display: grid;
-        grid-template-columns: max-content 1fr;
-        gap: 0.5rem 1rem;
-      }
-      .single-entry dt {
-        font-weight: 600;
-      }
       form.inline {
         display: inline;
+      }
+      section {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      section + section {
+        margin-top: 1rem;
+      }
+      .empty-state {
+        color: #6b7280;
       }
     </style>
   </head>
   <body>
     <h1>Admin Page</h1>
     <a href="{{ home_url }}">Return to Home</a>
-    {% if submissions %}
-    {% if submissions|length > 1 %}
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Email</th>
-          <th>Phone</th>
-          <th>Message</th>
-          <th>Status</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for submission in submissions %}
-        <tr>
-          <td>{{ submission.name }}</td>
-          <td>{{ submission.email }}</td>
-          <td>{{ submission.phone }}</td>
-          <td>{{ submission.message }}</td>
-          <td>
-            <form
-              class="inline"
-              method="post"
-              action="{{ url_for('update_submission_status', submission_id=submission.id) }}"
-            >
-              <select name="status" onchange="this.form.submit()">
-                {% for option in status_options %}
-                <option value="{{ option }}" {% if option == (submission.status or 'New') %}selected{% endif %}>
-                  {{ option }}
-                </option>
-                {% endfor %}
-              </select>
-              <noscript>
-                <button type="submit">Update</button>
-              </noscript>
-            </form>
-          </td>
-          <td>
-            <div class="actions">
-              <a href="{{ url_for('edit_submission', submission_id=submission.id) }}">Edit</a>
+    <section>
+      <h2>Enquiries</h2>
+      {% if submissions %}
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Message</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for submission in submissions %}
+          <tr>
+            <td>{{ submission.name }}</td>
+            <td>{{ submission.email }}</td>
+            <td>{{ submission.phone }}</td>
+            <td>{{ submission.message }}</td>
+            <td>
               <form
                 class="inline"
                 method="post"
-                action="{{ url_for('delete_submission', submission_id=submission.id) }}"
+                action="{{ url_for('update_submission_status', submission_id=submission.id) }}"
               >
-                <button type="submit">Delete</button>
+                <select name="status" onchange="this.form.submit()">
+                  {% for option in status_options %}
+                  <option value="{{ option }}" {% if option == (submission.status or 'New') %}selected{% endif %}>
+                    {{ option }}
+                  </option>
+                  {% endfor %}
+                </select>
+                <noscript>
+                  <button type="submit">Update</button>
+                </noscript>
               </form>
-            </div>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    {% set submission = submissions[0] %}
-    <div class="single-entry">
-      <h2>{{ submission.name }}</h2>
-      <dl>
-        <dt>Email</dt>
-        <dd>{{ submission.email }}</dd>
-        <dt>Phone</dt>
-        <dd>{{ submission.phone }}</dd>
-        <dt>Message</dt>
-        <dd>{{ submission.message }}</dd>
-        <dt>Status</dt>
-        <dd>
-          <form
-            class="inline"
-            method="post"
-            action="{{ url_for('update_submission_status', submission_id=submission.id) }}"
-          >
-            <select name="status" onchange="this.form.submit()">
-              {% for option in status_options %}
-              <option value="{{ option }}" {% if option == (submission.status or 'New') %}selected{% endif %}>
-                {{ option }}
-              </option>
-              {% endfor %}
-            </select>
-            <noscript>
-              <button type="submit">Update</button>
-            </noscript>
-          </form>
-        </dd>
-      </dl>
-      <div class="actions">
-        <a href="{{ url_for('edit_submission', submission_id=submission.id) }}">Edit</a>
-        <form
-          class="inline"
-          method="post"
-          action="{{ url_for('delete_submission', submission_id=submission.id) }}"
-        >
-          <button type="submit">Delete</button>
-        </form>
-      </div>
-    </div>
-    {% endif %}
-    {% else %}
-    <p>No submissions yet. Head back to the <a href="{{ home_url }}">home page</a> to create one.</p>
-    {% endif %}
+            </td>
+            <td>
+              <div class="actions">
+                <a href="{{ url_for('edit_submission', submission_id=submission.id) }}">Edit</a>
+                <form
+                  class="inline"
+                  method="post"
+                  action="{{ url_for('delete_submission', submission_id=submission.id) }}"
+                >
+                  <button type="submit">Delete</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="empty-state">
+        No submissions yet. Head back to the <a href="{{ home_url }}">home page</a> to create
+        one.
+      </p>
+      {% endif %}
+    </section>
+
+    <section>
+      <h2>Visitor Insights</h2>
+      {% if visitors %}
+      <table>
+        <thead>
+          <tr>
+            <th>IP Address</th>
+            <th>Visits</th>
+            <th>First Visit (UTC)</th>
+            <th>Last Visit (UTC)</th>
+            <th>Location</th>
+            <th>User Agent</th>
+            <th>Accept-Language</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ip, details in visitors %}
+          <tr>
+            <td>{{ ip }}</td>
+            <td>{{ details.visits }}</td>
+            <td>{{ details.first_visit.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            <td>{{ details.last_visit.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            <td>{{ details.location }}</td>
+            <td>{{ details.user_agent }}</td>
+            <td>{{ details.accept_language }}</td>
+            <td>
+              {% if ip in blocked_ips %}
+              <form
+                class="inline"
+                method="post"
+                action="{{ url_for('unblock_visitor', ip_address=ip) }}"
+              >
+                <button type="submit">Unblock</button>
+              </form>
+              {% else %}
+              <form
+                class="inline"
+                method="post"
+                action="{{ url_for('block_visitor', ip_address=ip) }}"
+              >
+                <button type="submit">Block</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="empty-state">No visitor data collected yet.</p>
+      {% endif %}
+    </section>
   </body>
 </html>

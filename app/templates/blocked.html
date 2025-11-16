@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Access Restricted</title>
+    <style>
+      body {
+        font-family: Arial, Helvetica, sans-serif;
+        margin: 2rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        max-width: 600px;
+      }
+      h1 {
+        color: #b91c1c;
+      }
+      a {
+        color: #1d4ed8;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Access Restricted</h1>
+    <p>
+      Your IP address has been blocked by the site administrator. If you believe this
+      is an error, please contact the administrator directly.
+    </p>
+    <p>
+      If you are the administrator, you can still manage the site from the
+      <a href="{{ url_for('admin_page') }}">admin area</a>.
+    </p>
+    <a href="{{ home_url }}">Back to Home</a>
+  </body>
+</html>
