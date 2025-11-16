@@ -251,8 +251,11 @@
         const form = document.getElementById("chatForm");
         const input = document.getElementById("chatInput");
         const messagesEl = document.getElementById("chatMessages");
+        const renderedIds = new Set();
         let lastMessageId = 0;
         let pollingHandle = null;
+        let eventSource = null;
+        let reconnectTimer = null;
         let isOpen = false;
 
         function renderMessage(message) {
@@ -266,18 +269,33 @@
           messagesEl.scrollTop = messagesEl.scrollHeight;
         }
 
-        async function loadMessages() {
+        function addMessage(message, fromHistory = false) {
+          if (!message || renderedIds.has(message.id)) {
+            return;
+          }
+          renderedIds.add(message.id);
+          lastMessageId = Math.max(lastMessageId, message.id);
+          renderMessage(message);
+        }
+
+        function renderHistory(messages) {
+          renderedIds.clear();
+          messagesEl.innerHTML = "";
+          messages
+            .slice()
+            .sort((a, b) => a.id - b.id)
+            .forEach((msg) => addMessage(msg, true));
+        }
+
+        async function pollOnce() {
           try {
             const response = await fetch(`/chat/messages?after=${lastMessageId}`, {
               cache: "no-store",
             });
             if (!response.ok) return;
             const data = await response.json();
-            if (data.messages && data.messages.length) {
-              data.messages.forEach((msg) => {
-                renderMessage(msg);
-                lastMessageId = Math.max(lastMessageId, msg.id);
-              });
+            if (Array.isArray(data.messages)) {
+              data.messages.forEach((msg) => addMessage(msg));
             }
           } catch (error) {
             console.error("Unable to load chat messages", error);
@@ -286,8 +304,8 @@
 
         function startPolling() {
           if (pollingHandle) return;
-          loadMessages();
-          pollingHandle = setInterval(loadMessages, 4000);
+          pollOnce();
+          pollingHandle = setInterval(pollOnce, 4000);
         }
 
         function stopPolling() {
@@ -297,17 +315,69 @@
           }
         }
 
+        function handleStreamPayload(payload) {
+          if (!payload) return;
+          if (payload.type === "ping") {
+            return;
+          }
+          if (payload.type === "history" && Array.isArray(payload.messages)) {
+            renderHistory(payload.messages);
+          } else if (payload.type === "message" && payload.message) {
+            addMessage(payload.message);
+          }
+        }
+
+        function disconnectStream() {
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+          }
+        }
+
+        function connectStream() {
+          if (!window.EventSource) {
+            return;
+          }
+          if (eventSource) {
+            return;
+          }
+          eventSource = new EventSource("/chat/stream");
+          eventSource.onmessage = (event) => {
+            try {
+              const payload = JSON.parse(event.data);
+              handleStreamPayload(payload);
+            } catch (error) {
+              console.error("Unable to parse chat update", error);
+            }
+          };
+          eventSource.onerror = () => {
+            disconnectStream();
+            reconnectTimer = setTimeout(connectStream, 2000);
+          };
+        }
+
         function setOpen(state) {
           isOpen = state;
           widget.classList.toggle("hidden", !state);
           toggle.setAttribute("aria-expanded", state ? "true" : "false");
+          if (!window.EventSource) {
+            if (state) {
+              startPolling();
+            } else {
+              stopPolling();
+            }
+          }
           if (state) {
-            startPolling();
             setTimeout(() => input.focus(), 100);
-          } else {
-            stopPolling();
           }
         }
+
+        connectStream();
+        window.addEventListener("beforeunload", disconnectStream);
 
         toggle.addEventListener("click", () => setOpen(!isOpen));
         closeBtn.addEventListener("click", () => setOpen(false));
@@ -323,19 +393,22 @@
               body: JSON.stringify({ sender: "visitor", body: value }),
             });
             if (response.ok) {
+              const message = await response.json();
               input.value = "";
-              loadMessages();
+              addMessage(message);
             }
           } catch (error) {
             console.error("Unable to send message", error);
           }
         });
 
-        window.addEventListener("focus", () => {
-          if (isOpen) {
-            loadMessages();
-          }
-        });
+        if (!window.EventSource) {
+          toggle.addEventListener("click", () => {
+            if (!pollingHandle && isOpen) {
+              startPolling();
+            }
+          });
+        }
       })();
     </script>
   </body>

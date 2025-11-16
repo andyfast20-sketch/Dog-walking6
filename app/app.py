@@ -1,6 +1,19 @@
+import json
+import queue
+import threading
 from datetime import datetime
 
-from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
+from flask import (
+    Flask,
+    Response,
+    abort,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    stream_with_context,
+    url_for,
+)
 
 app = Flask(__name__)
 
@@ -12,6 +25,8 @@ visitor_stats = {}
 blocked_ips = set()
 chat_messages = []
 next_chat_message_id = 1
+chat_stream_subscribers = set()
+chat_subscribers_lock = threading.Lock()
 
 
 IGNORED_USER_AGENT_KEYWORDS = ["vercel-screenshot"]
@@ -79,7 +94,41 @@ def _add_chat_message(sender: str, body: str):
     }
     chat_messages.append(message)
     next_chat_message_id += 1
+    _broadcast_chat_update({"type": "message", "message": message})
     return message
+
+
+def _broadcast_chat_update(payload):
+    with chat_subscribers_lock:
+        subscribers = list(chat_stream_subscribers)
+    for subscriber in subscribers:
+        subscriber.put(payload)
+
+
+def _format_sse_payload(payload: dict) -> str:
+    return f"data: {json.dumps(payload)}\n\n"
+
+
+def _chat_event_stream():
+    subscriber_queue: queue.Queue = queue.Queue()
+    with chat_subscribers_lock:
+        chat_stream_subscribers.add(subscriber_queue)
+
+    def stream():
+        try:
+            if chat_messages:
+                yield _format_sse_payload({"type": "history", "messages": chat_messages})
+            while True:
+                try:
+                    payload = subscriber_queue.get(timeout=25)
+                except queue.Empty:
+                    payload = {"type": "ping"}
+                yield _format_sse_payload(payload)
+        finally:
+            with chat_subscribers_lock:
+                chat_stream_subscribers.discard(subscriber_queue)
+
+    return stream_with_context(stream())
 
 
 @app.before_request
@@ -255,6 +304,13 @@ def mark_chat_as_read():
         if message["sender"] == "visitor":
             message["seen_by_admin"] = True
     return ("", 204)
+
+
+@app.route("/chat/stream")
+def chat_stream():
+    response = Response(_chat_event_stream(), mimetype="text/event-stream")
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 if __name__ == "__main__":
