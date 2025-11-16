@@ -68,6 +68,21 @@
       section + section {
         margin-top: 1rem;
       }
+      .chat-alert {
+        background: #fff;
+        border-radius: 16px;
+        padding: 1.25rem 1.5rem;
+        box-shadow: 0 15px 35px rgba(15, 23, 42, 0.06);
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+      .chat-alert button:disabled {
+        background: #cbd2d9;
+        cursor: not-allowed;
+      }
       .empty-state {
         color: #6b7280;
       }
@@ -161,6 +176,9 @@
       .chat-panel__form button {
         margin: 0;
         border-radius: 999px;
+      }
+      .hidden {
+        display: none;
       }
     </style>
   </head>
@@ -275,7 +293,21 @@
       {% endif %}
     </section>
 
-    <section class="chat-panel" id="chatPanel">
+    <section class="chat-alert">
+      <div>
+        <h2>Live Visitor Chat</h2>
+        <p id="chatStatusMessage" style="margin: 0; color: #475569">
+          {% if chat_unread %}
+          A visitor is waiting to chat.
+          {% else %}
+          No visitors are currently waiting.
+          {% endif %}
+        </p>
+      </div>
+      <button id="openChatButton" {% if not chat_unread %}disabled{% endif %}>Open chat window</button>
+    </section>
+
+    <section class="chat-panel hidden" id="chatPanel">
       <div class="chat-panel__header">
         <div>
           <h2>Live Visitor Chat</h2>
@@ -304,17 +336,38 @@
         const input = document.getElementById("adminChatInput");
         const indicator = document.getElementById("chatIndicator");
         const panel = document.getElementById("chatPanel");
+        const statusMessage = document.getElementById("chatStatusMessage");
+        const openButton = document.getElementById("openChatButton");
         if (!messagesEl || !form) {
           return;
         }
         let lastMessageId = 0;
+        let statusLastMessageId = 0;
         let needsAttention = indicator && indicator.classList.contains("active");
+        let chatWindowOpen = false;
+        const cachedMessages = [];
 
         function setIndicator(state) {
           if (!indicator) return;
           indicator.classList.toggle("active", state);
           indicator.textContent = state ? "New message" : "All caught up";
         }
+
+        function updateChatStatus(waiting) {
+          if (!statusMessage || !openButton) return;
+          if (waiting) {
+            statusMessage.textContent = "A visitor is waiting to chat.";
+          } else if (chatWindowOpen) {
+            statusMessage.textContent = "Chat window is open.";
+          } else {
+            statusMessage.textContent = "No visitors are currently waiting.";
+          }
+          if (!chatWindowOpen) {
+            openButton.disabled = !waiting;
+          }
+        }
+
+        updateChatStatus(needsAttention);
 
         let shouldStickToBottom = true;
 
@@ -339,21 +392,33 @@
           }
         }
 
+        function renderCachedMessages() {
+          messagesEl.innerHTML = "";
+          cachedMessages.forEach((msg) => renderMessage(msg));
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
         async function fetchMessages() {
           try {
-            const response = await fetch(`/chat/messages?after=${lastMessageId}`, {
+            const response = await fetch(`/chat/messages?after=${statusLastMessageId}`, {
               cache: "no-store",
             });
             if (!response.ok) return;
             const data = await response.json();
             if (data.messages && data.messages.length) {
+              const hasVisitorMessage = data.messages.some((msg) => msg.sender === "visitor");
               data.messages.forEach((msg) => {
-                renderMessage(msg);
-                lastMessageId = Math.max(lastMessageId, msg.id);
+                cachedMessages.push(msg);
+                statusLastMessageId = Math.max(statusLastMessageId, msg.id);
+                if (chatWindowOpen) {
+                  renderMessage(msg);
+                  lastMessageId = Math.max(lastMessageId, msg.id);
+                }
               });
-              if (data.messages.some((msg) => msg.sender === "visitor")) {
+              if (hasVisitorMessage) {
                 needsAttention = true;
                 setIndicator(true);
+                updateChatStatus(true);
               }
             }
           } catch (error) {
@@ -361,15 +426,34 @@
           }
         }
 
-        async function markAsRead() {
-          if (!needsAttention) return;
+        async function markAsRead(force = false) {
+          if (!needsAttention && !force) return;
           needsAttention = false;
           setIndicator(false);
+          updateChatStatus(false);
           try {
             await fetch("/admin/chat/read", { method: "POST" });
           } catch (error) {
             console.error("Unable to mark chat as read", error);
           }
+        }
+
+        function openChatWindow() {
+          if (!panel) return;
+          chatWindowOpen = true;
+          panel.classList.remove("hidden");
+          if (openButton) {
+            openButton.disabled = true;
+            openButton.textContent = "Chat window open";
+          }
+          shouldStickToBottom = true;
+          renderCachedMessages();
+          lastMessageId = statusLastMessageId;
+          markAsRead(true);
+        }
+
+        if (openButton) {
+          openButton.addEventListener("click", openChatWindow);
         }
 
         form.addEventListener("submit", async (event) => {
@@ -387,8 +471,12 @@
               input.value = "";
               shouldStickToBottom = true;
               if (message && message.id) {
-                renderMessage(message);
-                lastMessageId = Math.max(lastMessageId, message.id);
+                cachedMessages.push(message);
+                statusLastMessageId = Math.max(statusLastMessageId, message.id);
+                if (chatWindowOpen) {
+                  renderMessage(message);
+                  lastMessageId = Math.max(lastMessageId, message.id);
+                }
               } else {
                 await fetchMessages();
               }
@@ -401,11 +489,15 @@
 
         setInterval(fetchMessages, 4000);
         fetchMessages();
-        panel.addEventListener("click", markAsRead);
-        panel.addEventListener("mouseenter", markAsRead);
+        if (panel) {
+          panel.addEventListener("click", () => markAsRead());
+          panel.addEventListener("mouseenter", () => markAsRead());
+        }
         window.addEventListener("focus", () => {
           fetchMessages();
-          markAsRead();
+          if (chatWindowOpen) {
+            markAsRead();
+          }
         });
       })();
     </script>
