@@ -35,7 +35,7 @@
       .site-header {
         position: relative;
         overflow: hidden;
-        padding: 3rem clamp(1rem, 4vw, 4rem);
+        padding: 0 clamp(1rem, 4vw, 4rem) clamp(3.5rem, 6vw, 5rem);
       }
       .site-header::after {
         content: "";
@@ -48,18 +48,32 @@
       }
       .primary-nav {
         position: sticky;
-        top: 1.5rem;
+        top: 0;
+        left: 0;
+        width: 100%;
         z-index: 10;
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 1rem;
-        padding: 0.95rem 1.5rem;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.95);
-        border: 1px solid rgba(148, 163, 184, 0.2);
-        box-shadow: 0 25px 60px rgba(15, 23, 42, 0.15);
-        backdrop-filter: blur(12px);
+        padding: 1.1rem clamp(1rem, 3vw, 2.5rem);
+        margin-bottom: clamp(1.5rem, 4vw, 3rem);
+        border-radius: 0;
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(49, 46, 129, 0.92));
+        border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+        box-shadow: 0 30px 60px rgba(15, 23, 42, 0.35);
+        backdrop-filter: blur(10px);
+        overflow: hidden;
+      }
+      .primary-nav::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at 10% 50%, rgba(94, 234, 212, 0.35), transparent 55%),
+          radial-gradient(circle at 80% 20%, rgba(236, 72, 153, 0.3), transparent 50%);
+        opacity: 0.9;
+        mix-blend-mode: screen;
+        z-index: -1;
       }
       .logo {
         display: flex;
@@ -67,13 +81,15 @@
         gap: 0.65rem;
         font-weight: 700;
         font-size: 1.2rem;
-        color: #1f3d8f;
+        color: #f8fafc;
+        letter-spacing: 0.02em;
+        text-decoration: none;
       }
       .logo span {
         width: 42px;
         height: 42px;
         border-radius: 12px;
-        background: linear-gradient(135deg, #7f5af0, #5eead4);
+        background: linear-gradient(135deg, rgba(94, 234, 212, 0.8), rgba(236, 72, 153, 0.9));
         display: grid;
         place-items: center;
         color: #fff;
@@ -89,10 +105,14 @@
       }
       .nav-links a {
         text-decoration: none;
-        color: #0f172a;
+        color: rgba(248, 250, 252, 0.85);
         font-weight: 600;
         position: relative;
         padding-bottom: 0.3rem;
+      }
+      .nav-links a:hover,
+      .nav-links a:focus-visible {
+        color: #fff;
       }
       .nav-links a::after {
         content: "";
@@ -102,7 +122,7 @@
         height: 3px;
         width: 0;
         border-radius: 999px;
-        background: linear-gradient(90deg, #2563eb, #7c3aed, #14b8a6);
+        background: linear-gradient(90deg, #5eead4, #a5b4fc, #f472b6);
         transition: width 0.3s ease;
       }
       .nav-links a:hover::after,
@@ -115,9 +135,15 @@
         font-weight: 600;
         padding: 0.65rem 1.25rem;
         border-radius: 999px;
-        color: #fff;
-        background: linear-gradient(135deg, #ec4899, #8b5cf6);
-        box-shadow: 0 15px 35px rgba(236, 72, 153, 0.35);
+        color: #0f172a;
+        background: #fef3c7;
+        box-shadow: 0 12px 30px rgba(252, 211, 77, 0.35);
+        border: 1px solid rgba(253, 230, 138, 0.8);
+      }
+      .nav-cta:hover,
+      .nav-cta:focus-visible {
+        background: #fde68a;
+        box-shadow: 0 20px 35px rgba(252, 211, 77, 0.45);
       }
       @media (max-width: 640px) {
         .primary-nav {
@@ -685,7 +711,7 @@
     <div class="site-shell">
       <header class="site-header">
         <nav class="primary-nav" aria-label="Primary">
-          <a class="logo" href="{{ url_for('index') }}"><span>🐾</span>Happy Trails</a>
+          <a class="logo" href="{{ url_for('index') }}"><span>🐾</span>Happy Paws</a>
           <div class="nav-links">
             {% for link in primary_nav %}
             <a
