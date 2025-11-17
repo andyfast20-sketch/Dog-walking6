@@ -384,8 +384,11 @@ def _backup_directory_candidates():
     """Return a list of writeable directories we can attempt for backups."""
 
     directories = []
+    project_root = os.path.abspath(os.path.join(app.root_path, os.pardir))
     preferred = [
         app.instance_path,
+        os.path.join(project_root, "backups"),
+        project_root,
         app.root_path,
         os.getcwd(),
         os.environ.get("STATE_BACKUP_DIR"),
