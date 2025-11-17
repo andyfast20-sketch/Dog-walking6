@@ -251,6 +251,8 @@ def _backup_directory_candidates():
     directories = []
     preferred = [
         app.instance_path,
+        app.root_path,
+        os.getcwd(),
         os.environ.get("STATE_BACKUP_DIR"),
         os.path.join(tempfile.gettempdir(), "dog_walking_admin"),
     ]
