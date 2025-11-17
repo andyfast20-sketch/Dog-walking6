@@ -401,6 +401,10 @@
         background: #e2e8f0;
         color: #0f172a;
       }
+      .ghost-button--small {
+        padding: 0.35rem 0.8rem;
+        font-size: 0.85rem;
+      }
       .menu-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -1134,6 +1138,10 @@
         color: #b45309;
         font-size: 0.9rem;
       }
+      .backup-note code {
+        font-size: 0.85rem;
+        word-break: break-all;
+      }
       .backup-upload {
         display: flex;
         flex-direction: column;
@@ -1630,6 +1638,13 @@
               {{ state_backup_message }}
             </div>
             {% endif %}
+            <div
+              id="autoSaveController"
+              class="hidden"
+              data-auto-save-enabled="{{ 'true' if auto_save_enabled else 'false' }}"
+              data-auto-save-url="{{ url_for('run_auto_save') }}"
+              data-auto-save-last-run="{{ auto_save_last_run.isoformat() if auto_save_last_run else '' }}"
+            ></div>
             <div class="backup-grid">
               <div class="backup-panel">
                 <h3>Save everything</h3>
@@ -1653,6 +1668,44 @@
                 <p class="backup-note">Last saved {{ state_backup_metadata.saved_at or state_backup_metadata.modified_at }}.</p>
                 {% endif %}
               </div>
+              <div class="backup-panel">
+                <h3>Auto save</h3>
+                <p>Keep the current dashboard safe while you work. We'll save once a minute while this tab stays open.</p>
+                <form method="post" action="{{ url_for('toggle_auto_save_setting') }}" class="autopilot-card__toggle-form">
+                  <label class="toggle-switch">
+                    <input
+                      type="checkbox"
+                      name="enabled"
+                      value="1"
+                      {% if auto_save_enabled %}checked{% endif %}
+                      onchange="this.form.submit()"
+                      aria-label="Toggle auto save"
+                    />
+                    <span class="toggle-slider" aria-hidden="true"></span>
+                    <span class="toggle-state">{{ 'On' if auto_save_enabled else 'Off' }}</span>
+                  </label>
+                  <noscript>
+                    <button type="submit" name="enabled" value="{{ 0 if auto_save_enabled else 1 }}">
+                      {{ 'Disable' if auto_save_enabled else 'Enable' }} auto save
+                    </button>
+                  </noscript>
+                </form>
+                <p class="muted" id="autoSaveStatus" aria-live="polite">
+                  {% if auto_save_enabled %}
+                  Auto save will keep running while you're on this page.
+                  {% else %}
+                  Turn on auto save to back up changes every minute.
+                  {% endif %}
+                </p>
+                <p class="backup-note" id="autoSaveLastRun">
+                  Last auto save:
+                  {% if auto_save_last_run %}
+                  {{ auto_save_last_run.strftime('%b %d, %Y %H:%M UTC') }}
+                  {% else %}
+                  Not yet
+                  {% endif %}
+                </p>
+              </div>
             </div>
             <div class="backup-grid">
               <div class="backup-panel">
@@ -1672,9 +1725,25 @@
                   enctype="multipart/form-data"
                   class="backup-upload"
                 >
-                  <input type="file" name="state_file" accept="application/json,.json" required />
+                  <input
+                    id="backupUploadInput"
+                    type="file"
+                    name="state_file"
+                    accept="application/json,.json"
+                    {% if state_backup_metadata.directory %}
+                    data-backup-dir="{{ state_backup_metadata.directory }}"
+                    {% endif %}
+                    required
+                  />
                   <button type="submit">Upload &amp; restore</button>
                 </form>
+                {% if state_backup_metadata.directory %}
+                <p class="backup-note">
+                  Last backup folder:
+                  <code>{{ state_backup_metadata.directory }}</code>
+                  <button type="button" class="ghost-button ghost-button--small" data-copy-backup-path>Copy path</button>
+                </p>
+                {% endif %}
               </div>
             </div>
             <div class="backup-meta">
@@ -2536,6 +2605,126 @@
           timeButtons.forEach((button) => {
             button.addEventListener("click", () => select(button));
           });
+        }
+
+        const autoSaveController = document.getElementById("autoSaveController");
+        if (autoSaveController) {
+          const autoSaveEnabled = autoSaveController.dataset.autoSaveEnabled === "true";
+          const autoSaveUrl = autoSaveController.dataset.autoSaveUrl;
+          const initialLastRun = autoSaveController.dataset.autoSaveLastRun || "";
+          const statusEl = document.getElementById("autoSaveStatus");
+          const lastRunEl = document.getElementById("autoSaveLastRun");
+          const intervalMs = 60 * 1000;
+          let autoSaveTimer = null;
+          let autoSaveInFlight = false;
+
+          function setLastRunText(timestamp) {
+            if (!lastRunEl) {
+              return;
+            }
+            if (!timestamp) {
+              lastRunEl.textContent = "Last auto save: Not yet";
+              return;
+            }
+            const parsed = new Date(timestamp);
+            if (Number.isNaN(parsed.getTime())) {
+              lastRunEl.textContent = `Last auto save: ${timestamp}`;
+              return;
+            }
+            lastRunEl.textContent = `Last auto save: ${parsed.toLocaleString()}`;
+          }
+
+          function updateStatus(text) {
+            if (statusEl && text) {
+              statusEl.textContent = text;
+            }
+          }
+
+          async function runAutoSave() {
+            if (!autoSaveEnabled || autoSaveInFlight || document.visibilityState === "hidden") {
+              return;
+            }
+            if (!autoSaveUrl) {
+              return;
+            }
+            autoSaveInFlight = true;
+            updateStatus("Auto saving your dashboard...");
+            try {
+              const response = await fetch(autoSaveUrl, { method: "POST" });
+              if (!response.ok) {
+                updateStatus("Auto save paused. We'll retry soon.");
+                return;
+              }
+              const payload = await response.json().catch(() => ({}));
+              if (payload && payload.saved_at) {
+                setLastRunText(payload.saved_at);
+                updateStatus("Everything's saved.");
+              } else {
+                updateStatus("Auto save is running.");
+              }
+            } catch (error) {
+              console.warn("Auto save failed", error);
+              updateStatus("Auto save paused (network issue).");
+            } finally {
+              autoSaveInFlight = false;
+            }
+          }
+
+          function stopAutoSaveTimer() {
+            if (autoSaveTimer) {
+              clearInterval(autoSaveTimer);
+              autoSaveTimer = null;
+            }
+          }
+
+          function startAutoSaveTimer() {
+            if (!autoSaveEnabled || document.visibilityState === "hidden") {
+              return;
+            }
+            stopAutoSaveTimer();
+            autoSaveTimer = setInterval(runAutoSave, intervalMs);
+            runAutoSave();
+          }
+
+          setLastRunText(initialLastRun);
+          if (autoSaveEnabled) {
+            startAutoSaveTimer();
+            document.addEventListener("visibilitychange", () => {
+              stopAutoSaveTimer();
+              if (document.visibilityState === "visible") {
+                startAutoSaveTimer();
+              }
+            });
+          }
+        }
+
+        const backupUploadInput = document.getElementById("backupUploadInput");
+        if (backupUploadInput) {
+          const lastDir = backupUploadInput.dataset.backupDir;
+          if (lastDir) {
+            backupUploadInput.setAttribute("nwworkingdir", lastDir);
+            backupUploadInput.setAttribute("data-working-directory", lastDir);
+          }
+          const copyButton = document.querySelector("[data-copy-backup-path]");
+          if (copyButton && lastDir) {
+            copyButton.addEventListener("click", async () => {
+              const originalText = copyButton.textContent;
+              try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                  await navigator.clipboard.writeText(lastDir);
+                } else {
+                  throw new Error("Clipboard API unavailable");
+                }
+                copyButton.textContent = "Copied!";
+              } catch (error) {
+                console.warn("Unable to copy backup path", error);
+                copyButton.textContent = lastDir;
+              }
+              setTimeout(() => {
+                copyButton.textContent = originalText;
+              }, 2000);
+            });
+          }
         }
       })();
     </script>

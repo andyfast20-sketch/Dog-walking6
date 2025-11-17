@@ -374,6 +374,8 @@ autopilot_status = {
     "last_reply_preview": None,
     "last_visitor_id": None,
 }
+auto_save_enabled = False
+auto_save_last_run: Optional[datetime] = None
 SERVICE_NOTICE_DEFAULT_TEXT = "Website under construction - Do not place any bookings."
 site_service_notice = {"enabled": False, "message": SERVICE_NOTICE_DEFAULT_TEXT}
 STATE_BACKUP_FILENAME = "state_backup.json"
@@ -625,6 +627,8 @@ def _serialize_state() -> dict:
         "site_photos": dict(site_photos),
         "service_notice": dict(site_service_notice),
         "meet_greet_enabled": _meet_greet_setting(),
+        "auto_save_enabled": auto_save_enabled,
+        "auto_save_last_run": _serialize_datetime(auto_save_last_run),
     }
     return state
 
@@ -636,6 +640,7 @@ def _load_state(state: dict):
     global business_in_a_box, autopilot_enabled, autopilot_status, breed_ai_suggestions
     global coverage_areas, next_coverage_area_id, team_certificates, next_certificate_id
     global site_photos, site_service_notice, meet_greet_enabled
+    global auto_save_enabled, auto_save_last_run
 
     submissions = [dict(row) for row in state.get("submissions", []) if isinstance(row, dict)]
     next_submission_id = _coerce_int(state.get("next_submission_id"), _next_id_from_rows(submissions))
@@ -759,6 +764,8 @@ def _load_state(state: dict):
     else:
         site_service_notice = {"enabled": False, "message": SERVICE_NOTICE_DEFAULT_TEXT}
     meet_greet_enabled = bool(state.get("meet_greet_enabled", True))
+    auto_save_enabled = bool(state.get("auto_save_enabled", False))
+    auto_save_last_run = _parse_datetime(state.get("auto_save_last_run"))
 
 
 def _get_state_backup_metadata() -> dict:
@@ -769,6 +776,7 @@ def _get_state_backup_metadata() -> dict:
     }
     if not metadata["exists"]:
         return metadata
+    metadata["directory"] = os.path.dirname(path)
     metadata["size"] = os.path.getsize(path)
     metadata["modified_at"] = datetime.fromtimestamp(os.path.getmtime(path)).isoformat()
     try:
@@ -1381,6 +1389,8 @@ def admin_page():
         site_photo_custom_count=custom_photo_count,
         service_notice=_service_notice_state(),
         meet_greet_enabled=_meet_greet_setting(),
+        auto_save_enabled=auto_save_enabled,
+        auto_save_last_run=auto_save_last_run,
     )
 
 
@@ -1404,6 +1414,26 @@ def save_admin_state():
     if not _write_state_backup():
         return redirect(url_for("admin_page", state_action="save_failed", view="backups"))
     return redirect(url_for("admin_page", state_action="saved", view="backups"))
+
+
+@app.route("/admin/state/auto-save/toggle", methods=["POST"])
+def toggle_auto_save_setting():
+    global auto_save_enabled
+
+    auto_save_enabled = request.form.get("enabled") == "1"
+    return redirect(url_for("admin_page", view="backups"))
+
+
+@app.route("/admin/state/auto-save/run", methods=["POST"])
+def run_auto_save():
+    global auto_save_enabled, auto_save_last_run
+
+    if not auto_save_enabled:
+        return jsonify({"saved": False, "reason": "disabled"}), 400
+    if not _write_state_backup():
+        return jsonify({"saved": False, "reason": "write_failed"}), 500
+    auto_save_last_run = datetime.utcnow()
+    return jsonify({"saved": True, "saved_at": auto_save_last_run.isoformat()})
 
 
 @app.route("/admin/state/load", methods=["POST"])
