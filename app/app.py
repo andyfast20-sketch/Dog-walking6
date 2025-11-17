@@ -72,7 +72,15 @@ STATE_BACKUP_FILENAME = "state_backup.json"
 
 
 def _state_backup_path() -> str:
-    return os.path.join(app.root_path, STATE_BACKUP_FILENAME)
+    """Return the path for the admin backup file, ensuring the folder exists."""
+
+    backup_dir = app.instance_path
+    try:
+        os.makedirs(backup_dir, exist_ok=True)
+    except OSError:
+        # We'll surface the failure when attempting to open the file later.
+        pass
+    return os.path.join(backup_dir, STATE_BACKUP_FILENAME)
 
 
 def _serialize_datetime(value):
