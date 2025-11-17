@@ -38,6 +38,7 @@ def test_serialize_state_includes_chats_breeds_and_photos(app_module):
     }
     app_module.dog_breeds = [{"id": 1, "name": "Border Collie"}]
     app_module.site_photos["home_hero"] = "https://example.com/custom-hero.jpg"
+    app_module.meet_greet_enabled = False
 
     payload = app_module._serialize_state()
 
@@ -46,6 +47,7 @@ def test_serialize_state_includes_chats_breeds_and_photos(app_module):
     assert serialized_conversation["messages"][0]["body"] == "Hello there"
     assert payload["dog_breeds"][0]["name"] == "Border Collie"
     assert payload["site_photos"]["home_hero"] == "https://example.com/custom-hero.jpg"
+    assert payload["meet_greet_enabled"] is False
 
 
 def test_load_state_restores_chats_breeds_and_photos(app_module):
@@ -71,6 +73,9 @@ def test_load_state_restores_chats_breeds_and_photos(app_module):
     state["dog_breeds"] = [{"id": 5, "name": "Vizsla"}]
     state["next_dog_breed_id"] = 6
     state["site_photos"]["home_hero"] = "https://example.com/fresh-hero.jpg"
+    state["meet_greet_enabled"] = False
+
+    app_module.meet_greet_enabled = True
 
     app_module._load_state(state)
 
@@ -79,3 +84,4 @@ def test_load_state_restores_chats_breeds_and_photos(app_module):
     assert restored_conversation["messages"][0]["body"] == "Thanks for reaching out!"
     assert app_module.dog_breeds[0]["name"] == "Vizsla"
     assert app_module.site_photos["home_hero"] == "https://example.com/fresh-hero.jpg"
+    assert app_module.meet_greet_enabled is False

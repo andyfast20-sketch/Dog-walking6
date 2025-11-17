@@ -271,10 +271,12 @@ next_slot_id = 1
 dog_breeds = []
 next_dog_breed_id = 1
 breed_ai_suggestions = None
+meet_greet_enabled = True
 
 ADMIN_VIEWS = {
     "menu",
     "autopilot",
+    "status",
     "backups",
     "coverage",
     "credentials",
@@ -511,6 +513,10 @@ def _service_notice_state():
     return {"enabled": bool(site_service_notice.get("enabled")), "message": message}
 
 
+def _meet_greet_setting() -> bool:
+    return bool(meet_greet_enabled)
+
+
 def _next_id_from_rows(rows, key: str = "id") -> int:
     max_value = 0
     for row in rows:
@@ -615,6 +621,7 @@ def _serialize_state() -> dict:
         "autopilot_status": dict(autopilot_status),
         "site_photos": dict(site_photos),
         "service_notice": dict(site_service_notice),
+        "meet_greet_enabled": _meet_greet_setting(),
     }
     return state
 
@@ -625,7 +632,7 @@ def _load_state(state: dict):
     global next_slot_id, dog_breeds, next_dog_breed_id
     global business_in_a_box, autopilot_enabled, autopilot_status, breed_ai_suggestions
     global coverage_areas, next_coverage_area_id, team_certificates, next_certificate_id
-    global site_photos, site_service_notice
+    global site_photos, site_service_notice, meet_greet_enabled
 
     submissions = [dict(row) for row in state.get("submissions", []) if isinstance(row, dict)]
     next_submission_id = _coerce_int(state.get("next_submission_id"), _next_id_from_rows(submissions))
@@ -748,6 +755,7 @@ def _load_state(state: dict):
         }
     else:
         site_service_notice = {"enabled": False, "message": SERVICE_NOTICE_DEFAULT_TEXT}
+    meet_greet_enabled = bool(state.get("meet_greet_enabled", True))
 
 
 def _get_state_backup_metadata() -> dict:
@@ -1253,6 +1261,7 @@ def index():
         home_hero_image=_get_photo_url("home_hero"),
         home_profile_image=_get_photo_url("home_profile"),
         service_notice=_service_notice_state(),
+        meet_greet_enabled=_meet_greet_setting(),
     )
 
 
@@ -1272,6 +1281,7 @@ def bookings_page():
         datetime=datetime,
         bookings_hero_image=_get_photo_url("bookings_hero"),
         service_notice=_service_notice_state(),
+        meet_greet_enabled=_meet_greet_setting(),
     )
 
 
@@ -1362,6 +1372,7 @@ def admin_page():
         site_photo_total=len(site_photo_rows),
         site_photo_custom_count=custom_photo_count,
         service_notice=_service_notice_state(),
+        meet_greet_enabled=_meet_greet_setting(),
     )
 
 
@@ -1424,6 +1435,15 @@ def update_service_notice():
     if not message_value:
         message_value = SERVICE_NOTICE_DEFAULT_TEXT
     site_service_notice = {"enabled": enabled_value == "1", "message": message_value}
+    return redirect(url_for("admin_page", view="status"))
+
+
+@app.route("/admin/meet-greet", methods=["POST"])
+def update_meet_greet_setting():
+    global meet_greet_enabled
+
+    enabled_value = request.form.get("enabled", "0")
+    meet_greet_enabled = enabled_value == "1"
     return redirect(url_for("admin_page", view="status"))
 
 

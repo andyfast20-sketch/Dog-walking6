@@ -1247,6 +1247,27 @@
                 <span class="menu-pill">{{ service_notice.message }}</span>
               </div>
             </button>
+            <button type="button" class="menu-card" data-open-view="status">
+              <div class="menu-card__top">
+                <div>
+                  <p class="menu-card__eyebrow">Meet &amp; greet CTA</p>
+                  <h3>{{ 'Visible' if meet_greet_enabled else 'Hidden' }}</h3>
+                  <p>
+                    {{
+                      'Homepage section is currently promoted to visitors.'
+                      if meet_greet_enabled
+                      else 'Keep it off while meet & greets are unavailable.'
+                    }}
+                  </p>
+                </div>
+                <div class="menu-card__icon">🐶</div>
+              </div>
+              <div class="menu-card__meta">
+                <span class="menu-pill">
+                  {{ 'Homepage CTA live' if meet_greet_enabled else 'CTA hidden sitewide' }}
+                </span>
+              </div>
+            </button>
             <button type="button" class="menu-card" data-open-view="backups">
               <div class="menu-card__top">
                 <div>
@@ -1489,7 +1510,7 @@
             <div>
               <p class="eyebrow">Service banner</p>
               <h2 id="noticeHeading">Website status notice</h2>
-              <p>Flip the construction warning on or off whenever you're updating the public site.</p>
+              <p>Flip the construction warning or meet &amp; greet CTA on or off whenever you're updating the public site.</p>
             </div>
             <button type="button" class="ghost-button" data-open-view="menu">Back to main menu</button>
           </div>
@@ -1520,6 +1541,36 @@
               </div>
               <p class="service-status-card__note">
                 This setting is included when you save or load admin backups.
+              </p>
+            </form>
+          </section>
+          <section class="service-status-card">
+            <div class="service-status-card__preview {% if meet_greet_enabled %}is-active{% endif %}">
+              <span>Homepage meet &amp; greet section</span>
+              <p>
+                {{
+                  'Visitors can see the complimentary meet & greet section and CTA across the site.'
+                  if meet_greet_enabled
+                  else 'The meet & greet promo is currently hidden from public pages.'
+                }}
+              </p>
+            </div>
+            <form method="post" action="{{ url_for('update_meet_greet_setting') }}" class="service-status-card__form">
+              <p>Control whether the "Schedule a complimentary meet and greet" block appears on the homepage and bookings page.</p>
+              <div class="service-status-card__actions">
+                <button type="submit" name="enabled" value="1" {% if meet_greet_enabled %}disabled{% endif %}>Show section</button>
+                <button
+                  type="submit"
+                  name="enabled"
+                  value="0"
+                  class="ghost-button"
+                  {% if not meet_greet_enabled %}disabled{% endif %}
+                >
+                  Hide section
+                </button>
+              </div>
+              <p class="service-status-card__note">
+                This toggle is also saved inside admin backups.
               </p>
             </form>
           </section>
