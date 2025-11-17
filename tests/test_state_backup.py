@@ -85,3 +85,10 @@ def test_load_state_restores_chats_breeds_and_photos(app_module):
     assert app_module.dog_breeds[0]["name"] == "Vizsla"
     assert app_module.site_photos["home_hero"] == "https://example.com/fresh-hero.jpg"
     assert app_module.meet_greet_enabled is False
+
+
+def test_backup_candidates_include_project_root_and_folder(app_module):
+    project_root = Path(app_module.app.root_path).parent
+    candidates = app_module._backup_directory_candidates()
+    assert str(project_root) in candidates
+    assert str(project_root / "backups") in candidates
