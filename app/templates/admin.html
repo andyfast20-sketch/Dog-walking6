@@ -932,6 +932,7 @@
         <button type="button" data-open-view="breeds">Dog breeds</button>
         <button type="button" data-open-view="enquiries">Enquiries</button>
         <button type="button" data-open-view="appointments">Appointments</button>
+        <button type="button" data-open-view="coverage">Service area</button>
         <button type="button" data-open-view="visitors">Visitor insights</button>
         <button type="button" data-open-view="chat">Live chat</button>
       </nav>
@@ -1040,6 +1041,19 @@
                 {% else %}
                 <span class="menu-pill">All bookings handled</span>
                 {% endif %}
+              </div>
+            </button>
+            <button type="button" class="menu-card" data-open-view="coverage">
+              <div class="menu-card__top">
+                <div>
+                  <p class="menu-card__eyebrow">Service area</p>
+                  <h3>{{ coverage_areas | length }} live</h3>
+                  <p>Manage the neighbourhood cards shown on the homepage.</p>
+                </div>
+                <div class="menu-card__icon">🗺️</div>
+              </div>
+              <div class="menu-card__meta">
+                <span class="menu-pill">Update copy &amp; order anytime</span>
               </div>
             </button>
             <button type="button" class="menu-card" data-open-view="visitors">
@@ -1502,6 +1516,67 @@
           </section>
         </section>
 
+        <section class="view" data-view="coverage" aria-labelledby="coverageAdminHeading">
+          <div class="view-heading">
+            <div>
+              <p class="eyebrow">Service area</p>
+              <h2 id="coverageAdminHeading">Homepage coverage list</h2>
+              <p>Update the neighbourhoods visitors see on the main site.</p>
+            </div>
+            <button type="button" class="ghost-button" data-open-view="menu">Back to main menu</button>
+          </div>
+          <section class="coverage-admin" aria-labelledby="coverageAdminHeading">
+            <div class="coverage-admin__grid">
+              <article class="coverage-admin__card">
+                <h3>Add a new area</h3>
+                <p>Give it a friendly name and a short description.</p>
+                <form method="post" action="{{ url_for('save_coverage_area') }}">
+                  <label>
+                    Area name
+                    <input type="text" name="area_name" required />
+                  </label>
+                  <label>
+                    Description
+                    <textarea name="area_description" placeholder="Quiet lanes, riverside paths, etc." required></textarea>
+                  </label>
+                  <button type="submit">Add area</button>
+                </form>
+              </article>
+              {% if coverage_areas %}
+              {% for area in coverage_areas %}
+              <article class="coverage-admin__card">
+                <h3>{{ area.name }}</h3>
+                <p>Shown exactly as written on the homepage.</p>
+                <form method="post" action="{{ url_for('save_coverage_area') }}">
+                  <input type="hidden" name="area_id" value="{{ area.id }}" />
+                  <label>
+                    Area name
+                    <input type="text" name="area_name" value="{{ area.name }}" required />
+                  </label>
+                  <label>
+                    Description
+                    <textarea name="area_description" required>{{ area.description }}</textarea>
+                  </label>
+                  <div class="coverage-admin__actions">
+                    <button type="submit">Save changes</button>
+                    <button type="submit" form="delete-area-{{ area.id }}" class="ghost-button">Remove</button>
+                  </div>
+                </form>
+                <form
+                  id="delete-area-{{ area.id }}"
+                  method="post"
+                  action="{{ url_for('delete_coverage_area', area_id=area.id) }}"
+                  onsubmit="return confirm('Remove {{ area.name }} from the homepage?');"
+                ></form>
+              </article>
+              {% endfor %}
+              {% else %}
+              <p class="coverage-admin__empty">No coverage areas published yet.</p>
+              {% endif %}
+            </div>
+          </section>
+        </section>
+
         <section class="view" data-view="visitors" aria-labelledby="visitorHeading">
           <div class="view-heading">
             <div>
@@ -1555,67 +1630,6 @@
             {% else %}
             <p class="empty-state">No visitor data collected yet.</p>
             {% endif %}
-          </section>
-          <section class="coverage-admin" aria-labelledby="coverageHeading">
-            <div>
-              <p class="eyebrow">Service area</p>
-              <h2 id="coverageHeading" style="margin-top: 0.25rem">Homepage coverage list</h2>
-              <p style="margin: 0; color: #475569">Update the neighbourhoods visitors see on the main site.</p>
-            </div>
-            <div class="coverage-admin__grid">
-              <article class="coverage-admin__card">
-                <h3>Add a new area</h3>
-                <p>Give it a friendly name and a short description.</p>
-                <form method="post" action="{{ url_for('save_coverage_area') }}">
-                  <label>
-                    Area name
-                    <input type="text" name="area_name" required />
-                  </label>
-                  <label>
-                    Description
-                    <textarea name="area_description" placeholder="Quiet lanes, riverside paths, etc." required></textarea>
-                  </label>
-                  <button type="submit">Add area</button>
-                </form>
-              </article>
-              {% if coverage_areas %}
-              {% for area in coverage_areas %}
-              <article class="coverage-admin__card">
-                <h3>{{ area.name }}</h3>
-                <p>Shown exactly as written on the homepage.</p>
-                <form method="post" action="{{ url_for('save_coverage_area') }}">
-                  <input type="hidden" name="area_id" value="{{ area.id }}" />
-                  <label>
-                    Area name
-                    <input type="text" name="area_name" value="{{ area.name }}" required />
-                  </label>
-                  <label>
-                    Description
-                    <textarea name="area_description" required>{{ area.description }}</textarea>
-                  </label>
-                  <div class="coverage-admin__actions">
-                    <button type="submit">Save changes</button>
-                    <button
-                      type="submit"
-                      form="delete-area-{{ area.id }}"
-                      class="ghost-button"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </form>
-                <form
-                  id="delete-area-{{ area.id }}"
-                  method="post"
-                  action="{{ url_for('delete_coverage_area', area_id=area.id) }}"
-                  onsubmit="return confirm('Remove {{ area.name }} from the homepage?');"
-                ></form>
-              </article>
-              {% endfor %}
-              {% else %}
-              <p class="coverage-admin__empty">No coverage areas published yet.</p>
-              {% endif %}
-            </div>
           </section>
         </section>
 

@@ -219,6 +219,7 @@ ADMIN_VIEWS = {
     "menu",
     "autopilot",
     "backups",
+    "coverage",
     "breeds",
     "enquiries",
     "appointments",
