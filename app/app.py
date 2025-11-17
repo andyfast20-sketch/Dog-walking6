@@ -1600,6 +1600,7 @@ def clear_breed_ai_suggestions():
 @app.route("/admin/slots", methods=["POST"])
 def create_appointment_slot():
     global next_slot_id
+    appointments_url = url_for("admin_page", view="appointments")
     date_value = (request.form.get("date") or "").strip()
     time_value = (request.form.get("time") or "").strip()
     price_input = (request.form.get("price") or "").strip()
@@ -1607,14 +1608,14 @@ def create_appointment_slot():
     if service_type not in BOOKING_SERVICE_TYPES:
         service_type = "walk"
     if not date_value or not time_value:
-        return redirect(url_for("admin_page"))
+        return redirect(appointments_url)
     price_amount = _parse_price(price_input)
     if price_amount is None:
-        return redirect(url_for("admin_page"))
+        return redirect(appointments_url)
     try:
         start = datetime.strptime(f"{date_value} {time_value}", "%Y-%m-%d %H:%M")
     except ValueError:
-        return redirect(url_for("admin_page"))
+        return redirect(appointments_url)
     slot = {
         "id": next_slot_id,
         "start": start,
@@ -1629,7 +1630,7 @@ def create_appointment_slot():
     appointment_slots.append(slot)
     appointment_slots.sort(key=lambda entry: entry["start"])
     next_slot_id += 1
-    return redirect(url_for("admin_page"))
+    return redirect(appointments_url)
 
 
 @app.route("/admin/slots/<int:slot_id>/status", methods=["POST"])
@@ -1641,7 +1642,45 @@ def update_slot_status(slot_id: int):
     if status not in BOOKING_WORKFLOW_STATUSES:
         status = BOOKING_WORKFLOW_STATUSES[0]
     slot["workflow_status"] = status
-    return redirect(url_for("admin_page"))
+    return redirect(url_for("admin_page", view="appointments"))
+
+
+@app.route("/admin/slots/<int:slot_id>", methods=["POST"])
+def update_appointment_slot(slot_id: int):
+    slot = _get_slot(slot_id)
+    if slot is None:
+        abort(404)
+    appointments_url = url_for("admin_page", view="appointments")
+    date_value = (request.form.get("date") or "").strip()
+    time_value = (request.form.get("time") or "").strip()
+    price_input = (request.form.get("price") or "").strip()
+    service_type = (request.form.get("service_type") or slot.get("service_type") or "walk").strip()
+    if service_type not in BOOKING_SERVICE_TYPES:
+        service_type = "walk"
+    if not date_value or not time_value:
+        return redirect(appointments_url)
+    try:
+        start = datetime.strptime(f"{date_value} {time_value}", "%Y-%m-%d %H:%M")
+    except ValueError:
+        return redirect(appointments_url)
+    price_amount = None
+    if price_input:
+        price_amount = _parse_price(price_input)
+        if price_amount is None:
+            return redirect(appointments_url)
+    slot.update({"start": start, "service_type": service_type, "price": price_amount})
+    appointment_slots.sort(key=lambda entry: entry["start"])
+    return redirect(appointments_url)
+
+
+@app.route("/admin/slots/<int:slot_id>/delete", methods=["POST"])
+def delete_appointment_slot(slot_id: int):
+    global appointment_slots
+    slot = _get_slot(slot_id)
+    if slot is None:
+        abort(404)
+    appointment_slots = [entry for entry in appointment_slots if entry["id"] != slot_id]
+    return redirect(url_for("admin_page", view="appointments"))
 
 
 @app.route("/bookings/slots/<int:slot_id>", methods=["POST"])
