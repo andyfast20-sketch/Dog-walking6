@@ -76,6 +76,29 @@
         color: #94a3b8;
         margin: 0 0 0.3rem;
       }
+      .global-chat-banner {
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.9rem 1.25rem;
+        border-radius: 20px;
+        background: rgba(254, 243, 199, 0.95);
+        border: 1px solid rgba(251, 191, 36, 0.5);
+        box-shadow: 0 15px 35px rgba(251, 146, 60, 0.25);
+        margin: 0 0 1.5rem;
+        position: sticky;
+        top: 0.5rem;
+        z-index: 30;
+      }
+      .global-chat-banner.is-active {
+        display: flex;
+        animation: flashBg 1.1s ease-in-out infinite;
+      }
+      .global-chat-banner p {
+        margin: 0;
+        color: #92400e;
+      }
       .view-nav {
         background: rgba(255, 255, 255, 0.9);
         border-radius: 999px;
@@ -893,6 +916,15 @@
         </div>
         <a class="home-link" href="{{ home_url }}">Return to site</a>
       </header>
+      <div class="global-chat-banner" id="globalChatBanner" aria-live="polite">
+        <div>
+          <p class="eyebrow" style="margin-bottom: 0.15rem">Live chat</p>
+          <p id="globalChatBannerText">A visitor is waiting in live chat.</p>
+        </div>
+        <button type="button" class="ghost-button" data-open-view="chat" id="globalChatBannerButton">
+          Jump to chat
+        </button>
+      </div>
       <nav class="view-nav" aria-label="Admin menu">
         <button type="button" class="is-active" data-open-view="menu">Main menu</button>
         <button type="button" data-open-view="autopilot">Autopilot</button>
@@ -1721,6 +1753,8 @@
         const openButton = document.getElementById("openChatButton");
         const closeButton = document.getElementById("closeChatButton");
         const chatAlert = document.querySelector(".chat-alert");
+        const globalChatBanner = document.getElementById("globalChatBanner");
+        const globalChatBannerText = document.getElementById("globalChatBannerText");
         const conversationSelect = document.getElementById("chatVisitorSelect");
         const deleteButton = document.getElementById("deleteConversationButton");
         const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -1918,6 +1952,18 @@
           }
         }
 
+        function updateGlobalBanner(waitingCount) {
+          if (!globalChatBanner) return;
+          const hasWaiting = waitingCount > 0;
+          globalChatBanner.classList.toggle("is-active", hasWaiting);
+          if (hasWaiting && globalChatBannerText) {
+            globalChatBannerText.textContent =
+              waitingCount === 1
+                ? "A visitor is waiting in live chat."
+                : `${waitingCount} visitors are waiting in live chat.`;
+          }
+        }
+
         function updateChatStatus(waitingCount) {
           if (statusMessage) {
             if (!conversationMap.size) {
@@ -1945,6 +1991,7 @@
             }
           }
           setFlash(waitingCount > 0);
+          updateGlobalBanner(waitingCount);
         }
 
         function updateWaitingState() {
