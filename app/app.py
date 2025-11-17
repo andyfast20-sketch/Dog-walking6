@@ -524,6 +524,8 @@ def admin_page():
     slot_rows = [_serialize_slot(slot) for slot in _sorted_slots()]
     available_slots = [slot for slot in slot_rows if not slot["is_booked"]]
     booked_slots = [slot for slot in slot_rows if slot["is_booked"]]
+    new_enquiry_count = sum(1 for submission in submissions if (submission.get("status") or "New") == "New")
+    has_new_bookings = any((slot.get("workflow_status") or "New") == "New" for slot in booked_slots)
     return render_template(
         "admin.html",
         home_url=url_for("index"),
@@ -547,6 +549,9 @@ def admin_page():
         autopilot_api_key_missing=_get_deepseek_api_key() is None,
         dog_breeds=_sorted_breeds(),
         breed_ai_suggestions=breed_ai_suggestions,
+        new_enquiry_count=new_enquiry_count,
+        has_new_bookings=has_new_bookings,
+        visitor_count=len(visitor_rows),
     )
 
 
