@@ -742,6 +742,54 @@
         border-radius: 10px;
         font-weight: 600;
       }
+      .service-status-card {
+        background: #fff;
+        border-radius: 24px;
+        padding: clamp(1.25rem, 3vw, 2rem);
+        box-shadow: 0 20px 50px rgba(15, 23, 42, 0.1);
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+      .service-status-card__preview {
+        border-radius: 18px;
+        border: 1px dashed rgba(15, 23, 42, 0.2);
+        padding: 1.2rem 1.4rem;
+        background: rgba(254, 243, 199, 0.4);
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+      .service-status-card__preview.is-active {
+        border-color: rgba(194, 65, 12, 0.5);
+        background: rgba(254, 243, 199, 0.9);
+      }
+      .service-status-card__preview span {
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.75rem;
+        color: #92400e;
+      }
+      .service-status-card__preview p {
+        margin: 0;
+        font-weight: 600;
+        color: #7c2d12;
+      }
+      .service-status-card__form p {
+        margin: 0 0 0.75rem;
+        color: #475569;
+      }
+      .service-status-card__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: center;
+      }
+      .service-status-card__note {
+        margin: 0;
+        font-size: 0.85rem;
+        color: #94a3b8;
+      }
       .business-brief-form textarea {
         width: 100%;
         min-height: 130px;
@@ -1101,6 +1149,7 @@
       <nav class="view-nav" aria-label="Admin menu">
         <button type="button" class="is-active" data-open-view="menu">Main menu</button>
         <button type="button" data-open-view="autopilot">Autopilot</button>
+        <button type="button" data-open-view="status">Service notice</button>
         <button type="button" data-open-view="backups">Save &amp; load</button>
         <button type="button" data-open-view="photos">Site photos</button>
         <button type="button" data-open-view="breeds">Dog breeds</button>
@@ -1138,6 +1187,29 @@
               </div>
               <div class="menu-card__meta">
                 <span class="menu-pill">Last run: {{ autopilot_status.last_run or 'Never' }}</span>
+              </div>
+            </button>
+            <button
+              type="button"
+              class="menu-card {% if service_notice.enabled %}menu-card--alert{% endif %}"
+              data-open-view="status"
+            >
+              <div class="menu-card__top">
+                <div>
+                  <p class="menu-card__eyebrow">Service notice</p>
+                  <h3>{{ 'Live' if service_notice.enabled else 'Hidden' }}</h3>
+                  <p>
+                    {{
+                      'Visitors currently see the construction warning.'
+                      if service_notice.enabled
+                      else 'Activate when the site is under development.'
+                    }}
+                  </p>
+                </div>
+                <div class="menu-card__icon">🚧</div>
+              </div>
+              <div class="menu-card__meta">
+                <span class="menu-pill">{{ service_notice.message }}</span>
               </div>
             </button>
             <button type="button" class="menu-card" data-open-view="backups">
@@ -1377,6 +1449,47 @@
           </section>
         </section>
 
+        <section class="view" data-view="status" aria-labelledby="noticeHeading">
+          <div class="view-heading">
+            <div>
+              <p class="eyebrow">Service banner</p>
+              <h2 id="noticeHeading">Website status notice</h2>
+              <p>Flip the construction warning on or off whenever you're updating the public site.</p>
+            </div>
+            <button type="button" class="ghost-button" data-open-view="menu">Back to main menu</button>
+          </div>
+          <section class="service-status-card">
+            <div class="service-status-card__preview {% if service_notice.enabled %}is-active{% endif %}">
+              <span>Live banner preview</span>
+              <p>{{ service_notice.message }}</p>
+            </div>
+            <form method="post" action="{{ url_for('update_service_notice') }}" class="service-status-card__form">
+              <input type="hidden" name="message" value="{{ service_notice.message }}" />
+              <p>
+                The message is fixed so visitors always see:
+                <strong>{{ service_notice.message }}</strong>
+              </p>
+              <div class="service-status-card__actions">
+                <button type="submit" name="enabled" value="1" {% if service_notice.enabled %}disabled{% endif %}>
+                  Show notice
+                </button>
+                <button
+                  type="submit"
+                  name="enabled"
+                  value="0"
+                  class="ghost-button"
+                  {% if not service_notice.enabled %}disabled{% endif %}
+                >
+                  Hide notice
+                </button>
+              </div>
+              <p class="service-status-card__note">
+                This setting is included when you save or load admin backups.
+              </p>
+            </form>
+          </section>
+        </section>
+
         <section class="view" data-view="backups" aria-labelledby="backupHeading">
           <div class="view-heading">
             <div>
@@ -1395,7 +1508,10 @@
             <div class="backup-grid">
               <div class="backup-panel">
                 <h3>Save everything</h3>
-                <p>Write the current submissions, appointments, visitors, chats, breeds, and autopilot settings to a backup file on the server.</p>
+                <p>
+                  Write the current submissions, appointments, visitors, chats, breeds, autopilot settings, and service notice
+                  status to a backup file on the server.
+                </p>
                 <form method="post" action="{{ url_for('save_admin_state') }}">
                   <button type="submit">Save now</button>
                 </form>
