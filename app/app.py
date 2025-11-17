@@ -744,6 +744,7 @@ def index():
         submission_success=submission_success,
         booking_slots=slot_rows,
         dog_breeds=_sorted_breeds(),
+        current_year=datetime.utcnow().year,
     )
 
 
