@@ -1,6 +1,7 @@
 import json
 import os
 import queue
+import tempfile
 import threading
 import urllib.error
 import urllib.request
@@ -69,18 +70,59 @@ autopilot_status = {
     "last_visitor_id": None,
 }
 STATE_BACKUP_FILENAME = "state_backup.json"
+_active_backup_directory = None
 
 
-def _state_backup_path() -> str:
-    """Return the path for the admin backup file, ensuring the folder exists."""
+def _backup_directory_candidates():
+    """Return a list of writeable directories we can attempt for backups."""
 
-    backup_dir = app.instance_path
-    try:
-        os.makedirs(backup_dir, exist_ok=True)
-    except OSError:
-        # We'll surface the failure when attempting to open the file later.
-        pass
-    return os.path.join(backup_dir, STATE_BACKUP_FILENAME)
+    directories = []
+    preferred = [
+        app.instance_path,
+        os.environ.get("STATE_BACKUP_DIR"),
+        os.path.join(tempfile.gettempdir(), "dog_walking_admin"),
+    ]
+    for directory in preferred:
+        if directory and directory not in directories:
+            directories.append(directory)
+    return directories
+
+
+def _existing_backup_path() -> Optional[str]:
+    """Return the path for the backup file if it already exists."""
+
+    global _active_backup_directory
+    if _active_backup_directory:
+        path = os.path.join(_active_backup_directory, STATE_BACKUP_FILENAME)
+        if os.path.exists(path):
+            return path
+    for directory in _backup_directory_candidates():
+        path = os.path.join(directory, STATE_BACKUP_FILENAME)
+        if os.path.exists(path):
+            _active_backup_directory = directory
+            return path
+    return None
+
+
+def _write_state_backup() -> bool:
+    """Attempt to persist the serialized state to disk."""
+
+    global _active_backup_directory
+    state_payload = _serialize_state()
+    for directory in _backup_directory_candidates():
+        try:
+            os.makedirs(directory, exist_ok=True)
+        except OSError:
+            continue
+        path = os.path.join(directory, STATE_BACKUP_FILENAME)
+        try:
+            with open(path, "w", encoding="utf-8") as backup_file:
+                json.dump(state_payload, backup_file, indent=2)
+        except OSError:
+            continue
+        _active_backup_directory = directory
+        return True
+    return False
 
 
 def _serialize_datetime(value):
@@ -255,10 +297,10 @@ def _load_state(state: dict):
 
 
 def _get_state_backup_metadata() -> dict:
-    path = _state_backup_path()
+    path = _existing_backup_path()
     metadata = {
-        "exists": os.path.exists(path),
-        "filename": os.path.basename(path),
+        "exists": path is not None,
+        "filename": os.path.basename(path or STATE_BACKUP_FILENAME),
     }
     if not metadata["exists"]:
         return metadata
@@ -779,18 +821,15 @@ def admin_page():
 
 @app.route("/admin/state/save", methods=["POST"])
 def save_admin_state():
-    try:
-        with open(_state_backup_path(), "w", encoding="utf-8") as backup_file:
-            json.dump(_serialize_state(), backup_file, indent=2)
-    except OSError:
+    if not _write_state_backup():
         return redirect(url_for("admin_page", state_action="save_failed"))
     return redirect(url_for("admin_page", state_action="saved"))
 
 
 @app.route("/admin/state/load", methods=["POST"])
 def load_admin_state():
-    path = _state_backup_path()
-    if not os.path.exists(path):
+    path = _existing_backup_path()
+    if not path or not os.path.exists(path):
         return redirect(url_for("admin_page", state_action="missing"))
     try:
         with open(path, "r", encoding="utf-8") as backup_file:
