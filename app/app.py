@@ -198,6 +198,17 @@ next_slot_id = 1
 dog_breeds = []
 next_dog_breed_id = 1
 breed_ai_suggestions = None
+
+ADMIN_VIEWS = {
+    "menu",
+    "autopilot",
+    "backups",
+    "breeds",
+    "enquiries",
+    "appointments",
+    "visitors",
+    "chat",
+}
 BOOKING_WORKFLOW_STATUSES = ["New", "In Progress", "Dealt With"]
 DEFAULT_TIME_CHOICES = [
     "08:00",
@@ -925,6 +936,8 @@ def hello_world_page(page_id: int):
 
 @app.route("/admin")
 def admin_page():
+    requested_view = (request.args.get("view") or "menu").strip().lower()
+    active_view = requested_view if requested_view in ADMIN_VIEWS else "menu"
     visitor_rows = sorted(
         visitor_stats.items(),
         key=lambda item: item[1]["last_visit"],
@@ -979,6 +992,7 @@ def admin_page():
         state_backup_metadata=_get_state_backup_metadata(),
         state_backup_message=state_backup_message,
         state_backup_is_error=state_backup_is_error,
+        active_view=active_view,
     )
 
 
@@ -1033,14 +1047,14 @@ def add_dog_breed():
     if normalized and not _breed_name_exists(normalized):
         dog_breeds.append({"id": next_dog_breed_id, "name": normalized})
         next_dog_breed_id += 1
-    return redirect(url_for("admin_page"))
+    return redirect(url_for("admin_page", view="breeds"))
 
 
 @app.route("/admin/dog-breeds/<int:breed_id>/delete", methods=["POST"])
 def delete_dog_breed(breed_id: int):
     global dog_breeds
     dog_breeds = [breed for breed in dog_breeds if breed["id"] != breed_id]
-    return redirect(url_for("admin_page"))
+    return redirect(url_for("admin_page", view="breeds"))
 
 
 def _extract_json_object(payload: str):
@@ -1063,7 +1077,7 @@ def request_breed_ai():
     prompt = (request.form.get("breed_prompt") or "").strip()
     if not prompt:
         breed_ai_suggestions = None
-        return redirect(url_for("admin_page"))
+        return redirect(url_for("admin_page", view="breeds"))
     breed_ai_suggestions = {
         "prompt": prompt,
         "add": [],
@@ -1092,7 +1106,7 @@ def request_breed_ai():
         data = _extract_json_object(reply)
     except Exception as exc:  # pylint: disable=broad-except
         breed_ai_suggestions["error"] = str(exc)
-        return redirect(url_for("admin_page"))
+        return redirect(url_for("admin_page", view="breeds"))
     add_items = []
     remove_items = []
     for key, target in (("add", add_items), ("remove", remove_items)):
@@ -1101,7 +1115,7 @@ def request_breed_ai():
             if value_str and value_str not in target:
                 target.append(value_str)
     breed_ai_suggestions.update({"add": add_items, "remove": remove_items})
-    return redirect(url_for("admin_page"))
+    return redirect(url_for("admin_page", view="breeds"))
 
 
 @app.route("/admin/dog-breeds/ai/apply", methods=["POST"])
@@ -1114,7 +1128,7 @@ def apply_breed_ai_suggestions():
         if normalized:
             selected.append(normalized)
     if not selected or action not in {"add", "remove"}:
-        return redirect(url_for("admin_page"))
+        return redirect(url_for("admin_page", view="breeds"))
     if action == "add":
         for name in selected:
             if not _breed_name_exists(name):
@@ -1134,14 +1148,14 @@ def apply_breed_ai_suggestions():
             ]
         if not breed_ai_suggestions["add"] and not breed_ai_suggestions["remove"]:
             breed_ai_suggestions = None
-    return redirect(url_for("admin_page"))
+    return redirect(url_for("admin_page", view="breeds"))
 
 
 @app.route("/admin/dog-breeds/ai/clear", methods=["POST"])
 def clear_breed_ai_suggestions():
     global breed_ai_suggestions
     breed_ai_suggestions = None
-    return redirect(url_for("admin_page"))
+    return redirect(url_for("admin_page", view="breeds"))
 
 
 @app.route("/admin/slots", methods=["POST"])

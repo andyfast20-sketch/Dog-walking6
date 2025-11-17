@@ -1498,7 +1498,8 @@
         const views = Array.from(document.querySelectorAll("[data-view]"));
         const navButtons = Array.from(document.querySelectorAll(".view-nav [data-open-view]"));
         const triggers = Array.from(document.querySelectorAll("[data-open-view]"));
-        let activeView = "menu";
+        const initialView = {{ active_view | tojson }};
+        let activeView = initialView || "menu";
 
         function setActiveView(viewName) {
           if (!viewName) {
