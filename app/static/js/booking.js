@@ -10,6 +10,7 @@
   const bookingEmailInput = document.getElementById("bookingEmail");
   const bookingBreedInput = document.getElementById("bookingBreed");
   const bookingSlotSummary = document.getElementById("bookingSlotSummary");
+  const bookingSlotPrice = document.getElementById("bookingSlotPrice");
   const bookingModalClose = document.getElementById("bookingModalClose");
   const bookingModalError = document.getElementById("bookingModalError");
   const bookingSuccess = document.getElementById("bookingSuccess");
@@ -33,9 +34,35 @@
     if (priceEl && slot.price_label) {
       priceEl.textContent = slot.price_label;
     }
+    if (typeof slot.price !== "undefined") {
+      button.dataset.priceAmount =
+        slot.price === null || typeof slot.price === "undefined" ? "" : String(slot.price);
+    }
+    if (typeof slot.price_label !== "undefined") {
+      button.dataset.priceLabel = slot.price_label || "";
+    }
     if (statusEl) {
       statusEl.textContent = isBooked ? "Booked" : "Available";
     }
+  }
+
+  function updateModalPrice(button) {
+    if (!bookingSlotPrice) return false;
+    const amount = button.dataset.priceAmount || "";
+    const label = button.dataset.priceLabel || "";
+    const numericAmount = Number(amount);
+    const hasPrice = Boolean(label || amount);
+    if (!hasPrice || Number.isNaN(numericAmount) && !label) {
+      bookingSlotPrice.textContent = "";
+      bookingSlotPrice.classList.add("hidden");
+      bookingSlotPrice.classList.remove("is-free");
+      return false;
+    }
+    const isFree = !Number.isNaN(numericAmount) && numericAmount === 0;
+    bookingSlotPrice.textContent = isFree ? "Free" : label || amount;
+    bookingSlotPrice.classList.toggle("is-free", isFree);
+    bookingSlotPrice.classList.remove("hidden");
+    return isFree;
   }
 
   function closeBookingModal() {
@@ -56,8 +83,11 @@
     if (bookingSlotIdInput) {
       bookingSlotIdInput.value = button.dataset.slotId;
     }
+    const friendlyLabel = button.dataset.friendlyLabel || "";
+    const isFreeSlot = updateModalPrice(button);
     if (bookingSlotSummary) {
-      bookingSlotSummary.textContent = button.dataset.friendlyLabel || "";
+      bookingSlotSummary.textContent =
+        isFreeSlot && friendlyLabel ? friendlyLabel.replace(/\s*\([^)]*\)\s*$/, "") : friendlyLabel;
     }
     bookingModalError.classList.add("hidden");
     bookingModal.classList.remove("hidden");

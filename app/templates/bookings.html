@@ -285,6 +285,10 @@
         transform: translateY(-3px);
         border-color: #2563eb;
       }
+      .slot-card strong,
+      .slot-card__time {
+        color: #0f172a;
+      }
       .slot-card__time {
         font-size: 1.05rem;
         font-weight: 600;
@@ -325,6 +329,37 @@
         background: rgba(187, 247, 208, 0.4);
         color: #14532d;
         font-weight: 600;
+      }
+      .slot-price-pill {
+        display: inline-flex;
+        align-items: center;
+        margin-top: 0.65rem;
+        padding: 0.35rem 0.85rem;
+        border-radius: 999px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        background: rgba(224, 231, 255, 0.8);
+        color: #1e1b4b;
+      }
+      .slot-price-pill.is-free {
+        color: #f0fdf4;
+        background: #16a34a;
+        box-shadow: 0 0 18px rgba(34, 197, 94, 0.65);
+        animation: freeFlash 1.2s ease-in-out infinite alternate;
+      }
+      @keyframes freeFlash {
+        0% {
+          background: #16a34a;
+          color: #f0fdf4;
+        }
+        50% {
+          background: #22c55e;
+          color: #ffffff;
+        }
+        100% {
+          background: #15803d;
+          color: #ecfdf5;
+        }
       }
       .empty-state {
         background: rgba(15, 23, 42, 0.02);
@@ -382,6 +417,10 @@
         padding: 0.6rem 0.75rem;
         color: #991b1b;
         font-weight: 600;
+      }
+      .booking-modal__price {
+        margin: -0.25rem 0 0.5rem;
+        font-size: 1rem;
       }
       .booking-modal__note {
         font-size: 0.9rem;
@@ -487,7 +526,7 @@
               <div class="option-card">
                 <h3>Book a Meet &amp; Greet</h3>
                 <p>Invite us over for a relaxed 30-minute visit where we connect with your dog and walk your setup.</p>
-                <a class="secondary" href="#meetForm">Schedule the visit</a>
+                <a class="secondary" href="#meetSlots">Browse available slots</a>
               </div>
             </div>
           </div>
@@ -498,7 +537,7 @@
             />
           </figure>
         </section>
-        <section>
+        <section id="meetSlots">
           <div class="eyebrow" style="color: #0ea5e9">Live openings</div>
           <h2 style="margin-top: 0">Reserve a meet &amp; greet time</h2>
           <p style="color: #475569">Pick the concierge visit that fits your schedule. We'll confirm instantly.</p>
@@ -510,6 +549,8 @@
               class="slot-card {% if slot.is_booked %}is-booked{% endif %}"
               data-slot-button
               data-slot-id="{{ slot.id }}"
+              data-price-label="{{ slot.price_label or '' }}"
+              data-price-amount="{{ '%.2f'|format(slot.price) if slot.price is not none else '' }}"
               data-state="{% if slot.is_booked %}booked{% else %}available{% endif %}"
               data-friendly-label="{{ slot.friendly_label }}"
               aria-disabled="{% if slot.is_booked %}true{% else %}false{% endif %}"
@@ -526,10 +567,10 @@
             {% endfor %}
           </div>
           {% else %}
-          <p class="empty-state">No meet &amp; greet slots are available at the moment. Check back soon or submit the form below.</p>
-          {% endif %}
-          <div class="booking-success hidden" id="bookingSuccess"></div>
-        </section>
+            <p class="empty-state">No meet &amp; greet slots are available at the moment. Check back soon or text us at (555) 014-7788 to be added to the priority list.</p>
+            {% endif %}
+            <div class="booking-success hidden" id="bookingSuccess"></div>
+          </section>
         <section>
           <div class="eyebrow" style="color: #f97316">Why it matters</div>
           <h2 style="margin-top: 0">Meet &amp; greets keep pups confident and routines seamless.</h2>
@@ -560,11 +601,11 @@
           <div class="eyebrow" style="color: #06b6d4">What to expect</div>
           <h2 style="margin-top: 0">Your meet &amp; greet timeline</h2>
           <div class="timeline">
-            <div class="timeline-step">
-              <span>1</span>
-              <h3>Share the basics</h3>
-              <p>Submit the form below with your details, preferred dates, and anything we should prep for.</p>
-            </div>
+              <div class="timeline-step">
+                <span>1</span>
+                <h3>Share the basics</h3>
+                <p>Grab a slot above and include care notes plus access details right inside the booking modal.</p>
+              </div>
             <div class="timeline-step">
               <span>2</span>
               <h3>Concierge confirmation</h3>
@@ -582,44 +623,6 @@
             </div>
           </div>
         </section>
-        <section id="meetForm">
-          <div class="eyebrow" style="color: #a855f7">Schedule your meet &amp; greet</div>
-          <h2 style="margin-top: 0">Tell us about your pup</h2>
-          <p style="color: #475569">We'll respond with a confirmation and any follow-up questions.</p>
-          <form method="post">
-            {% if meet_submission_success %}
-            <div class="success-banner">Thanks! We'll reach out with your confirmed meet &amp; greet time.</div>
-            {% endif %}
-            <div>
-              <label for="name">Your name</label>
-              <input id="name" name="name" required placeholder="Alex Walker" />
-            </div>
-            <div>
-              <label for="email">Email</label>
-              <input id="email" type="email" name="email" required placeholder="you@email.com" />
-            </div>
-            <div>
-              <label for="phone">Phone</label>
-              <input id="phone" name="phone" placeholder="(555) 010-1212" />
-            </div>
-            <div>
-              <label for="dog_name">Dog's name</label>
-              <input id="dog_name" name="dog_name" placeholder="Poppy" />
-            </div>
-            <div>
-              <label for="preferred_date">Preferred date &amp; time</label>
-              <input id="preferred_date" name="preferred_date" placeholder="This Friday around 3pm" />
-            </div>
-            <div>
-              <label for="details">Anything else?</label>
-              <textarea id="details" name="details" placeholder="Tell us routines, quirks, or building instructions"></textarea>
-            </div>
-            <div class="form-actions">
-              <button type="submit">Send request</button>
-              <p style="margin: 0; color: #475569">Prefer to call? Text us at (555) 014-7788.</p>
-            </div>
-          </form>
-        </section>
       </main>
       <footer>&copy; {{ datetime.utcnow().year }} Happy Trails Dog Walking. All rights reserved.</footer>
     </div>
@@ -632,6 +635,7 @@
         <div>
           <h2 style="margin-bottom: 0.35rem">Reserve this slot</h2>
           <p id="bookingSlotSummary" style="margin: 0; color: #475569"></p>
+          <div id="bookingSlotPrice" class="slot-price-pill hidden"></div>
         </div>
         <form id="bookingForm">
           <input type="hidden" id="bookingSlotId" />
