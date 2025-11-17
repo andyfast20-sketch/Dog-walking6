@@ -373,7 +373,7 @@ def _format_price_label(value) -> str:
     amount = _parse_price(value)
     if amount is None:
         return ""
-    formatted = f"${amount:,.2f}"
+    formatted = f"£{amount:,.2f}"
     if formatted.endswith(".00"):
         formatted = formatted[:-3]
     return formatted
@@ -988,42 +988,15 @@ def index():
     )
 
 
-@app.route("/bookings", methods=["GET", "POST"])
+@app.route("/bookings", methods=["GET"])
 def bookings_page():
-    global next_submission_id
-
-    meet_submission_success = False
     slot_rows = [_serialize_slot(slot) for slot in _sorted_slots()]
     meet_slots = [slot for slot in slot_rows if slot.get("service_type") == "meet"]
-    if request.method == "POST":
-        visitor_name = request.form.get("name", "").strip()
-        visitor_email = request.form.get("email", "").strip()
-        visitor_phone = request.form.get("phone", "").strip()
-        dog_name = request.form.get("dog_name", "").strip()
-        preferred_date = request.form.get("preferred_date", "").strip()
-        extra_notes = request.form.get("details", "").strip()
-
-        submission = {
-            "id": next_submission_id,
-            "name": visitor_name,
-            "email": visitor_email,
-            "phone": visitor_phone,
-            "message": (
-                "Meet & Greet Request — Dog: "
-                f"{dog_name or 'N/A'}; Preferred date: {preferred_date or 'flexible'}; "
-                f"Notes: {extra_notes or 'none provided'}"
-            ),
-            "status": STATUS_OPTIONS[0],
-        }
-        submissions.append(submission)
-        next_submission_id += 1
-        meet_submission_success = True
 
     return render_template(
         "bookings.html",
         primary_nav=_build_primary_nav("bookings"),
         home_booking_url=f"{url_for('index')}#booking",
-        meet_submission_success=meet_submission_success,
         meet_slots=meet_slots,
         dog_breeds=_sorted_breeds(),
         datetime=datetime,
