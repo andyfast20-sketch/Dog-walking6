@@ -192,6 +192,58 @@ PAGE_DEFINITIONS = {
 }
 
 
+def _build_site_photo_defaults():
+    defaults = {
+        "home_hero": {
+            "label": "Homepage hero photo",
+            "description": "Large image shown in the hero on the homepage.",
+            "default_url": "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=900&q=80",
+            "group": "homepage",
+        },
+        "home_profile": {
+            "label": "Homepage profile photo",
+            "description": "Portrait used in the concierge walker spotlight on the homepage.",
+            "default_url": "https://files.catbox.moe/986gie.jpg",
+            "group": "homepage",
+        },
+        "bookings_hero": {
+            "label": "Bookings hero photo",
+            "description": "Image displayed beside the bookings hero content.",
+            "default_url": "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=1000&q=80",
+            "group": "bookings",
+        },
+    }
+    for page in PAGE_DEFINITIONS.values():
+        defaults[f"page_{page['id']}_hero"] = {
+            "label": f"{page['title']} hero photo",
+            "description": "Large featured photo at the top of this page.",
+            "default_url": page["hero_image"],
+            "group": "info_pages",
+            "page_id": page["id"],
+            "page_title": page["title"],
+        }
+    return defaults
+
+
+SITE_PHOTO_GROUP_LABELS = {
+    "homepage": "Homepage",
+    "bookings": "Bookings",
+    "info_pages": "Story pages",
+}
+SITE_PHOTO_GROUP_ORDER = ["homepage", "bookings", "info_pages"]
+SITE_PHOTO_DEFAULTS = _build_site_photo_defaults()
+
+
+def _initial_site_photo_state():
+    state = {}
+    for key, meta in SITE_PHOTO_DEFAULTS.items():
+        state[key] = meta["default_url"]
+    return state
+
+
+site_photos = _initial_site_photo_state()
+
+
 def _build_primary_nav(active_key: str):
     nav_items = []
     for item in PRIMARY_NAV_CONFIG:
@@ -227,6 +279,7 @@ ADMIN_VIEWS = {
     "coverage",
     "credentials",
     "breeds",
+    "photos",
     "enquiries",
     "appointments",
     "visitors",
@@ -396,6 +449,54 @@ def _coerce_int(value, default: int) -> int:
         return default
 
 
+def _get_photo_url(key: str) -> str:
+    meta = SITE_PHOTO_DEFAULTS.get(key)
+    if not meta:
+        return ""
+    current = site_photos.get(key)
+    return current or meta["default_url"]
+
+
+def _site_photo_rows():
+    rows = []
+    for key, meta in SITE_PHOTO_DEFAULTS.items():
+        current = _get_photo_url(key) or meta["default_url"]
+        default_url = meta["default_url"]
+        group_key = meta.get("group", "site")
+        try:
+            group_order = SITE_PHOTO_GROUP_ORDER.index(group_key)
+        except ValueError:
+            group_order = len(SITE_PHOTO_GROUP_ORDER)
+        rows.append(
+            {
+                "key": key,
+                "label": meta["label"],
+                "description": meta.get("description"),
+                "url": current,
+                "default_url": default_url,
+                "is_default": current == default_url,
+                "group_key": group_key,
+                "group_label": SITE_PHOTO_GROUP_LABELS.get(group_key, "Site-wide"),
+                "group_order": group_order,
+                "page_id": meta.get("page_id"),
+                "page_title": meta.get("page_title"),
+            }
+        )
+    rows.sort(key=lambda row: (row["group_order"], row["label"].lower()))
+    return rows
+
+
+def _group_photo_rows(rows):
+    groups = []
+    current_key = None
+    for row in rows:
+        if row["group_key"] != current_key:
+            groups.append({"key": row["group_key"], "label": row["group_label"], "photos": []})
+            current_key = row["group_key"]
+        groups[-1]["photos"].append(row)
+    return groups
+
+
 def _next_id_from_rows(rows, key: str = "id") -> int:
     max_value = 0
     for row in rows:
@@ -495,6 +596,7 @@ def _serialize_state() -> dict:
         "business_in_a_box": business_in_a_box,
         "autopilot_enabled": autopilot_enabled,
         "autopilot_status": dict(autopilot_status),
+        "site_photos": dict(site_photos),
     }
     return state
 
@@ -505,6 +607,7 @@ def _load_state(state: dict):
     global next_slot_id, dog_breeds, next_dog_breed_id
     global business_in_a_box, autopilot_enabled, autopilot_status, breed_ai_suggestions
     global coverage_areas, next_coverage_area_id, team_certificates, next_certificate_id
+    global site_photos
 
     submissions = [dict(row) for row in state.get("submissions", []) if isinstance(row, dict)]
     next_submission_id = _coerce_int(state.get("next_submission_id"), _next_id_from_rows(submissions))
@@ -598,6 +701,13 @@ def _load_state(state: dict):
             "last_reply_preview": loaded_status.get("last_reply_preview"),
             "last_visitor_id": loaded_status.get("last_visitor_id"),
         }
+
+    site_photos = _initial_site_photo_state()
+    loaded_photos = state.get("site_photos")
+    if isinstance(loaded_photos, dict):
+        for key, value in loaded_photos.items():
+            if key in site_photos and isinstance(value, str) and value.strip():
+                site_photos[key] = value.strip()
 
 
 def _get_state_backup_metadata() -> dict:
@@ -1088,6 +1198,8 @@ def index():
         current_year=datetime.utcnow().year,
         primary_nav=_build_primary_nav("home"),
         coverage_areas=_sorted_coverage_areas(),
+        home_hero_image=_get_photo_url("home_hero"),
+        home_profile_image=_get_photo_url("home_profile"),
     )
 
 
@@ -1103,6 +1215,7 @@ def bookings_page():
         meet_slots=meet_slots,
         dog_breeds=_sorted_breeds(),
         datetime=datetime,
+        bookings_hero_image=_get_photo_url("bookings_hero"),
     )
 
 
@@ -1111,10 +1224,12 @@ def hello_world_page(page_id: int):
     page = PAGE_DEFINITIONS.get(page_id)
     if not page:
         abort(404)
+    page_data = dict(page)
+    page_data["hero_image"] = _get_photo_url(f"page_{page_id}_hero")
     certificates = _sorted_certificates() if page.get("nav_key") == "about" else []
     return render_template(
         "info_page.html",
-        page=page,
+        page=page_data,
         home_url=url_for("index"),
         primary_nav=_build_primary_nav(page["nav_key"]),
         certificates=certificates,
@@ -1140,6 +1255,9 @@ def admin_page():
     booked_slots = [slot for slot in slot_rows if slot["is_booked"]]
     new_enquiry_count = sum(1 for submission in submissions if (submission.get("status") or "New") == "New")
     has_new_bookings = any((slot.get("workflow_status") or "New") == "New" for slot in booked_slots)
+    site_photo_rows = _site_photo_rows()
+    site_photo_groups = _group_photo_rows(site_photo_rows)
+    custom_photo_count = sum(1 for row in site_photo_rows if not row["is_default"])
     state_action = request.args.get("state_action", "")
     state_messages = {
         "saved": "Settings saved to backup file.",
@@ -1183,7 +1301,25 @@ def admin_page():
         active_view=active_view,
         coverage_areas=_sorted_coverage_areas(),
         certificates=_sorted_certificates(),
+        site_photo_groups=site_photo_groups,
+        site_photo_total=len(site_photo_rows),
+        site_photo_custom_count=custom_photo_count,
     )
+
+
+@app.route("/admin/site-photos", methods=["POST"])
+def update_site_photo():
+    global site_photos
+
+    key = (request.form.get("photo_key") or "").strip()
+    if key not in SITE_PHOTO_DEFAULTS:
+        return redirect(url_for("admin_page", view="photos"))
+    if request.form.get("reset"):
+        site_photos[key] = SITE_PHOTO_DEFAULTS[key]["default_url"]
+    else:
+        url_value = (request.form.get("photo_url") or "").strip()
+        site_photos[key] = url_value or SITE_PHOTO_DEFAULTS[key]["default_url"]
+    return redirect(url_for("admin_page", view="photos"))
 
 
 @app.route("/admin/state/save", methods=["POST"])
