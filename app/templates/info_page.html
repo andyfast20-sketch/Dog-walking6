@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ page.title }} · Happy Trails</title>
+    <style>
+      :root {
+        font-family: "Poppins", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont,
+          "Helvetica Neue", sans-serif;
+        background-color: #f6f8fb;
+        color: #0f172a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(circle at top, #fdf4ff 0%, #f5f7ff 30%, #eef2ff 60%, #f6f8fb 100%);
+        padding: clamp(1rem, 4vw, 3rem);
+      }
+      .info-shell {
+        max-width: 1200px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+      }
+      .primary-nav {
+        position: sticky;
+        top: 1rem;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.95rem 1.5rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        box-shadow: 0 25px 60px rgba(15, 23, 42, 0.15);
+        backdrop-filter: blur(12px);
+      }
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        font-weight: 700;
+        font-size: 1.2rem;
+        color: #1f3d8f;
+        text-decoration: none;
+      }
+      .logo span {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #7f5af0, #5eead4);
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-size: 1.35rem;
+      }
+      .nav-links {
+        display: flex;
+        gap: 1.25rem;
+      }
+      .nav-links a {
+        text-decoration: none;
+        color: #0f172a;
+        font-weight: 600;
+        position: relative;
+        padding-bottom: 0.3rem;
+      }
+      .nav-links a::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        height: 3px;
+        width: 0;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #2563eb, #7c3aed, #14b8a6);
+        transition: width 0.3s ease;
+      }
+      .nav-links a:hover::after,
+      .nav-links a.is-active::after {
+        width: 100%;
+      }
+      .nav-cta {
+        text-decoration: none;
+        font-size: 0.9rem;
+        font-weight: 600;
+        padding: 0.65rem 1.25rem;
+        border-radius: 999px;
+        color: #fff;
+        background: linear-gradient(135deg, #ec4899, #8b5cf6);
+        box-shadow: 0 15px 35px rgba(236, 72, 153, 0.35);
+      }
+      @media (max-width: 640px) {
+        .primary-nav {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 0.75rem;
+        }
+        .nav-links {
+          flex-wrap: wrap;
+        }
+        .nav-cta {
+          align-self: stretch;
+          text-align: center;
+        }
+      }
+      .info-main {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 32px;
+        padding: clamp(1.5rem, 4vw, 3.25rem);
+        box-shadow: 0 30px 90px rgba(15, 23, 42, 0.12);
+        display: flex;
+        flex-direction: column;
+        gap: 2.5rem;
+      }
+      .info-hero {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: clamp(1.5rem, 3vw, 3rem);
+        align-items: center;
+      }
+      .info-hero figure {
+        margin: 0;
+        border-radius: 28px;
+        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(15, 23, 42, 0.18);
+      }
+      .info-hero img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+      .info-eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.25em;
+        color: #a855f7;
+        font-weight: 700;
+        margin-bottom: 0.75rem;
+      }
+      .info-hero h1 {
+        margin: 0 0 1rem;
+        font-size: clamp(2rem, 4vw, 3.25rem);
+      }
+      .info-hero p {
+        margin: 0 0 1rem;
+        color: #475569;
+        font-size: 1.05rem;
+      }
+      .info-highlight {
+        border-radius: 22px;
+        padding: 1rem 1.25rem;
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(16, 185, 129, 0.18));
+        border: 1px solid rgba(59, 130, 246, 0.2);
+        font-weight: 600;
+      }
+      .info-section {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1.25rem;
+      }
+      .info-card {
+        border-radius: 24px;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        padding: 1.5rem;
+        background: #fff;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .info-card h2 {
+        margin: 0;
+        font-size: 1.4rem;
+      }
+      .info-card p {
+        margin: 0;
+        color: #475569;
+      }
+      .info-card ul {
+        margin: 0;
+        padding-left: 1.1rem;
+        color: #111827;
+        font-weight: 600;
+        line-height: 1.6;
+      }
+      .info-footer {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        justify-content: flex-start;
+      }
+      .btn {
+        border: none;
+        border-radius: 999px;
+        padding: 0.9rem 1.5rem;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 1rem;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+      }
+      .btn-primary {
+        background: linear-gradient(135deg, #2563eb, #5eead4);
+        color: #fff;
+        box-shadow: 0 15px 40px rgba(37, 99, 235, 0.35);
+      }
+      .btn-secondary {
+        background: transparent;
+        border: 1px solid rgba(15, 23, 42, 0.2);
+        color: #0f172a;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="info-shell">
+      <nav class="primary-nav" aria-label="Primary">
+        <a class="logo" href="{{ url_for('index') }}"><span>🐾</span>Happy Trails</a>
+        <div class="nav-links">
+          {% for link in primary_nav %}
+          <a
+            href="{{ link.href }}"
+            class="{% if link.is_active %}is-active{% endif %}"
+            {% if link.is_active %}aria-current="page"{% endif %}
+          >
+            {{ link.label }}
+          </a>
+          {% endfor %}
+        </div>
+        <a class="nav-cta" href="{{ url_for('index') }}#booking">Plan a walk</a>
+      </nav>
+      <main class="info-main">
+        <header class="info-hero">
+          <div>
+            <p class="info-eyebrow">{{ page.eyebrow }}</p>
+            <h1>{{ page.title }}</h1>
+            <p>{{ page.lede }}</p>
+            <div class="info-highlight">{{ page.highlight }}</div>
+          </div>
+          <figure>
+            <img src="{{ page.hero_image }}" alt="{{ page.title }}" loading="lazy" />
+          </figure>
+        </header>
+        <section class="info-section">
+          {% for section in page.sections %}
+          <article class="info-card">
+            <h2>{{ section.title }}</h2>
+            <p>{{ section.body }}</p>
+            {% if section.bullets %}
+            <ul>
+              {% for bullet in section.bullets %}
+              <li>{{ bullet }}</li>
+              {% endfor %}
+            </ul>
+            {% endif %}
+          </article>
+          {% endfor %}
+        </section>
+        <div class="info-footer">
+          <a class="btn btn-primary" href="{{ home_url }}">Return home</a>
+          <a class="btn btn-secondary" href="{{ url_for('index') }}#contact">Book a meet &amp; greet</a>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>
