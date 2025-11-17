@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bookings · Happy Trails</title>
+    <style>
+      :root {
+        font-family: "Poppins", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont,
+          "Helvetica Neue", sans-serif;
+        color: #0f172a;
+        background: radial-gradient(circle at top, #fdf4ff 0%, #f5f7ff 35%, #eef2ff 70%, #f6f8fb 100%);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: inherit;
+        color: inherit;
+      }
+      img {
+        max-width: 100%;
+        display: block;
+      }
+      .site-shell {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      .primary-nav {
+        position: sticky;
+        top: 0;
+        left: 0;
+        width: 100%;
+        z-index: 15;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1.25rem clamp(1.25rem, 4vw, 4rem);
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(67, 56, 202, 0.93));
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 30px 60px rgba(15, 23, 42, 0.35);
+        backdrop-filter: blur(12px);
+      }
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        color: #f8fafc;
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 1.2rem;
+      }
+      .logo span {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, rgba(94, 234, 212, 0.85), rgba(236, 72, 153, 0.95));
+        display: grid;
+        place-items: center;
+        font-size: 1.35rem;
+      }
+      .nav-links {
+        display: flex;
+        gap: 1.3rem;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .nav-links a {
+        color: rgba(248, 250, 252, 0.85);
+        text-decoration: none;
+        font-weight: 600;
+        position: relative;
+        padding-bottom: 0.25rem;
+      }
+      .nav-links a:hover,
+      .nav-links a:focus-visible {
+        color: #fff;
+      }
+      .nav-links a::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        height: 3px;
+        width: 0;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #5eead4, #a5b4fc, #f472b6);
+        transition: width 0.3s ease;
+      }
+      .nav-links a:hover::after,
+      .nav-links a.is-active::after {
+        width: 100%;
+      }
+      .nav-cta {
+        text-decoration: none;
+        font-weight: 600;
+        padding: 0.65rem 1.25rem;
+        border-radius: 999px;
+        color: #0f172a;
+        background: #fef3c7;
+        border: 1px solid rgba(253, 230, 138, 0.8);
+        box-shadow: 0 15px 35px rgba(252, 211, 77, 0.35);
+      }
+      @media (max-width: 720px) {
+        .primary-nav {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .nav-links {
+          flex-wrap: wrap;
+        }
+        .nav-cta {
+          align-self: stretch;
+          text-align: center;
+        }
+      }
+      main {
+        flex: 1;
+        padding: clamp(1.5rem, 4vw, 4rem);
+        display: flex;
+        flex-direction: column;
+        gap: 2.5rem;
+      }
+      section {
+        background: #fff;
+        border-radius: 32px;
+        padding: clamp(1.5rem, 3vw, 3rem);
+        box-shadow: 0 25px 70px rgba(15, 23, 42, 0.12);
+      }
+      .hero {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: clamp(1.5rem, 3vw, 3.5rem);
+        align-items: center;
+      }
+      .hero h1 {
+        margin: 0 0 1rem;
+        font-size: clamp(2.3rem, 5vw, 3.8rem);
+        line-height: 1.1;
+      }
+      .hero p {
+        margin: 0 0 1.1rem;
+        color: #475569;
+        font-size: 1.1rem;
+      }
+      .hero figure {
+        margin: 0;
+        border-radius: 32px;
+        overflow: hidden;
+        box-shadow: 0 30px 80px rgba(15, 23, 42, 0.2);
+      }
+      .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.25em;
+        font-weight: 700;
+        color: #6366f1;
+        margin-bottom: 0.75rem;
+      }
+      .options-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1.25rem;
+      }
+      .option-card {
+        border-radius: 26px;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        background: linear-gradient(135deg, rgba(226, 232, 240, 0.45), rgba(255, 255, 255, 0.9));
+      }
+      .option-card h3 {
+        margin: 0;
+        font-size: 1.4rem;
+      }
+      .option-card p {
+        margin: 0;
+        color: #475569;
+      }
+      .option-card a {
+        align-self: flex-start;
+        text-decoration: none;
+        padding: 0.85rem 1.5rem;
+        border-radius: 999px;
+        font-weight: 600;
+        background: linear-gradient(135deg, #2563eb, #5eead4);
+        color: #fff;
+        box-shadow: 0 18px 40px rgba(37, 99, 235, 0.35);
+      }
+      .option-card a.secondary {
+        background: linear-gradient(135deg, #ec4899, #8b5cf6);
+        box-shadow: 0 18px 40px rgba(236, 72, 153, 0.35);
+      }
+      .reason-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+      }
+      .reason-card {
+        border-radius: 24px;
+        padding: 1.25rem 1.5rem;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        background: #fff;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      }
+      .reason-card h4 {
+        margin: 0 0 0.35rem;
+      }
+      .reason-card p {
+        margin: 0;
+        color: #475569;
+      }
+      .timeline {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+        position: relative;
+      }
+      .timeline-step {
+        padding: 1.25rem 1.5rem;
+        border-radius: 24px;
+        background: linear-gradient(135deg, rgba(14, 165, 233, 0.15), rgba(244, 114, 182, 0.18));
+        border: 1px solid rgba(14, 165, 233, 0.25);
+      }
+      .timeline-step span {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        margin-bottom: 0.5rem;
+        background: rgba(15, 23, 42, 0.08);
+        font-weight: 700;
+        color: #0f172a;
+      }
+      form {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+        margin-top: 1.5rem;
+      }
+      label {
+        font-weight: 600;
+        display: block;
+        margin-bottom: 0.35rem;
+      }
+      input,
+      textarea {
+        width: 100%;
+        border-radius: 18px;
+        border: 1px solid rgba(15, 23, 42, 0.15);
+        padding: 0.75rem 1rem;
+        font-family: inherit;
+        font-size: 1rem;
+      }
+      textarea {
+        min-height: 120px;
+        resize: vertical;
+      }
+      .form-actions {
+        grid-column: 1 / -1;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: center;
+      }
+      button {
+        border: none;
+        border-radius: 999px;
+        padding: 0.9rem 1.5rem;
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: pointer;
+        background: linear-gradient(135deg, #2563eb, #5eead4);
+        color: #fff;
+        box-shadow: 0 18px 40px rgba(37, 99, 235, 0.35);
+      }
+      .success-banner {
+        grid-column: 1 / -1;
+        padding: 0.85rem 1.2rem;
+        border-radius: 18px;
+        background: rgba(134, 239, 172, 0.25);
+        border: 1px solid rgba(34, 197, 94, 0.5);
+        font-weight: 600;
+        color: #15803d;
+      }
+      footer {
+        padding: 2rem 1.5rem 3rem;
+        text-align: center;
+        color: rgba(15, 23, 42, 0.6);
+        font-size: 0.95rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="site-shell">
+      <header>
+        <nav class="primary-nav" aria-label="Primary">
+          <a class="logo" href="{{ url_for('index') }}"><span>🐾</span>Happy Paws</a>
+          <div class="nav-links">
+            {% for link in primary_nav %}
+            <a
+              href="{{ link.href }}"
+              class="{% if link.is_active %}is-active{% endif %}"
+              {% if link.is_active %}aria-current="page"{% endif %}
+            >
+              {{ link.label }}
+            </a>
+            {% endfor %}
+          </div>
+          <a class="nav-cta" href="{{ home_booking_url }}">Plan a walk</a>
+        </nav>
+      </header>
+      <main>
+        <section class="hero">
+          <div>
+            <p class="eyebrow">Bookings</p>
+            <h1>Choose the perfect first step for your pup.</h1>
+            <p>
+              Book a walk instantly or schedule a concierge-style meet &amp; greet so we can learn every quirk,
+              routine, and cuddle cue before services begin.
+            </p>
+            <div class="options-grid">
+              <div class="option-card">
+                <h3>Book a Walk</h3>
+                <p>Grab an available time from our live calendar and get instant confirmation.</p>
+                <a href="{{ home_booking_url }}">Browse walk times</a>
+              </div>
+              <div class="option-card">
+                <h3>Book a Meet &amp; Greet</h3>
+                <p>Invite us over for a relaxed 30-minute visit where we connect with your dog and walk your setup.</p>
+                <a class="secondary" href="#meetForm">Schedule the visit</a>
+              </div>
+            </div>
+          </div>
+          <figure>
+            <img
+              src="https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=1000&q=80"
+              alt="Dog snuggled on a sofa"
+            />
+          </figure>
+        </section>
+        <section>
+          <div class="eyebrow" style="color: #f97316">Why it matters</div>
+          <h2 style="margin-top: 0">Meet &amp; greets keep pups confident and routines seamless.</h2>
+          <p style="color: #475569; font-size: 1.05rem">
+            Think of it as a stress-free dress rehearsal. We learn your cues, your dog's energy, and the quirks that
+            make home feel safe so day-one walks feel like reunions instead of new introductions.
+          </p>
+          <div class="reason-grid">
+            <article class="reason-card">
+              <h4>Trust building</h4>
+              <p>Dogs relax faster when they've already exchanged sniffs and treats with their walker.</p>
+            </article>
+            <article class="reason-card">
+              <h4>Home walkthrough</h4>
+              <p>Show us leashes, harnesses, treat drawers, and alarm panels so we can replicate your routine.</p>
+            </article>
+            <article class="reason-card">
+              <h4>Care planning</h4>
+              <p>We note meds, feeding cues, reactivity triggers, and preferred walking routes.</p>
+            </article>
+            <article class="reason-card">
+              <h4>Concierge touches</h4>
+              <p>Customize updates, post-walk rituals, and access preferences before the first booking.</p>
+            </article>
+          </div>
+        </section>
+        <section>
+          <div class="eyebrow" style="color: #06b6d4">What to expect</div>
+          <h2 style="margin-top: 0">Your meet &amp; greet timeline</h2>
+          <div class="timeline">
+            <div class="timeline-step">
+              <span>1</span>
+              <h3>Share the basics</h3>
+              <p>Submit the form below with your details, preferred dates, and anything we should prep for.</p>
+            </div>
+            <div class="timeline-step">
+              <span>2</span>
+              <h3>Concierge confirmation</h3>
+              <p>We reply within the hour with a confirmed time plus the name and bio of your walker.</p>
+            </div>
+            <div class="timeline-step">
+              <span>3</span>
+              <h3>In-home visit</h3>
+              <p>We spend ~30 minutes meeting your pup, reviewing routines, and answering every question.</p>
+            </div>
+            <div class="timeline-step">
+              <span>4</span>
+              <h3>Ready for adventures</h3>
+              <p>Once we're aligned, we activate your profile so you can book walks with zero friction.</p>
+            </div>
+          </div>
+        </section>
+        <section id="meetForm">
+          <div class="eyebrow" style="color: #a855f7">Schedule your meet &amp; greet</div>
+          <h2 style="margin-top: 0">Tell us about your pup</h2>
+          <p style="color: #475569">We'll respond with a confirmation and any follow-up questions.</p>
+          <form method="post">
+            {% if meet_submission_success %}
+            <div class="success-banner">Thanks! We'll reach out with your confirmed meet &amp; greet time.</div>
+            {% endif %}
+            <div>
+              <label for="name">Your name</label>
+              <input id="name" name="name" required placeholder="Alex Walker" />
+            </div>
+            <div>
+              <label for="email">Email</label>
+              <input id="email" type="email" name="email" required placeholder="you@email.com" />
+            </div>
+            <div>
+              <label for="phone">Phone</label>
+              <input id="phone" name="phone" placeholder="(555) 010-1212" />
+            </div>
+            <div>
+              <label for="dog_name">Dog's name</label>
+              <input id="dog_name" name="dog_name" placeholder="Poppy" />
+            </div>
+            <div>
+              <label for="preferred_date">Preferred date &amp; time</label>
+              <input id="preferred_date" name="preferred_date" placeholder="This Friday around 3pm" />
+            </div>
+            <div>
+              <label for="details">Anything else?</label>
+              <textarea id="details" name="details" placeholder="Tell us routines, quirks, or building instructions"></textarea>
+            </div>
+            <div class="form-actions">
+              <button type="submit">Send request</button>
+              <p style="margin: 0; color: #475569">Prefer to call? Text us at (555) 014-7788.</p>
+            </div>
+          </form>
+        </section>
+      </main>
+      <footer>&copy; {{ datetime.utcnow().year }} Happy Trails Dog Walking. All rights reserved.</footer>
+    </div>
+  </body>
+</html>
