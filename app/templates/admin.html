@@ -200,6 +200,96 @@
         color: #94a3b8;
         font-style: italic;
       }
+      .photo-admin {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+      .photo-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+      }
+      .photo-group__header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 0.5rem;
+        align-items: baseline;
+      }
+      .photo-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1rem;
+      }
+      .photo-card {
+        background: #fff;
+        border-radius: 20px;
+        padding: 1rem;
+        box-shadow: 0 15px 40px rgba(15, 23, 42, 0.08);
+        border: 1px solid rgba(15, 23, 42, 0.05);
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .photo-card__preview {
+        border-radius: 14px;
+        overflow: hidden;
+        aspect-ratio: 4 / 3;
+        background: #f1f5f9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .photo-card__preview img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+      .photo-card__details {
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+      }
+      .photo-card__details h3 {
+        margin: 0;
+        font-size: 1.05rem;
+      }
+      .photo-card__details p {
+        margin: 0;
+        color: #475569;
+        font-size: 0.9rem;
+      }
+      .photo-card form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .photo-card label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+      .photo-card input[type="url"] {
+        border-radius: 12px;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        padding: 0.55rem 0.65rem;
+        font-size: 0.95rem;
+        font-family: inherit;
+      }
+      .photo-card__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+      }
+      .photo-card__meta {
+        font-size: 0.8rem;
+        color: #94a3b8;
+      }
       .credential-admin {
         display: flex;
         flex-direction: column;
@@ -1012,6 +1102,7 @@
         <button type="button" class="is-active" data-open-view="menu">Main menu</button>
         <button type="button" data-open-view="autopilot">Autopilot</button>
         <button type="button" data-open-view="backups">Save &amp; load</button>
+        <button type="button" data-open-view="photos">Site photos</button>
         <button type="button" data-open-view="breeds">Dog breeds</button>
         <button type="button" data-open-view="enquiries">Enquiries</button>
         <button type="button" data-open-view="appointments">Appointments</button>
@@ -1072,6 +1163,25 @@
                   Backup file detected
                   {% else %}
                   Awaiting first save
+                  {% endif %}
+                </span>
+              </div>
+            </button>
+            <button type="button" class="menu-card" data-open-view="photos">
+              <div class="menu-card__top">
+                <div>
+                  <p class="menu-card__eyebrow">Site photos</p>
+                  <h3>{{ site_photo_total }} image{{ 's' if site_photo_total != 1 else '' }}</h3>
+                  <p>Review every hero image and portrait across the live pages.</p>
+                </div>
+                <div class="menu-card__icon">🖼️</div>
+              </div>
+              <div class="menu-card__meta">
+                <span class="menu-pill {% if site_photo_custom_count %}menu-pill--alert{% endif %}">
+                  {% if site_photo_custom_count %}
+                  {{ site_photo_custom_count }} custom update{{ 's' if site_photo_custom_count != 1 else '' }}
+                  {% else %}
+                  All default images
                   {% endif %}
                 </span>
               </div>
@@ -1327,6 +1437,72 @@
               <p class="backup-note">{{ state_backup_metadata.error }}</p>
               {% endif %}
             </div>
+          </section>
+        </section>
+
+        <section class="view" data-view="photos" aria-labelledby="photoHeading">
+          <div class="view-heading">
+            <div>
+              <p class="eyebrow">Visual library</p>
+              <h2 id="photoHeading">Manage site photos</h2>
+              <p>Preview every hero image and portrait, swap URLs, and reset anything back to its default.</p>
+            </div>
+            <button type="button" class="ghost-button" data-open-view="menu">Back to main menu</button>
+          </div>
+          <section class="photo-admin">
+            {% if site_photo_groups %}
+            {% for group in site_photo_groups %}
+            <div class="photo-group">
+              <div class="photo-group__header">
+                <h3>{{ group.label }}</h3>
+                <p class="photo-card__meta">
+                  {{ group.photos | length }} photo{{ 's' if group.photos | length != 1 else '' }} in this section
+                </p>
+              </div>
+              <div class="photo-grid">
+                {% for photo in group.photos %}
+                <article class="photo-card">
+                  <div class="photo-card__preview">
+                    <img src="{{ photo.url }}" alt="{{ photo.label }} preview" loading="lazy" />
+                  </div>
+                  <div class="photo-card__details">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem">
+                      <h3>{{ photo.label }}</h3>
+                      <span class="menu-pill {% if not photo.is_default %}menu-pill--alert{% endif %}">
+                        {% if photo.is_default %}
+                        Default
+                        {% else %}
+                        Custom
+                        {% endif %}
+                      </span>
+                    </div>
+                    <p>{{ photo.description }}</p>
+                    {% if photo.page_title %}
+                    <p class="photo-card__meta">Page: {{ photo.page_title }}</p>
+                    {% endif %}
+                  </div>
+                  <form method="post" action="{{ url_for('update_site_photo') }}">
+                    <input type="hidden" name="photo_key" value="{{ photo.key }}" />
+                    <label>
+                      Image URL
+                      <input type="url" name="photo_url" value="{{ photo.url }}" placeholder="https://..." />
+                    </label>
+                    <div class="photo-card__actions">
+                      <button type="submit">Save photo</button>
+                      <button type="submit" name="reset" value="1" class="ghost-button" {% if photo.is_default %}disabled{% endif %}>
+                        Use default
+                      </button>
+                    </div>
+                    <p class="photo-card__meta">Default: {{ photo.default_url }}</p>
+                  </form>
+                </article>
+                {% endfor %}
+              </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p class="coverage-admin__empty">No photos registered yet.</p>
+            {% endif %}
           </section>
         </section>
 
