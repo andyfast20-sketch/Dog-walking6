@@ -747,6 +747,8 @@ def _get_state_backup_metadata() -> dict:
             "appointments": len(data.get("appointment_slots", [])),
             "visitors": len((data.get("visitor_stats") or {})),
             "chats": len((data.get("chat_conversations") or {})),
+            "dog_breeds": len(data.get("dog_breeds", [])),
+            "site_photos": len((data.get("site_photos") or {})),
             "coverage_areas": len(data.get("coverage_areas", [])),
             "certificates": len(data.get("certificates", [])),
         }

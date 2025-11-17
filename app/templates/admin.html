@@ -1395,7 +1395,7 @@
             <div class="backup-grid">
               <div class="backup-panel">
                 <h3>Save everything</h3>
-                <p>Write the current submissions, appointments, visitors, chats, breeds, and autopilot settings to a backup file on the server.</p>
+                <p>Write the current submissions, appointments, visitors, chats, dog breeds, custom site photos, and autopilot settings to a backup file on the server.</p>
                 <form method="post" action="{{ url_for('save_admin_state') }}">
                   <button type="submit">Save now</button>
                 </form>
@@ -1428,6 +1428,8 @@
                 <li>{{ state_backup_metadata.counts.submissions }} enquiries</li>
                 <li>{{ state_backup_metadata.counts.visitors }} visitors</li>
                 <li>{{ state_backup_metadata.counts.chats }} conversations</li>
+                <li>{{ state_backup_metadata.counts.dog_breeds }} dog breeds</li>
+                <li>{{ state_backup_metadata.counts.site_photos }} site photos</li>
                 <li>{{ state_backup_metadata.counts.appointments }} appointment slots</li>
                 <li>{{ state_backup_metadata.counts.coverage_areas }} coverage areas</li>
                 <li>{{ state_backup_metadata.counts.certificates }} certificates</li>
