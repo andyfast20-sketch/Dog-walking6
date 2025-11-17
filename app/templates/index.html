@@ -395,6 +395,17 @@
         background: rgba(94, 234, 212, 0.15);
         color: #5eead4;
       }
+      .slot-card__service {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: rgba(248, 250, 252, 0.8);
+      }
+      .slot-card__price {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #fef9c3;
+      }
       .slot-card.is-booked {
         background: rgba(15, 23, 42, 0.15);
         border-color: rgba(255, 255, 255, 0.08);
@@ -911,6 +922,10 @@
             >
               <strong>{{ slot.date_label }}</strong>
               <span class="slot-card__time">{{ slot.time_label }}</span>
+              <span class="slot-card__service">{{ slot.service_label }}</span>
+              {% if slot.price_label %}
+              <span class="slot-card__price">{{ slot.price_label }}</span>
+              {% endif %}
               <span class="slot-card__status">{% if slot.is_booked %}Booked{% else %}Available{% endif %}</span>
             </button>
             {% endfor %}
@@ -1041,133 +1056,9 @@
         <button type="submit">Send</button>
       </form>
     </div>
+    <script src="{{ url_for('static', filename='js/booking.js') }}" defer></script>
     <script>
       (function () {
-        const bookingModal = document.getElementById("bookingModal");
-        const bookingForm = document.getElementById("bookingForm");
-        if (bookingModal && bookingForm) {
-          const bookingButtons = document.querySelectorAll("[data-slot-button]");
-          const bookingSlotIdInput = document.getElementById("bookingSlotId");
-          const bookingNameInput = document.getElementById("bookingName");
-          const bookingEmailInput = document.getElementById("bookingEmail");
-          const bookingBreedInput = document.getElementById("bookingBreed");
-          const bookingSlotSummary = document.getElementById("bookingSlotSummary");
-          const bookingModalClose = document.getElementById("bookingModalClose");
-          const bookingModalError = document.getElementById("bookingModalError");
-          const bookingSuccess = document.getElementById("bookingSuccess");
-          const bookingSubmit = bookingForm.querySelector("button[type='submit']");
-          const submitDefaultLabel = bookingSubmit ? bookingSubmit.textContent : "";
-
-          function updateSlotButton(slot) {
-            if (!slot) return;
-            const button = document.querySelector(`[data-slot-button][data-slot-id="${slot.id}"]`);
-            if (!button) return;
-            const statusEl = button.querySelector(".slot-card__status");
-            const isBooked = Boolean(slot.is_booked);
-            button.dataset.state = isBooked ? "booked" : "available";
-            button.disabled = isBooked;
-            button.setAttribute("aria-disabled", isBooked ? "true" : "false");
-            button.classList.toggle("is-booked", isBooked);
-            if (slot.friendly_label) {
-              button.dataset.friendlyLabel = slot.friendly_label;
-            }
-            if (statusEl) {
-              statusEl.textContent = isBooked ? "Booked" : "Available";
-            }
-          }
-
-          function closeBookingModal() {
-            bookingModal.classList.add("hidden");
-            document.body.classList.remove("modal-open");
-            bookingForm.reset();
-            bookingSlotIdInput.value = "";
-            bookingSlotSummary.textContent = "";
-            bookingModalError.classList.add("hidden");
-          }
-
-          function openBookingModal(button) {
-            bookingForm.reset();
-            bookingSlotIdInput.value = button.dataset.slotId;
-            bookingSlotSummary.textContent = button.dataset.friendlyLabel || "";
-            bookingModalError.classList.add("hidden");
-            bookingModal.classList.remove("hidden");
-            document.body.classList.add("modal-open");
-            setTimeout(() => bookingNameInput.focus(), 50);
-          }
-
-          bookingButtons.forEach((button) => {
-            button.addEventListener("click", () => {
-              if (button.dataset.state !== "available") {
-                return;
-              }
-              openBookingModal(button);
-            });
-          });
-
-          if (bookingModalClose) {
-            bookingModalClose.addEventListener("click", closeBookingModal);
-          }
-          bookingModal.addEventListener("click", (event) => {
-            if (event.target === bookingModal) {
-              closeBookingModal();
-            }
-          });
-          document.addEventListener("keydown", (event) => {
-            if (event.key === "Escape" && !bookingModal.classList.contains("hidden")) {
-              closeBookingModal();
-            }
-          });
-
-          bookingForm.addEventListener("submit", async (event) => {
-            event.preventDefault();
-            if (!bookingSlotIdInput.value) {
-              return;
-            }
-            bookingModalError.classList.add("hidden");
-            const payload = {
-              name: bookingNameInput.value.trim(),
-              email: bookingEmailInput.value.trim(),
-            };
-            if (bookingBreedInput) {
-              payload.breed_id = bookingBreedInput.value;
-            }
-            const visitorName = payload.name || "there";
-            if (bookingSubmit) {
-              bookingSubmit.disabled = true;
-              bookingSubmit.textContent = "Booking...";
-            }
-            const friendlyLabel = bookingSlotSummary.textContent;
-            try {
-              const response = await fetch(`/bookings/slots/${encodeURIComponent(bookingSlotIdInput.value)}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-              });
-              const data = await response.json().catch(() => ({}));
-              if (!response.ok) {
-                throw new Error(data.error || "Unable to book this slot.");
-              }
-              if (data.slot) {
-                updateSlotButton(data.slot);
-              }
-              if (bookingSuccess) {
-                const label = (data.slot && data.slot.friendly_label) || friendlyLabel;
-                bookingSuccess.textContent = `Thanks ${visitorName}! ${label} is now reserved.`;
-                bookingSuccess.classList.remove("hidden");
-              }
-              closeBookingModal();
-            } catch (error) {
-              bookingModalError.textContent = error.message || "Unable to book this slot.";
-              bookingModalError.classList.remove("hidden");
-            } finally {
-              if (bookingSubmit) {
-                bookingSubmit.disabled = false;
-                bookingSubmit.textContent = submitDefaultLabel || "Book this slot";
-              }
-            }
-          });
-        }
-
         const VISITOR_STORAGE_KEY = "liveChatVisitorId";
         function generateVisitorId() {
           if (window.crypto && window.crypto.randomUUID) {
