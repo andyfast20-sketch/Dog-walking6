@@ -146,6 +146,29 @@
         background: #fde68a;
         box-shadow: 0 20px 35px rgba(252, 211, 77, 0.45);
       }
+      .service-banner {
+        width: 100%;
+        margin: 0 auto clamp(1.5rem, 3vw, 2.5rem);
+        padding: 0.9rem 1.25rem;
+        border-radius: 18px;
+        background: rgba(254, 215, 170, 0.95);
+        border: 1px solid rgba(251, 146, 60, 0.4);
+        color: #7c2d12;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        box-shadow: 0 15px 35px rgba(249, 115, 22, 0.25);
+      }
+      .service-banner span {
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.75rem;
+        color: rgba(124, 45, 18, 0.9);
+      }
+      .service-banner p {
+        margin: 0;
+        font-weight: 600;
+      }
       @media (max-width: 640px) {
         .primary-nav {
           flex-direction: column;
@@ -890,6 +913,12 @@
           </div>
           <a class="nav-cta" href="#booking">Plan a walk</a>
         </nav>
+        {% if service_notice.enabled %}
+        <div class="service-banner" role="status" aria-live="assertive">
+          <span>Service notice</span>
+          <p>{{ service_notice.message }}</p>
+        </div>
+        {% endif %}
         <div class="hero">
           <div>
             <p style="text-transform: uppercase; letter-spacing: 0.2em; color: #6366f1; font-weight: 700">

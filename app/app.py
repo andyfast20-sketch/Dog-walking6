@@ -372,6 +372,8 @@ autopilot_status = {
     "last_reply_preview": None,
     "last_visitor_id": None,
 }
+SERVICE_NOTICE_DEFAULT_TEXT = "Website under construction - Do not place any bookings."
+site_service_notice = {"enabled": False, "message": SERVICE_NOTICE_DEFAULT_TEXT}
 STATE_BACKUP_FILENAME = "state_backup.json"
 _active_backup_directory = None
 
@@ -502,6 +504,13 @@ def _group_photo_rows(rows):
     return groups
 
 
+def _service_notice_state():
+    message = (site_service_notice.get("message") or SERVICE_NOTICE_DEFAULT_TEXT).strip()
+    if not message:
+        message = SERVICE_NOTICE_DEFAULT_TEXT
+    return {"enabled": bool(site_service_notice.get("enabled")), "message": message}
+
+
 def _next_id_from_rows(rows, key: str = "id") -> int:
     max_value = 0
     for row in rows:
@@ -605,6 +614,7 @@ def _serialize_state() -> dict:
         "autopilot_enabled": autopilot_enabled,
         "autopilot_status": dict(autopilot_status),
         "site_photos": dict(site_photos),
+        "service_notice": dict(site_service_notice),
     }
     return state
 
@@ -615,7 +625,7 @@ def _load_state(state: dict):
     global next_slot_id, dog_breeds, next_dog_breed_id
     global business_in_a_box, autopilot_enabled, autopilot_status, breed_ai_suggestions
     global coverage_areas, next_coverage_area_id, team_certificates, next_certificate_id
-    global site_photos
+    global site_photos, site_service_notice
 
     submissions = [dict(row) for row in state.get("submissions", []) if isinstance(row, dict)]
     next_submission_id = _coerce_int(state.get("next_submission_id"), _next_id_from_rows(submissions))
@@ -726,6 +736,18 @@ def _load_state(state: dict):
         for key, value in loaded_photos.items():
             if key in site_photos and isinstance(value, str) and value.strip():
                 site_photos[key] = value.strip()
+
+    loaded_notice = state.get("service_notice")
+    if isinstance(loaded_notice, dict):
+        message = (loaded_notice.get("message") or SERVICE_NOTICE_DEFAULT_TEXT).strip()
+        if not message:
+            message = SERVICE_NOTICE_DEFAULT_TEXT
+        site_service_notice = {
+            "enabled": bool(loaded_notice.get("enabled", False)),
+            "message": message,
+        }
+    else:
+        site_service_notice = {"enabled": False, "message": SERVICE_NOTICE_DEFAULT_TEXT}
 
 
 def _get_state_backup_metadata() -> dict:
@@ -1230,6 +1252,7 @@ def index():
         coverage_areas=_sorted_coverage_areas(),
         home_hero_image=_get_photo_url("home_hero"),
         home_profile_image=_get_photo_url("home_profile"),
+        service_notice=_service_notice_state(),
     )
 
 
@@ -1248,6 +1271,7 @@ def bookings_page():
         format_price_label=_format_price_label,
         datetime=datetime,
         bookings_hero_image=_get_photo_url("bookings_hero"),
+        service_notice=_service_notice_state(),
     )
 
 
@@ -1265,6 +1289,7 @@ def hello_world_page(page_id: int):
         home_url=url_for("index"),
         primary_nav=_build_primary_nav(page["nav_key"]),
         certificates=certificates,
+        service_notice=_service_notice_state(),
     )
 
 
@@ -1336,6 +1361,7 @@ def admin_page():
         site_photo_groups=site_photo_groups,
         site_photo_total=len(site_photo_rows),
         site_photo_custom_count=custom_photo_count,
+        service_notice=_service_notice_state(),
     )
 
 
@@ -1387,6 +1413,18 @@ def toggle_autopilot():
         }
     )
     return redirect(url_for("admin_page"))
+
+
+@app.route("/admin/service-notice", methods=["POST"])
+def update_service_notice():
+    global site_service_notice
+
+    enabled_value = request.form.get("enabled", "0")
+    message_value = (request.form.get("message") or SERVICE_NOTICE_DEFAULT_TEXT).strip()
+    if not message_value:
+        message_value = SERVICE_NOTICE_DEFAULT_TEXT
+    site_service_notice = {"enabled": enabled_value == "1", "message": message_value}
+    return redirect(url_for("admin_page", view="status"))
 
 
 @app.route("/admin/business-profile", methods=["POST"])

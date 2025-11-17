@@ -129,6 +129,29 @@
         background: #fde68a;
         box-shadow: 0 20px 35px rgba(252, 211, 77, 0.45);
       }
+      .service-banner {
+        width: 100%;
+        margin: 0 auto clamp(1.2rem, 2vw, 2rem);
+        padding: 0.85rem 1.2rem;
+        border-radius: 18px;
+        background: rgba(254, 215, 170, 0.95);
+        border: 1px solid rgba(251, 146, 60, 0.4);
+        color: #7c2d12;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        box-shadow: 0 15px 35px rgba(249, 115, 22, 0.25);
+      }
+      .service-banner span {
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.75rem;
+        color: rgba(124, 45, 18, 0.9);
+      }
+      .service-banner p {
+        margin: 0;
+        font-weight: 600;
+      }
       @media (max-width: 640px) {
         .primary-nav {
           flex-direction: column;
@@ -492,23 +515,29 @@
   </head>
   <body>
     <div class="site-shell">
-      <header>
-        <nav class="primary-nav" aria-label="Primary">
-          <a class="logo" href="{{ url_for('index') }}"><span>🐾</span>Happy Paws</a>
-          <div class="nav-links">
-            {% for link in primary_nav %}
-            <a
-              href="{{ link.href }}"
-              class="{% if link.is_active %}is-active{% endif %}"
-              {% if link.is_active %}aria-current="page"{% endif %}
-            >
-              {{ link.label }}
-            </a>
-            {% endfor %}
+        <header>
+          <nav class="primary-nav" aria-label="Primary">
+            <a class="logo" href="{{ url_for('index') }}"><span>🐾</span>Happy Paws</a>
+            <div class="nav-links">
+              {% for link in primary_nav %}
+              <a
+                href="{{ link.href }}"
+                class="{% if link.is_active %}is-active{% endif %}"
+                {% if link.is_active %}aria-current="page"{% endif %}
+              >
+                {{ link.label }}
+              </a>
+              {% endfor %}
+            </div>
+            <a class="nav-cta" href="{{ home_booking_url }}">Plan a walk</a>
+          </nav>
+          {% if service_notice.enabled %}
+          <div class="service-banner" role="status" aria-live="assertive">
+            <span>Service notice</span>
+            <p>{{ service_notice.message }}</p>
           </div>
-          <a class="nav-cta" href="{{ home_booking_url }}">Plan a walk</a>
-        </nav>
-      </header>
+          {% endif %}
+        </header>
       <main>
         <section class="hero">
           <div>
