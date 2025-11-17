@@ -475,6 +475,11 @@
         color: #c2410c;
         background: #fff7ed;
       }
+      .menu-pill--success {
+        border-color: #22c55e;
+        color: #15803d;
+        background: #f0fdf4;
+      }
       table {
         border-collapse: collapse;
         width: 100%;
@@ -1162,8 +1167,26 @@
           background: #fff7ed;
         }
       }
+      @keyframes flashSuccessBg {
+        0% {
+          box-shadow: 0 0 0 rgba(34, 197, 94, 0.25);
+          background: #f0fdf4;
+        }
+        50% {
+          box-shadow: 0 0 25px rgba(34, 197, 94, 0.45);
+          background: #dcfce7;
+        }
+        100% {
+          box-shadow: 0 0 0 rgba(34, 197, 94, 0.25);
+          background: #f0fdf4;
+        }
+      }
       .menu-card--alert {
         animation: flashBg 1.5s ease-in-out infinite;
+      }
+      .menu-card--success {
+        animation: flashSuccessBg 1.5s ease-in-out infinite;
+        border-color: #22c55e;
       }
       @keyframes pulse {
         0% {
@@ -1362,7 +1385,7 @@
             </button>
             <button
               type="button"
-              class="menu-card {% if has_new_bookings %}menu-card--alert{% endif %}"
+              class="menu-card {% if has_new_bookings %}menu-card--success{% endif %}"
               data-open-view="appointments"
             >
               <div class="menu-card__top">
@@ -1375,7 +1398,7 @@
               </div>
               <div class="menu-card__meta">
                 {% if has_new_bookings %}
-                <span class="menu-pill menu-pill--alert">New booking needs review</span>
+                <span class="menu-pill menu-pill--success">New booking needs review</span>
                 {% else %}
                 <span class="menu-pill">All bookings handled</span>
                 {% endif %}
