@@ -1179,6 +1179,7 @@
             {% endif %}
           </form>
         </section>
+        {% if meet_greet_enabled %}
         <section aria-labelledby="meetGreetTitle">
           <div class="section-heading">
             <p style="text-transform: uppercase; letter-spacing: 0.2em; color: #06b6d4; font-weight: 700">
@@ -1203,9 +1204,9 @@
                 <li>Safety check of harnesses, leashes, and entry instructions</li>
                 <li>Custom walk plan built on your dog's energy level</li>
               </ul>
-              <button class="btn btn-primary" onclick="document.getElementById('booking').scrollIntoView({ behavior: 'smooth' })">
-                Book a free meet & greet
-              </button>
+              <a class="btn btn-primary" href="{{ url_for('bookings_page') }}#meetSlots">
+                Book a free meet &amp; greet
+              </a>
             </article>
             <article class="meet-greet__card">
               <h3>What to expect</h3>
@@ -1226,12 +1227,13 @@
               <p class="meet-greet__note">
                 Meet and greets are always complimentary—think of them as your on-boarding to concierge-level dog walking.
               </p>
-              <button class="btn btn-secondary" onclick="document.getElementById('booking').scrollIntoView({ behavior: 'smooth' })">
+              <a class="btn btn-secondary" href="{{ url_for('bookings_page') }}#meetSlots">
                 Reserve your spot
-              </button>
+              </a>
             </article>
           </div>
         </section>
+        {% endif %}
       </main>
       <footer>
         <p>© {{ current_year }} Happy Trails Dog Walking · Fully bonded & insured · Serving downtown & beyond</p>

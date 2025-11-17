@@ -544,8 +544,12 @@
             <p class="eyebrow">Bookings</p>
             <h1>Choose the perfect first step for your pup.</h1>
             <p>
+              {% if meet_greet_enabled %}
               Book a walk instantly or schedule a concierge-style meet &amp; greet so we can learn every quirk,
               routine, and cuddle cue before services begin.
+              {% else %}
+              Book a walk instantly and we'll confirm faster than your pup can fetch a leash.
+              {% endif %}
             </p>
             <div class="options-grid">
               <div class="option-card">
@@ -553,11 +557,13 @@
                 <p>Grab an available time from our live calendar and get instant confirmation.</p>
                 <a href="{{ home_booking_url }}">Browse walk times</a>
               </div>
+              {% if meet_greet_enabled %}
               <div class="option-card">
                 <h3>Book a Meet &amp; Greet</h3>
                 <p>Invite us over for a relaxed 30-minute visit where we connect with your dog and walk your setup.</p>
                 <a class="secondary" href="#meetSlots">Browse available slots</a>
               </div>
+              {% endif %}
             </div>
           </div>
           <figure>
@@ -567,6 +573,7 @@
             />
           </figure>
         </section>
+        {% if meet_greet_enabled %}
         <section id="meetSlots">
           <div class="eyebrow" style="color: #0ea5e9">Live openings</div>
           <h2 style="margin-top: 0">Reserve a meet &amp; greet time</h2>
@@ -600,7 +607,7 @@
             <p class="empty-state">No meet &amp; greet slots are available at the moment. Check back soon or text us at (555) 014-7788 to be added to the priority list.</p>
             {% endif %}
             <div class="booking-success hidden" id="bookingSuccess"></div>
-          </section>
+        </section>
         <section>
           <div class="eyebrow" style="color: #f97316">Why it matters</div>
           <h2 style="margin-top: 0">Meet &amp; greets keep pups confident and routines seamless.</h2>
@@ -653,6 +660,7 @@
             </div>
           </div>
         </section>
+        {% endif %}
       </main>
       <footer>&copy; {{ datetime.utcnow().year }} Happy Trails Dog Walking. All rights reserved.</footer>
     </div>
