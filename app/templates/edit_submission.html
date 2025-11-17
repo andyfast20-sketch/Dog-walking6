@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Edit Submission</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chat-widget.css') }}" />
     <style>
       body {
         font-family: Arial, Helvetica, sans-serif;
@@ -78,5 +79,7 @@
       <a href="{{ admin_url }}">Back to Admin</a>
       <a href="{{ home_url }}">Return Home</a>
     </div>
+    {% include "chat_widget.html" %}
+    <script src="{{ url_for('static', filename='js/chat-widget.js') }}" defer></script>
   </body>
 </html>
