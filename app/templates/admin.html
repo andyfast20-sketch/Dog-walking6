@@ -1766,6 +1766,14 @@
                         {% if slot.visitor_dog_breed %}
                         <div class="muted">Breed: {{ slot.visitor_dog_breed }}</div>
                         {% endif %}
+                        {% if slot.visitor_service_area %}
+                        <div class="muted">
+                          Area: {{ slot.visitor_service_area }}
+                          {% if slot.visitor_travel_fee_label %}
+                          · Travel fee {{ slot.visitor_travel_fee_label }}
+                          {% endif %}
+                        </div>
+                        {% endif %}
                       </td>
                       <td>
                         <form class="slot-status-form" method="post" action="{{ url_for('update_slot_status', slot_id=slot.id) }}">
@@ -1804,7 +1812,7 @@
             <div class="coverage-admin__grid">
               <article class="coverage-admin__card">
                 <h3>Add a new area</h3>
-                <p>Give it a friendly name and a short description.</p>
+                <p>Give it a friendly name, description, and optional travel fee.</p>
                 <form method="post" action="{{ url_for('save_coverage_area') }}">
                   <label>
                     Area name
@@ -1814,6 +1822,10 @@
                     Description
                     <textarea name="area_description" placeholder="Quiet lanes, riverside paths, etc." required></textarea>
                   </label>
+                  <label>
+                    Travel fee (optional)
+                    <input type="number" name="area_travel_fee" min="0" step="0.01" placeholder="0" />
+                  </label>
                   <button type="submit">Add area</button>
                 </form>
               </article>
@@ -1822,6 +1834,13 @@
               <article class="coverage-admin__card">
                 <h3>{{ area.name }}</h3>
                 <p>Shown exactly as written on the homepage.</p>
+                <p class="muted" style="margin: 0 0 0.75rem">
+                  {% if area.travel_fee %}
+                  Travel fee shown to visitors: +{{ format_price_label(area.travel_fee) }}
+                  {% else %}
+                  No travel fee added for this area.
+                  {% endif %}
+                </p>
                 <form method="post" action="{{ url_for('save_coverage_area') }}">
                   <input type="hidden" name="area_id" value="{{ area.id }}" />
                   <label>
@@ -1831,6 +1850,16 @@
                   <label>
                     Description
                     <textarea name="area_description" required>{{ area.description }}</textarea>
+                  </label>
+                  <label>
+                    Travel fee (optional)
+                    <input
+                      type="number"
+                      name="area_travel_fee"
+                      min="0"
+                      step="0.01"
+                      value="{{ '%.2f'|format(area.travel_fee) if area.travel_fee is not none else '' }}"
+                    />
                   </label>
                   <div class="coverage-admin__actions">
                     <button type="submit">Save changes</button>

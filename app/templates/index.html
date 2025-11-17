@@ -792,25 +792,78 @@
       .coverage-list span {
         color: #475569;
       }
+      .coverage-list .coverage-fee {
+        display: inline-flex;
+        align-items: center;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #0f172a;
+        background: rgba(14, 165, 233, 0.18);
+        border-radius: 999px;
+        padding: 0.1rem 0.6rem;
+        margin-left: 0.5rem;
+      }
       body.modal-open {
         overflow: hidden;
       }
-      .testimonials {
+      .meet-greet {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 1.25rem;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: clamp(1.5rem, 3vw, 3rem);
+        align-items: stretch;
       }
-      .testimonial {
-        border-radius: 20px;
-        padding: 1.25rem;
+      .meet-greet__card {
+        border-radius: 24px;
         border: 1px solid rgba(15, 23, 42, 0.08);
         background: #f8fafc;
+        padding: clamp(1.25rem, 2vw, 2rem);
         display: flex;
         flex-direction: column;
+        gap: 1rem;
+        box-shadow: 0 18px 40px rgba(14, 116, 144, 0.08);
+      }
+      .meet-greet__card h3 {
+        margin: 0;
+        font-size: 1.3rem;
+      }
+      .meet-greet__badge {
+        align-self: flex-start;
+        padding: 0.35rem 0.8rem;
+        border-radius: 999px;
+        background: rgba(14, 116, 144, 0.12);
+        color: #0e7490;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font-size: 0.75rem;
+      }
+      .meet-greet__list {
+        margin: 0;
+        padding-left: 1.25rem;
+        color: #475569;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+      .meet-greet__note {
+        margin: 0;
+        color: #1f2937;
+        font-size: 1rem;
+      }
+      .meet-greet__perks {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
         gap: 0.75rem;
       }
-      .testimonial strong {
-        color: #1f3d8f;
+      .meet-greet__perk {
+        border-radius: 18px;
+        padding: 1rem 1.1rem;
+        background: rgba(59, 130, 246, 0.08);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+      }
+      .meet-greet__perk strong {
+        display: block;
+        margin-bottom: 0.2rem;
       }
       footer {
         padding: 2.5rem clamp(1rem, 4vw, 4rem);
@@ -944,6 +997,9 @@
                 {% for area in coverage_areas %}
                 <li>
                   <strong>{{ area.name }}</strong>
+                  {% if area.travel_fee %}
+                  <span class="coverage-fee">+{{ format_price_label(area.travel_fee) }} travel</span>
+                  {% endif %}
                   <span>{{ area.description }}</span>
                 </li>
                 {% endfor %}
@@ -1094,26 +1150,56 @@
             {% endif %}
           </form>
         </section>
-        <section>
+        <section aria-labelledby="meetGreetTitle">
           <div class="section-heading">
-            <p style="text-transform: uppercase; letter-spacing: 0.2em; color: #38bdf8; font-weight: 700">
-              Stories
+            <p style="text-transform: uppercase; letter-spacing: 0.2em; color: #06b6d4; font-weight: 700">
+              Meet & Greet
             </p>
-            <h2>Pet parents love us</h2>
-            <p>Real notes from the Happy Trails community.</p>
+            <h2 id="meetGreetTitle">Schedule a complimentary meet and greet</h2>
+            <p>
+              Before the first walk, we pair you with your walker for a relaxed meet-up. It's free, friendly, and built to make
+              sure every pup feels at home.
+            </p>
           </div>
-          <div class="testimonials">
-            <article class="testimonial">
-              <p>“I get a live map every time Maple goes out. It's the peace of mind I never knew I needed.”</p>
-              <strong>Sara & Maple</strong>
+          <div class="meet-greet">
+            <article class="meet-greet__card">
+              <span class="meet-greet__badge">No cost</span>
+              <h3>30-minute welcome visit</h3>
+              <p class="meet-greet__note">
+                We come to you (or your favourite park) to learn routines, swap keys, and answer every question. Bring treats,
+                questions, and any special instructions—we love the details.
+              </p>
+              <ul class="meet-greet__list">
+                <li>Introductions for you, your pup, and your walker</li>
+                <li>Safety check of harnesses, leashes, and entry instructions</li>
+                <li>Custom walk plan built on your dog's energy level</li>
+              </ul>
+              <button class="btn btn-primary" onclick="document.getElementById('booking').scrollIntoView({ behavior: 'smooth' })">
+                Book a free meet & greet
+              </button>
             </article>
-            <article class="testimonial">
-              <p>“Flexible scheduling and the walkers genuinely adore our anxious rescue pup. Ten out of ten.”</p>
-              <strong>Chris & Tofu</strong>
-            </article>
-            <article class="testimonial">
-              <p>“Booked a walk from the airport lounge and had photos before takeoff. Incredible service.”</p>
-              <strong>Priya & Miso</strong>
+            <article class="meet-greet__card">
+              <h3>What to expect</h3>
+              <div class="meet-greet__perks">
+                <div class="meet-greet__perk">
+                  <strong>Warm introductions</strong>
+                  <span>Let your pup sniff things out while we build trust at their pace.</span>
+                </div>
+                <div class="meet-greet__perk">
+                  <strong>Care blueprint</strong>
+                  <span>We'll map hydration breaks, preferred routes, and post-walk rituals.</span>
+                </div>
+                <div class="meet-greet__perk">
+                  <strong>Instant booking</strong>
+                  <span>Ready to go? Approve your schedule on the spot from the Happy Trails app.</span>
+                </div>
+              </div>
+              <p class="meet-greet__note">
+                Meet and greets are always complimentary—think of them as your on-boarding to concierge-level dog walking.
+              </p>
+              <button class="btn btn-secondary" onclick="document.getElementById('booking').scrollIntoView({ behavior: 'smooth' })">
+                Reserve your spot
+              </button>
             </article>
           </div>
         </section>
@@ -1131,6 +1217,9 @@
           <h2 style="margin-bottom: 0.35rem">Reserve this slot</h2>
           <p id="bookingSlotSummary" style="margin: 0; color: #475569"></p>
         </div>
+        {% set breeds_available = dog_breeds|length > 0 %}
+        {% set areas_available = coverage_areas|length > 0 %}
+        {% set booking_ready = breeds_available and areas_available %}
         <form id="bookingForm">
           <input type="hidden" id="bookingSlotId" />
           <label>
@@ -1141,7 +1230,6 @@
             Email address
             <input type="email" id="bookingEmail" required />
           </label>
-          {% set breeds_available = dog_breeds|length > 0 %}
           {% if breeds_available %}
           <label>
             Dog breed
@@ -1157,8 +1245,25 @@
             Add dog breeds from the admin page to enable bookings.
           </p>
           {% endif %}
+          {% if areas_available %}
+          <label>
+            Service area
+            <select id="bookingCoverageArea" required>
+              <option value="" disabled selected>Select your area</option>
+              {% for area in coverage_areas %}
+              <option value="{{ area.id }}">
+                {{ area.name }}{% if area.travel_fee %} · +{{ format_price_label(area.travel_fee) }} travel{% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </label>
+          {% else %}
+          <p class="booking-modal__note">
+            Add service areas from the admin page to enable bookings.
+          </p>
+          {% endif %}
           <div class="booking-modal__error hidden" id="bookingModalError"></div>
-          <button type="submit" {% if not breeds_available %}disabled{% endif %}>Book this slot</button>
+          <button type="submit" {% if not booking_ready %}disabled{% endif %}>Book this slot</button>
         </form>
       </div>
     </div>
