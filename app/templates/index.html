@@ -46,13 +46,20 @@
         background: radial-gradient(circle, rgba(255, 255, 255, 0.9), transparent 65%);
         z-index: 0;
       }
-      .nav {
+      .primary-nav {
+        position: sticky;
+        top: 1.5rem;
+        z-index: 10;
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 1rem;
-        position: relative;
-        z-index: 1;
+        padding: 0.95rem 1.5rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        box-shadow: 0 25px 60px rgba(15, 23, 42, 0.15);
+        backdrop-filter: blur(12px);
       }
       .logo {
         display: flex;
@@ -84,6 +91,47 @@
         text-decoration: none;
         color: #0f172a;
         font-weight: 600;
+        position: relative;
+        padding-bottom: 0.3rem;
+      }
+      .nav-links a::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        height: 3px;
+        width: 0;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #2563eb, #7c3aed, #14b8a6);
+        transition: width 0.3s ease;
+      }
+      .nav-links a:hover::after,
+      .nav-links a.is-active::after {
+        width: 100%;
+      }
+      .nav-cta {
+        text-decoration: none;
+        font-size: 0.9rem;
+        font-weight: 600;
+        padding: 0.65rem 1.25rem;
+        border-radius: 999px;
+        color: #fff;
+        background: linear-gradient(135deg, #ec4899, #8b5cf6);
+        box-shadow: 0 15px 35px rgba(236, 72, 153, 0.35);
+      }
+      @media (max-width: 640px) {
+        .primary-nav {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 0.75rem;
+        }
+        .nav-links {
+          flex-wrap: wrap;
+        }
+        .nav-cta {
+          align-self: stretch;
+          text-align: center;
+        }
       }
       .hero {
         display: grid;
@@ -220,6 +268,27 @@
       }
       .service-card span {
         font-size: 1.6rem;
+      }
+      .faq-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1.25rem;
+      }
+      .faq-card {
+        border-radius: 20px;
+        padding: 1.25rem 1.5rem;
+        background: linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(244, 114, 182, 0.18));
+        border: 1px solid rgba(14, 165, 233, 0.25);
+        color: #0f172a;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+      }
+      .faq-card h3 {
+        margin: 0 0 0.35rem;
+        font-size: 1.1rem;
+      }
+      .faq-card p {
+        margin: 0;
+        color: #1f2937;
       }
       form {
         display: grid;
@@ -615,14 +684,20 @@
   <body>
     <div class="site-shell">
       <header class="site-header">
-        <nav class="nav">
-          <div class="logo"><span>🐾</span>Happy Trails</div>
-          {% set first_link = page_links|first %}
-          <ul class="nav-links">
-            <li><a href="#booking">Book a walk</a></li>
-            <li><a href="#contact">Contact</a></li>
-            <li><a href="{{ first_link.href if first_link else '#pages' }}">More pages</a></li>
-          </ul>
+        <nav class="primary-nav" aria-label="Primary">
+          <a class="logo" href="{{ url_for('index') }}"><span>🐾</span>Happy Trails</a>
+          <div class="nav-links">
+            {% for link in primary_nav %}
+            <a
+              href="{{ link.href }}"
+              class="{% if link.is_active %}is-active{% endif %}"
+              {% if link.is_active %}aria-current="page"{% endif %}
+            >
+              {{ link.label }}
+            </a>
+            {% endfor %}
+          </div>
+          <a class="nav-cta" href="#booking">Plan a walk</a>
         </nav>
         <div class="hero">
           <div>
@@ -757,6 +832,33 @@
               <span>🏡</span>
               <strong>In-home Visits</strong>
               <p>Feeding, medication reminders, and evening tuck-ins available.</p>
+            </article>
+          </div>
+        </section>
+        <section id="faq">
+          <div class="section-heading">
+            <p style="text-transform: uppercase; letter-spacing: 0.2em; color: #06b6d4; font-weight: 700">
+              FAQ
+            </p>
+            <h2>Your top questions, answered</h2>
+            <p>Quick clarity on how we work, from safety checks to scheduling.</p>
+          </div>
+          <div class="faq-grid">
+            <article class="faq-card">
+              <h3>How soon can you fit us in?</h3>
+              <p>Same-day bookings are available until 3pm. Choose an open slot and we'll confirm instantly.</p>
+            </article>
+            <article class="faq-card">
+              <h3>Who will be walking my dog?</h3>
+              <p>You meet your walker before the first visit. We keep the same pro assigned for consistency.</p>
+            </article>
+            <article class="faq-card">
+              <h3>How do updates work?</h3>
+              <p>Every walk includes GPS tracking, time stamps, and candid photos delivered to your phone.</p>
+            </article>
+            <article class="faq-card">
+              <h3>What about keys and security?</h3>
+              <p>Keys are coded and stored in a locked cabinet. Smart lock access codes are rotated monthly.</p>
             </article>
           </div>
         </section>

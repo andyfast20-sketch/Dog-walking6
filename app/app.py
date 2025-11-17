@@ -23,6 +23,167 @@ from flask import (
 app = Flask(__name__)
 
 
+PRIMARY_NAV_CONFIG = [
+    {"key": "home", "label": "Home", "endpoint": "index", "url_kwargs": {}},
+    {
+        "key": "about",
+        "label": "About",
+        "endpoint": "hello_world_page",
+        "url_kwargs": {"page_id": 1},
+    },
+    {
+        "key": "services",
+        "label": "Services",
+        "endpoint": "hello_world_page",
+        "url_kwargs": {"page_id": 2},
+    },
+    {
+        "key": "prices",
+        "label": "Prices",
+        "endpoint": "hello_world_page",
+        "url_kwargs": {"page_id": 3},
+    },
+    {
+        "key": "contact",
+        "label": "Contact",
+        "endpoint": "hello_world_page",
+        "url_kwargs": {"page_id": 4},
+    },
+]
+
+PAGE_DEFINITIONS = {
+    1: {
+        "id": 1,
+        "nav_key": "about",
+        "eyebrow": "Our story",
+        "title": "Who we are",
+        "lede": "Happy Trails Dog Walking is a concierge-style service inspired by the dogs who tugged us down these streets more than a decade ago.",
+        "highlight": "Neighbors trust us with their best friends because we blend attentive care with seamless tech.",
+        "hero_image": "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=900&q=80",
+        "sections": [
+            {
+                "title": "Our promise",
+                "body": "Safety-first adventures, thoughtful pacing, and photo updates every walk.",
+                "bullets": [
+                    "GPS tracking with live arrival estimates",
+                    "Solo walks for anxious pups",
+                    "Flexible meet-and-greet scheduling",
+                ],
+            },
+            {
+                "title": "Meet the crew",
+                "body": "Handlers are certified in canine first aid, background checked, and mentored for three months before heading out solo.",
+                "bullets": [
+                    "Monthly continuing education",
+                    "Neighborhood specialists",
+                    "Emergency support line",
+                ],
+            },
+        ],
+    },
+    2: {
+        "id": 2,
+        "nav_key": "services",
+        "eyebrow": "What we do",
+        "title": "Tailored walking services",
+        "lede": "From quick relief breaks to half-day adventures, every outing is curated for your pup's personality and energy level.",
+        "highlight": "Pick a foundation service and layer on training refreshers, trail runs, or cuddle cooldowns.",
+        "hero_image": "https://images.unsplash.com/photo-1518378188025-22bd89516ee2?auto=format&fit=crop&w=900&q=80",
+        "sections": [
+            {
+                "title": "Daily essentials",
+                "body": "Perfect for consistent routines and midday wiggles.",
+                "bullets": [
+                    "20-minute refresh walks",
+                    "45-minute neighborhood tours",
+                    "Weekend warrior playdates",
+                ],
+            },
+            {
+                "title": "Specialty add-ons",
+                "body": "Customize each visit with enrichment and concierge touches.",
+                "bullets": [
+                    "Training reinforcement",
+                    "Puppy socialization field trips",
+                    "Medication and meal support",
+                ],
+            },
+        ],
+    },
+    3: {
+        "id": 3,
+        "nav_key": "prices",
+        "eyebrow": "Investment",
+        "title": "Transparent pricing",
+        "lede": "Premium care, clear rates, and no surprise fees. Bundle sessions or pay-as-you-go with digital receipts every Friday.",
+        "highlight": "Members save up to 15% with recurring walk packs and concierge perks.",
+        "hero_image": "https://images.unsplash.com/photo-1507149833265-60c372daea22?auto=format&fit=crop&w=900&q=80",
+        "sections": [
+            {
+                "title": "Core walk menu",
+                "body": "Choose the cadence that matches your schedule.",
+                "bullets": [
+                    "Express (20 min) — $28",
+                    "Signature (45 min) — $42",
+                    "Adventure hour — $58",
+                ],
+            },
+            {
+                "title": "Membership perks",
+                "body": "Bundle more, save more, and unlock concierge extras.",
+                "bullets": [
+                    "5-walk pack: save 5%",
+                    "10-walk pack: save 10%",
+                    "Unlimited month: includes free pup taxi",
+                ],
+            },
+        ],
+    },
+    4: {
+        "id": 4,
+        "nav_key": "contact",
+        "eyebrow": "Let's talk",
+        "title": "Get in touch",
+        "lede": "Prefer a personal hello? Reach us the way that works for you and we'll respond within the hour.",
+        "highlight": "Dedicated concierge monitors calls, texts, and chat Monday–Saturday, 7am–9pm.",
+        "hero_image": "https://images.unsplash.com/photo-1507146426996-ef05306b995a?auto=format&fit=crop&w=900&q=80",
+        "sections": [
+            {
+                "title": "Direct contact",
+                "body": "We're real humans excited to help schedule walks and answer questions.",
+                "bullets": [
+                    "Call: (555) 012-4455",
+                    "Text: (555) 014-7788",
+                    "Email: concierge@happytrails.dog",
+                ],
+            },
+            {
+                "title": "Visit us",
+                "body": "Stop by the studio to say hi and pick up pup merch.",
+                "bullets": [
+                    "143 Riverwalk Ave, Suite 3",
+                    "Weekdays 10am–6pm",
+                    "Parking validated for clients",
+                ],
+            },
+        ],
+    },
+}
+
+
+def _build_primary_nav(active_key: str):
+    nav_items = []
+    for item in PRIMARY_NAV_CONFIG:
+        nav_items.append(
+            {
+                "label": item["label"],
+                "href": url_for(item["endpoint"], **item["url_kwargs"]),
+                "is_active": item["key"] == active_key,
+            }
+        )
+    return nav_items
+
+
 submissions = []
 next_submission_id = 1
 STATUS_OPTIONS = ["New", "In Process", "Finished"]
@@ -729,10 +890,10 @@ def index():
         return redirect(url_for("index", submitted=1))
 
     page_links = [
-        {"label": "Page 1", "href": url_for("hello_world_page", page_id=1)},
-        {"label": "Page 2", "href": url_for("hello_world_page", page_id=2)},
-        {"label": "Page 3", "href": url_for("hello_world_page", page_id=3)},
-        {"label": "Page 4", "href": url_for("hello_world_page", page_id=4)},
+        {"label": "About Happy Trails", "href": url_for("hello_world_page", page_id=1)},
+        {"label": "Our Services", "href": url_for("hello_world_page", page_id=2)},
+        {"label": "Pricing Guide", "href": url_for("hello_world_page", page_id=3)},
+        {"label": "Contact Options", "href": url_for("hello_world_page", page_id=4)},
         {"label": "Admin Page", "href": url_for("admin_page")},
     ]
     submission_success = request.args.get("submitted") == "1"
@@ -745,20 +906,21 @@ def index():
         booking_slots=slot_rows,
         dog_breeds=_sorted_breeds(),
         current_year=datetime.utcnow().year,
+        primary_nav=_build_primary_nav("home"),
     )
 
 
 @app.route("/page/<int:page_id>", methods=["GET"])
 def hello_world_page(page_id: int):
-    if page_id not in range(1, 5):
+    page = PAGE_DEFINITIONS.get(page_id)
+    if not page:
         abort(404)
-    if page_id == 1:
-        return render_template(
-            "page1.html",
-            home_url=url_for("index"),
-            contact_url=url_for("index"),
-        )
-    return render_template("hello_world.html", home_url=url_for("index"))
+    return render_template(
+        "info_page.html",
+        page=page,
+        home_url=url_for("index"),
+        primary_nav=_build_primary_nav(page["nav_key"]),
+    )
 
 
 @app.route("/admin")
