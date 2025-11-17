@@ -68,6 +68,207 @@ autopilot_status = {
     "last_reply_preview": None,
     "last_visitor_id": None,
 }
+STATE_BACKUP_FILENAME = "state_backup.json"
+
+
+def _state_backup_path() -> str:
+    return os.path.join(app.root_path, STATE_BACKUP_FILENAME)
+
+
+def _serialize_datetime(value):
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return value
+
+
+def _parse_datetime(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value
+    try:
+        return datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _coerce_int(value, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _next_id_from_rows(rows, key: str = "id") -> int:
+    max_value = 0
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        raw_value = row.get(key)
+        try:
+            numeric_value = int(raw_value)
+        except (TypeError, ValueError):
+            continue
+        if numeric_value > max_value:
+            max_value = numeric_value
+    return max_value + 1
+
+
+def _serialize_state() -> dict:
+    visitor_rows = {}
+    for ip_address, visitor in visitor_stats.items():
+        data = dict(visitor)
+        data["first_visit"] = _serialize_datetime(data.get("first_visit"))
+        data["last_visit"] = _serialize_datetime(data.get("last_visit"))
+        visitor_rows[ip_address] = data
+    conversation_rows = {}
+    for visitor_id, conversation in chat_conversations.items():
+        data = {
+            "visitor_id": visitor_id,
+            "ip_address": conversation.get("ip_address"),
+            "created_at": _serialize_datetime(conversation.get("created_at")),
+            "last_message_at": _serialize_datetime(conversation.get("last_message_at")),
+            "messages": [dict(message) for message in conversation.get("messages", [])],
+        }
+        conversation_rows[visitor_id] = data
+    slot_rows = []
+    for slot in appointment_slots:
+        slot_rows.append(
+            {
+                "id": slot.get("id"),
+                "start": _serialize_datetime(slot.get("start")),
+                "is_booked": bool(slot.get("is_booked", False)),
+                "workflow_status": slot.get("workflow_status"),
+                "visitor_name": slot.get("visitor_name"),
+                "visitor_email": slot.get("visitor_email"),
+                "visitor_dog_breed": slot.get("visitor_dog_breed"),
+                "booked_at": _serialize_datetime(slot.get("booked_at")),
+            }
+        )
+    state = {
+        "version": 1,
+        "saved_at": datetime.utcnow().isoformat(),
+        "submissions": [dict(submission) for submission in submissions],
+        "next_submission_id": next_submission_id,
+        "visitor_stats": visitor_rows,
+        "blocked_ips": list(blocked_ips),
+        "chat_conversations": conversation_rows,
+        "next_chat_message_id": next_chat_message_id,
+        "appointment_slots": slot_rows,
+        "next_slot_id": next_slot_id,
+        "dog_breeds": [dict(breed) for breed in dog_breeds],
+        "next_dog_breed_id": next_dog_breed_id,
+        "breed_ai_suggestions": breed_ai_suggestions,
+        "business_in_a_box": business_in_a_box,
+        "autopilot_enabled": autopilot_enabled,
+        "autopilot_status": dict(autopilot_status),
+    }
+    return state
+
+
+def _load_state(state: dict):
+    global submissions, next_submission_id, visitor_stats, blocked_ips
+    global chat_conversations, next_chat_message_id, appointment_slots
+    global next_slot_id, dog_breeds, next_dog_breed_id
+    global business_in_a_box, autopilot_enabled, autopilot_status, breed_ai_suggestions
+
+    submissions = [dict(row) for row in state.get("submissions", []) if isinstance(row, dict)]
+    next_submission_id = _coerce_int(state.get("next_submission_id"), _next_id_from_rows(submissions))
+
+    visitor_rows = {}
+    for ip_address, payload in (state.get("visitor_stats") or {}).items():
+        if not isinstance(payload, dict):
+            continue
+        data = dict(payload)
+        data["first_visit"] = _parse_datetime(data.get("first_visit")) or datetime.utcnow()
+        data["last_visit"] = _parse_datetime(data.get("last_visit")) or data["first_visit"]
+        visitor_rows[ip_address] = data
+    visitor_stats = visitor_rows
+
+    blocked_ips = set(state.get("blocked_ips") or [])
+
+    conversation_rows = {}
+    for visitor_id, conversation in (state.get("chat_conversations") or {}).items():
+        if not isinstance(conversation, dict):
+            continue
+        data = {
+            "visitor_id": visitor_id,
+            "ip_address": conversation.get("ip_address"),
+            "created_at": _parse_datetime(conversation.get("created_at")) or datetime.utcnow(),
+            "last_message_at": _parse_datetime(conversation.get("last_message_at")),
+            "messages": [dict(message) for message in conversation.get("messages", []) if isinstance(message, dict)],
+        }
+        conversation_rows[visitor_id] = data
+    chat_conversations = conversation_rows
+
+    all_messages = []
+    for conversation in chat_conversations.values():
+        all_messages.extend(conversation.get("messages", []))
+    next_chat_message_id = _coerce_int(state.get("next_chat_message_id"), _next_id_from_rows(all_messages))
+
+    slots = []
+    for payload in state.get("appointment_slots", []):
+        if not isinstance(payload, dict):
+            continue
+        start = _parse_datetime(payload.get("start"))
+        if not start:
+            continue
+        slot = {
+            "id": _coerce_int(payload.get("id"), _next_id_from_rows(slots)),
+            "start": start,
+            "is_booked": bool(payload.get("is_booked", False)),
+            "workflow_status": payload.get("workflow_status", ""),
+            "visitor_name": payload.get("visitor_name"),
+            "visitor_email": payload.get("visitor_email"),
+            "visitor_dog_breed": payload.get("visitor_dog_breed"),
+            "booked_at": _parse_datetime(payload.get("booked_at")),
+        }
+        slots.append(slot)
+    appointment_slots = sorted(slots, key=lambda slot: slot["start"])
+    next_slot_id = _coerce_int(state.get("next_slot_id"), _next_id_from_rows(appointment_slots))
+
+    dog_breeds = [dict(breed) for breed in state.get("dog_breeds", []) if isinstance(breed, dict)]
+    next_dog_breed_id = _coerce_int(state.get("next_dog_breed_id"), _next_id_from_rows(dog_breeds))
+
+    loaded_breed_ai = state.get("breed_ai_suggestions")
+    breed_ai_suggestions = loaded_breed_ai if isinstance(loaded_breed_ai, dict) else None
+
+    business_in_a_box = state.get("business_in_a_box") or BUSINESS_BOX_DEFAULT
+    autopilot_enabled = bool(state.get("autopilot_enabled", False))
+    loaded_status = state.get("autopilot_status")
+    if isinstance(loaded_status, dict):
+        autopilot_status = {
+            "state": loaded_status.get("state", autopilot_status.get("state", "off")),
+            "last_run": loaded_status.get("last_run"),
+            "last_error": loaded_status.get("last_error"),
+            "last_reply_preview": loaded_status.get("last_reply_preview"),
+            "last_visitor_id": loaded_status.get("last_visitor_id"),
+        }
+
+
+def _get_state_backup_metadata() -> dict:
+    path = _state_backup_path()
+    metadata = {
+        "exists": os.path.exists(path),
+        "filename": os.path.basename(path),
+    }
+    if not metadata["exists"]:
+        return metadata
+    metadata["size"] = os.path.getsize(path)
+    metadata["modified_at"] = datetime.fromtimestamp(os.path.getmtime(path)).isoformat()
+    try:
+        with open(path, "r", encoding="utf-8") as backup_file:
+            data = json.load(backup_file)
+        metadata["saved_at"] = data.get("saved_at")
+        metadata["counts"] = {
+            "submissions": len(data.get("submissions", [])),
+            "appointments": len(data.get("appointment_slots", [])),
+            "visitors": len((data.get("visitor_stats") or {})),
+            "chats": len((data.get("chat_conversations") or {})),
+        }
+    except (OSError, ValueError, json.JSONDecodeError):
+        metadata["error"] = "Unable to read backup details"
+    return metadata
 
 
 def _get_submission(submission_id: int):
@@ -526,6 +727,16 @@ def admin_page():
     booked_slots = [slot for slot in slot_rows if slot["is_booked"]]
     new_enquiry_count = sum(1 for submission in submissions if (submission.get("status") or "New") == "New")
     has_new_bookings = any((slot.get("workflow_status") or "New") == "New" for slot in booked_slots)
+    state_action = request.args.get("state_action", "")
+    state_messages = {
+        "saved": "Settings saved to backup file.",
+        "loaded": "Backup loaded successfully.",
+        "save_failed": "Unable to save backup file.",
+        "load_failed": "Backup file could not be loaded.",
+        "missing": "No backup file was found to load.",
+    }
+    state_backup_message = state_messages.get(state_action)
+    state_backup_is_error = state_action in {"save_failed", "load_failed", "missing"}
     return render_template(
         "admin.html",
         home_url=url_for("index"),
@@ -552,7 +763,34 @@ def admin_page():
         new_enquiry_count=new_enquiry_count,
         has_new_bookings=has_new_bookings,
         visitor_count=len(visitor_rows),
+        state_backup_metadata=_get_state_backup_metadata(),
+        state_backup_message=state_backup_message,
+        state_backup_is_error=state_backup_is_error,
     )
+
+
+@app.route("/admin/state/save", methods=["POST"])
+def save_admin_state():
+    try:
+        with open(_state_backup_path(), "w", encoding="utf-8") as backup_file:
+            json.dump(_serialize_state(), backup_file, indent=2)
+    except OSError:
+        return redirect(url_for("admin_page", state_action="save_failed"))
+    return redirect(url_for("admin_page", state_action="saved"))
+
+
+@app.route("/admin/state/load", methods=["POST"])
+def load_admin_state():
+    path = _state_backup_path()
+    if not os.path.exists(path):
+        return redirect(url_for("admin_page", state_action="missing"))
+    try:
+        with open(path, "r", encoding="utf-8") as backup_file:
+            data = json.load(backup_file)
+    except (OSError, json.JSONDecodeError):
+        return redirect(url_for("admin_page", state_action="load_failed"))
+    _load_state(data)
+    return redirect(url_for("admin_page", state_action="loaded"))
 
 
 @app.route("/admin/autopilot", methods=["POST"])
