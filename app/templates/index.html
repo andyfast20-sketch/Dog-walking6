@@ -368,6 +368,124 @@
         color: #92400e;
         border: 1px solid #fcd34d;
       }
+      .profile-section {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(226, 232, 255, 0.9));
+        border: 1px solid rgba(99, 102, 241, 0.15);
+        box-shadow: 0 25px 60px rgba(15, 23, 42, 0.12);
+      }
+      .profile-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: clamp(1.5rem, 3vw, 3rem);
+        align-items: stretch;
+      }
+      .profile-card {
+        border-radius: 28px;
+        background: #ffffff;
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+        text-align: center;
+        box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+      }
+      .profile-photo {
+        border-radius: 24px;
+        overflow: hidden;
+        box-shadow: 0 15px 35px rgba(15, 23, 42, 0.15);
+      }
+      .profile-card img {
+        width: 100%;
+        height: 280px;
+        object-fit: cover;
+      }
+      .profile-contact {
+        border-radius: 20px;
+        padding: 1.1rem;
+        background: linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(94, 234, 212, 0.2));
+        border: 1px solid rgba(37, 99, 235, 0.12);
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+      }
+      .profile-contact strong {
+        font-size: 1.1rem;
+        color: #0f172a;
+      }
+      .profile-contact a {
+        color: #0f172a;
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .profile-info {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+      }
+      .profile-info small {
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: #818cf8;
+        font-weight: 700;
+      }
+      .profile-info h2 {
+        margin: 0;
+        font-size: clamp(2rem, 4vw, 2.7rem);
+        color: #0f172a;
+      }
+      .profile-info p {
+        color: #475569;
+        font-size: 1.05rem;
+        margin: 0;
+      }
+      .profile-highlights {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 0.6rem;
+      }
+      .profile-highlights li {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        font-weight: 600;
+        color: #1f2937;
+      }
+      .profile-highlights span {
+        font-size: 1.2rem;
+      }
+      .badge-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+      .badge {
+        border-radius: 999px;
+        padding: 0.45rem 0.9rem;
+        border: 1px solid rgba(15, 118, 110, 0.2);
+        background: rgba(16, 185, 129, 0.12);
+        color: #0f766e;
+        font-weight: 600;
+      }
+      .profile-metrics {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 0.75rem;
+      }
+      .profile-metric {
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        padding: 0.85rem 1rem;
+        background: #fff;
+        text-align: center;
+      }
+      .profile-metric strong {
+        display: block;
+        font-size: 1.3rem;
+        color: #1f3d8f;
+      }
       body.modal-open {
         overflow: hidden;
       }
@@ -545,6 +663,58 @@
         </div>
       </header>
       <main>
+        <section class="profile-section" aria-labelledby="walkerProfileTitle">
+          <div class="profile-grid">
+            <article class="profile-card">
+              <div class="profile-photo">
+                <img
+                  src="https://images.unsplash.com/photo-1504593811423-6dd665756598?auto=format&fit=crop&w=640&q=80"
+                  alt="Portrait of Andy, smiling local dog walker"
+                  loading="lazy"
+                />
+              </div>
+              <div class="profile-contact">
+                <strong>Happy Trails concierge walker</strong>
+                <p style="margin: 0">Call <a href="tel:07595289669">07595 289669</a></p>
+                <button class="btn btn-primary" onclick="document.getElementById('contact').scrollIntoView({ behavior: 'smooth' })">
+                  Plan a walk
+                </button>
+              </div>
+            </article>
+            <div class="profile-info">
+              <small>Meet Andy</small>
+              <h2 id="walkerProfileTitle">Neighbourhood walks, luxury-level care</h2>
+              <p>
+                Fifteen years on these routes means I know every shaded lane and calm cut-through. I keep things unrushed, positive, and tailored so pups come home content and you stay worry-free.
+              </p>
+              <div class="profile-metrics">
+                <div class="profile-metric">
+                  <strong>15 yrs</strong>
+                  Local experience
+                </div>
+                <div class="profile-metric">
+                  <strong>12 min</strong>
+                  Average reply time
+                </div>
+                <div class="profile-metric">
+                  <strong>4 mi</strong>
+                  Daily service radius
+                </div>
+              </div>
+              <ul class="profile-highlights">
+                <li><span>✨</span>One household at a time for calm, concierge walks.</li>
+                <li><span>🗺️</span>Live GPS pings with candid photo postcards.</li>
+                <li><span>🧡</span>DBS cleared, first-aid trained, fully insured.</li>
+              </ul>
+              <div class="badge-grid" role="list">
+                <div class="badge" role="listitem">DBS Checked</div>
+                <div class="badge" role="listitem">Fully Insured</div>
+                <div class="badge" role="listitem">Canine First Aid</div>
+                <div class="badge" role="listitem">GPS + Photo Updates</div>
+              </div>
+            </div>
+          </div>
+        </section>
         <section id="pages">
           <div class="section-heading">
             <p style="text-transform: uppercase; letter-spacing: 0.2em; color: #a855f7; font-weight: 700">
