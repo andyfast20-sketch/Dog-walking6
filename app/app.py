@@ -1335,9 +1335,14 @@ def admin_page():
         "save_failed": "Unable to save backup file.",
         "load_failed": "Backup file could not be loaded.",
         "missing": "No backup file was found to load.",
+        "imported": "Uploaded backup applied successfully.",
+        "import_failed": "Uploaded backup could not be processed.",
+        "import_missing": "Please choose a backup file before uploading.",
+        "import_invalid": "Uploaded file was not recognized as a valid backup.",
     }
     state_backup_message = state_messages.get(state_action)
-    state_backup_is_error = state_action in {"save_failed", "load_failed", "missing"}
+    error_actions = {"save_failed", "load_failed", "missing", "import_failed", "import_invalid", "import_missing"}
+    state_backup_is_error = state_action in error_actions
     return render_template(
         "admin.html",
         home_url=url_for("index"),
@@ -1397,22 +1402,61 @@ def update_site_photo():
 @app.route("/admin/state/save", methods=["POST"])
 def save_admin_state():
     if not _write_state_backup():
-        return redirect(url_for("admin_page", state_action="save_failed"))
-    return redirect(url_for("admin_page", state_action="saved"))
+        return redirect(url_for("admin_page", state_action="save_failed", view="backups"))
+    return redirect(url_for("admin_page", state_action="saved", view="backups"))
 
 
 @app.route("/admin/state/load", methods=["POST"])
 def load_admin_state():
     path = _existing_backup_path()
     if not path or not os.path.exists(path):
-        return redirect(url_for("admin_page", state_action="missing"))
+        return redirect(url_for("admin_page", state_action="missing", view="backups"))
     try:
         with open(path, "r", encoding="utf-8") as backup_file:
             data = json.load(backup_file)
     except (OSError, json.JSONDecodeError):
-        return redirect(url_for("admin_page", state_action="load_failed"))
+        return redirect(url_for("admin_page", state_action="load_failed", view="backups"))
     _load_state(data)
-    return redirect(url_for("admin_page", state_action="loaded"))
+    return redirect(url_for("admin_page", state_action="loaded", view="backups"))
+
+
+@app.route("/admin/state/download", methods=["GET"])
+def download_admin_state():
+    """Provide the current in-memory state as a downloadable JSON file."""
+
+    payload = json.dumps(_serialize_state(), indent=2)
+    timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    filename = f"dog-walking-admin-{timestamp}.json"
+    headers = {
+        "Content-Disposition": f"attachment; filename={filename}",
+        "Cache-Control": "no-store",
+    }
+    return Response(payload, mimetype="application/json", headers=headers)
+
+
+@app.route("/admin/state/import", methods=["POST"])
+def import_admin_state():
+    """Allow admins to upload a JSON backup and restore it immediately."""
+
+    uploaded = request.files.get("state_file")
+    if not uploaded or not uploaded.filename:
+        return redirect(url_for("admin_page", state_action="import_missing", view="backups"))
+    try:
+        raw_bytes = uploaded.read()
+    except OSError:
+        return redirect(url_for("admin_page", state_action="import_failed", view="backups"))
+    try:
+        payload = raw_bytes.decode("utf-8")
+        data = json.loads(payload)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return redirect(url_for("admin_page", state_action="import_invalid", view="backups"))
+    if not isinstance(data, dict):
+        return redirect(url_for("admin_page", state_action="import_invalid", view="backups"))
+    try:
+        _load_state(data)
+    except Exception:  # pragma: no cover - defensive; _load_state validates content
+        return redirect(url_for("admin_page", state_action="import_failed", view="backups"))
+    return redirect(url_for("admin_page", state_action="imported", view="backups"))
 
 
 @app.route("/admin/autopilot", methods=["POST"])

@@ -1078,6 +1078,9 @@
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
         gap: 1.25rem;
       }
+      .backup-grid + .backup-grid {
+        margin-top: 0.5rem;
+      }
       .backup-panel {
         border: 1px solid #e2e8f0;
         border-radius: 16px;
@@ -1125,6 +1128,19 @@
         margin: 0;
         color: #b45309;
         font-size: 0.9rem;
+      }
+      .backup-upload {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .backup-upload input[type="file"] {
+        border: 1px dashed #cbd5f5;
+        padding: 0.55rem;
+        border-radius: 12px;
+        background: #fff;
+        font-family: inherit;
+        color: #0f172a;
       }
       .empty-state {
         color: #6b7280;
@@ -1613,6 +1629,29 @@
                 {% else %}
                 <p class="backup-note">Last saved {{ state_backup_metadata.saved_at or state_backup_metadata.modified_at }}.</p>
                 {% endif %}
+              </div>
+            </div>
+            <div class="backup-grid">
+              <div class="backup-panel">
+                <h3>Download a copy</h3>
+                <p>Grab a JSON file that mirrors everything currently in the admin memory and store it locally.</p>
+                <form method="get" action="{{ url_for('download_admin_state') }}">
+                  <button type="submit">Download backup</button>
+                </form>
+                <p class="backup-note">Perfect for keeping a copy before redeploying or switching machines.</p>
+              </div>
+              <div class="backup-panel">
+                <h3>Upload and restore</h3>
+                <p>Import any JSON backup you previously downloaded. This overwrites the live dashboard data.</p>
+                <form
+                  method="post"
+                  action="{{ url_for('import_admin_state') }}"
+                  enctype="multipart/form-data"
+                  class="backup-upload"
+                >
+                  <input type="file" name="state_file" accept="application/json,.json" required />
+                  <button type="submit">Upload &amp; restore</button>
+                </form>
               </div>
             </div>
             <div class="backup-meta">
