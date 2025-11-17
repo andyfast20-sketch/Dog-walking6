@@ -933,6 +933,41 @@
         border-radius: 10px;
         border: 1px solid #cbd2d9;
       }
+      .slot-edit-panel {
+        margin-top: 0.75rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid #e2e8f0;
+      }
+      .slot-edit-panel summary {
+        cursor: pointer;
+        font-weight: 600;
+        color: #2563eb;
+      }
+      .slot-edit-form {
+        margin-top: 0.5rem;
+        display: grid;
+        gap: 0.75rem;
+      }
+      .slot-edit-form label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        font-size: 0.9rem;
+        color: #475569;
+      }
+      .slot-edit-form input,
+      .slot-edit-form select {
+        font: inherit;
+        padding: 0.35rem 0.5rem;
+        border-radius: 6px;
+        border: 1px solid #cbd5f5;
+      }
+      .slot-edit-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+      }
       .time-picker__options {
         display: flex;
         flex-wrap: wrap;
@@ -1544,6 +1579,8 @@
                 <li>{{ state_backup_metadata.counts.submissions }} enquiries</li>
                 <li>{{ state_backup_metadata.counts.visitors }} visitors</li>
                 <li>{{ state_backup_metadata.counts.chats }} conversations</li>
+                <li>{{ state_backup_metadata.counts.dog_breeds }} dog breeds</li>
+                <li>{{ state_backup_metadata.counts.site_photos }} site photos</li>
                 <li>{{ state_backup_metadata.counts.appointments }} appointment slots</li>
                 <li>{{ state_backup_metadata.counts.coverage_areas }} coverage areas</li>
                 <li>{{ state_backup_metadata.counts.certificates }} certificates</li>
@@ -1838,6 +1875,8 @@
                 {% if available_slots %}
                 <ul class="slot-list">
                   {% for slot in available_slots %}
+                  {% set slot_date = slot.start_iso[:10] %}
+                  {% set slot_time = slot.start_iso[11:16] %}
                   <li>
                     <strong>{{ slot.long_date_label }}</strong>
                     <span class="muted">{{ slot.time_label }}</span>
@@ -1847,6 +1886,59 @@
                       <span class="slot-price">{{ slot.price_label }}</span>
                       {% endif %}
                     </div>
+                    <details class="slot-edit-panel">
+                      <summary>Edit or delete this slot</summary>
+                      <form
+                        class="slot-edit-form"
+                        method="post"
+                        action="{{ url_for('update_appointment_slot', slot_id=slot.id) }}"
+                      >
+                        <label>
+                          Pick a date
+                          <input type="date" name="date" value="{{ slot_date }}" required />
+                        </label>
+                        <label>
+                          Choose a time
+                          <input type="time" name="time" value="{{ slot_time }}" required />
+                        </label>
+                        <label>
+                          Price
+                          <input
+                            type="number"
+                            name="price"
+                            min="0"
+                            step="0.01"
+                            value="{{ '%.2f'|format(slot.price) if slot.price is not none else '' }}"
+                          />
+                        </label>
+                        <label>
+                          Booking type
+                          <select name="service_type" required>
+                            {% for value, label in booking_service_type_options %}
+                            <option value="{{ value }}" {% if value == slot.service_type %}selected{% endif %}>
+                              {{ label }}
+                            </option>
+                            {% endfor %}
+                          </select>
+                        </label>
+                        <div class="slot-edit-actions">
+                          <button type="submit">Save changes</button>
+                          <button
+                            type="submit"
+                            form="delete-slot-{{ slot.id }}"
+                            class="ghost-button"
+                            onclick="return confirm('Remove this slot?');"
+                          >
+                            Delete slot
+                          </button>
+                        </div>
+                      </form>
+                      <form
+                        id="delete-slot-{{ slot.id }}"
+                        method="post"
+                        action="{{ url_for('delete_appointment_slot', slot_id=slot.id) }}"
+                      ></form>
+                    </details>
                   </li>
                   {% endfor %}
                 </ul>
@@ -1863,10 +1955,13 @@
                       <th>When</th>
                       <th>Visitor</th>
                       <th>Status</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {% for slot in booked_slots %}
+                    {% set slot_date = slot.start_iso[:10] %}
+                    {% set slot_time = slot.start_iso[11:16] %}
                     <tr>
                       <td>
                         <strong>{{ slot.long_date_label }}</strong>
@@ -1902,6 +1997,61 @@
                           </select>
                           <noscript><button type="submit">Update</button></noscript>
                         </form>
+                      </td>
+                      <td>
+                        <details class="slot-edit-panel">
+                          <summary>Edit or delete</summary>
+                          <form
+                            class="slot-edit-form"
+                            method="post"
+                            action="{{ url_for('update_appointment_slot', slot_id=slot.id) }}"
+                          >
+                            <label>
+                              Pick a date
+                              <input type="date" name="date" value="{{ slot_date }}" required />
+                            </label>
+                            <label>
+                              Choose a time
+                              <input type="time" name="time" value="{{ slot_time }}" required />
+                            </label>
+                            <label>
+                              Price
+                              <input
+                                type="number"
+                                name="price"
+                                min="0"
+                                step="0.01"
+                                value="{{ '%.2f'|format(slot.price) if slot.price is not none else '' }}"
+                              />
+                            </label>
+                            <label>
+                              Booking type
+                              <select name="service_type" required>
+                                {% for value, label in booking_service_type_options %}
+                                <option value="{{ value }}" {% if value == slot.service_type %}selected{% endif %}>
+                                  {{ label }}
+                                </option>
+                                {% endfor %}
+                              </select>
+                            </label>
+                            <div class="slot-edit-actions">
+                              <button type="submit">Save changes</button>
+                              <button
+                                type="submit"
+                                form="delete-booked-slot-{{ slot.id }}"
+                                class="ghost-button"
+                                onclick="return confirm('Delete this booked slot?');"
+                              >
+                                Delete slot
+                              </button>
+                            </div>
+                          </form>
+                          <form
+                            id="delete-booked-slot-{{ slot.id }}"
+                            method="post"
+                            action="{{ url_for('delete_appointment_slot', slot_id=slot.id) }}"
+                          ></form>
+                        </details>
                       </td>
                     </tr>
                     {% endfor %}
