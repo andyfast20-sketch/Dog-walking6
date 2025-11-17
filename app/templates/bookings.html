@@ -628,6 +628,8 @@
       <footer>&copy; {{ datetime.utcnow().year }} Happy Trails Dog Walking. All rights reserved.</footer>
     </div>
     {% set breeds_available = dog_breeds|length > 0 %}
+    {% set areas_available = coverage_areas|length > 0 %}
+    {% set booking_ready = breeds_available and areas_available %}
     <div class="booking-modal hidden" id="bookingModal" role="dialog" aria-modal="true">
       <div class="booking-modal__content">
         <button class="booking-modal__close" id="bookingModalClose" aria-label="Close booking form">
@@ -663,8 +665,25 @@
             Add dog breeds from the admin page to enable bookings.
           </p>
           {% endif %}
+          {% if areas_available %}
+          <label>
+            Service area
+            <select id="bookingCoverageArea" required>
+              <option value="" disabled selected>Select your area</option>
+              {% for area in coverage_areas %}
+              <option value="{{ area.id }}">
+                {{ area.name }}{% if area.travel_fee %} · +{{ format_price_label(area.travel_fee) }} travel{% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </label>
+          {% else %}
+          <p class="booking-modal__note">
+            Add service areas from the admin page to enable bookings.
+          </p>
+          {% endif %}
           <div class="booking-modal__error hidden" id="bookingModalError"></div>
-          <button type="submit" {% if not breeds_available %}disabled{% endif %}>Book this slot</button>
+          <button type="submit" {% if not booking_ready %}disabled{% endif %}>Book this slot</button>
         </form>
       </div>
     </div>

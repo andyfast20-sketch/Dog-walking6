@@ -792,6 +792,17 @@
       .coverage-list span {
         color: #475569;
       }
+      .coverage-list .coverage-fee {
+        display: inline-flex;
+        align-items: center;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #0f172a;
+        background: rgba(14, 165, 233, 0.18);
+        border-radius: 999px;
+        padding: 0.1rem 0.6rem;
+        margin-left: 0.5rem;
+      }
       body.modal-open {
         overflow: hidden;
       }
@@ -986,6 +997,9 @@
                 {% for area in coverage_areas %}
                 <li>
                   <strong>{{ area.name }}</strong>
+                  {% if area.travel_fee %}
+                  <span class="coverage-fee">+{{ format_price_label(area.travel_fee) }} travel</span>
+                  {% endif %}
                   <span>{{ area.description }}</span>
                 </li>
                 {% endfor %}
@@ -1203,6 +1217,9 @@
           <h2 style="margin-bottom: 0.35rem">Reserve this slot</h2>
           <p id="bookingSlotSummary" style="margin: 0; color: #475569"></p>
         </div>
+        {% set breeds_available = dog_breeds|length > 0 %}
+        {% set areas_available = coverage_areas|length > 0 %}
+        {% set booking_ready = breeds_available and areas_available %}
         <form id="bookingForm">
           <input type="hidden" id="bookingSlotId" />
           <label>
@@ -1213,7 +1230,6 @@
             Email address
             <input type="email" id="bookingEmail" required />
           </label>
-          {% set breeds_available = dog_breeds|length > 0 %}
           {% if breeds_available %}
           <label>
             Dog breed
@@ -1229,8 +1245,25 @@
             Add dog breeds from the admin page to enable bookings.
           </p>
           {% endif %}
+          {% if areas_available %}
+          <label>
+            Service area
+            <select id="bookingCoverageArea" required>
+              <option value="" disabled selected>Select your area</option>
+              {% for area in coverage_areas %}
+              <option value="{{ area.id }}">
+                {{ area.name }}{% if area.travel_fee %} · +{{ format_price_label(area.travel_fee) }} travel{% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </label>
+          {% else %}
+          <p class="booking-modal__note">
+            Add service areas from the admin page to enable bookings.
+          </p>
+          {% endif %}
           <div class="booking-modal__error hidden" id="bookingModalError"></div>
-          <button type="submit" {% if not breeds_available %}disabled{% endif %}>Book this slot</button>
+          <button type="submit" {% if not booking_ready %}disabled{% endif %}>Book this slot</button>
         </form>
       </div>
     </div>

@@ -9,6 +9,7 @@
   const bookingNameInput = document.getElementById("bookingName");
   const bookingEmailInput = document.getElementById("bookingEmail");
   const bookingBreedInput = document.getElementById("bookingBreed");
+  const bookingCoverageAreaInput = document.getElementById("bookingCoverageArea");
   const bookingSlotSummary = document.getElementById("bookingSlotSummary");
   const bookingSlotPrice = document.getElementById("bookingSlotPrice");
   const bookingModalClose = document.getElementById("bookingModalClose");
@@ -132,6 +133,9 @@
     };
     if (bookingBreedInput) {
       payload.breed_id = bookingBreedInput.value;
+    }
+    if (bookingCoverageAreaInput) {
+      payload.coverage_area_id = bookingCoverageAreaInput.value;
     }
     const visitorName = payload.name || "there";
     if (bookingSubmit) {
