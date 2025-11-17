@@ -253,16 +253,19 @@ DEFAULT_COVERAGE_AREAS = [
         "id": 1,
         "name": "Parkside & Cathedral Quarter",
         "description": "Leafy boulevards, museum blocks, and riverside dog runs.",
+        "travel_fee": 0,
     },
     {
         "id": 2,
         "name": "Meadow Lane + Riverside",
         "description": "Wide paths with plenty of shade and calm waterfront strolls.",
+        "travel_fee": 0,
     },
     {
         "id": 3,
         "name": "Southbank & Market Streets",
         "description": "Cobbled lanes, coffee stops, and pocket parks every few blocks.",
+        "travel_fee": 0,
     },
 ]
 DEFAULT_CERTIFICATES = [
@@ -303,6 +306,8 @@ BUSINESS_BOX_DEFAULT = (
 )
 business_in_a_box = BUSINESS_BOX_DEFAULT
 coverage_areas = [dict(area) for area in DEFAULT_COVERAGE_AREAS]
+for area in coverage_areas:
+    area.setdefault("travel_fee", None)
 next_coverage_area_id = len(coverage_areas) + 1
 team_certificates = [dict(certificate) for certificate in DEFAULT_CERTIFICATES]
 next_certificate_id = len(team_certificates) + 1
@@ -469,6 +474,9 @@ def _serialize_state() -> dict:
                 "visitor_name": slot.get("visitor_name"),
                 "visitor_email": slot.get("visitor_email"),
                 "visitor_dog_breed": slot.get("visitor_dog_breed"),
+                "visitor_service_area_id": slot.get("visitor_service_area_id"),
+                "visitor_service_area_name": slot.get("visitor_service_area_name"),
+                "visitor_travel_fee": slot.get("visitor_travel_fee"),
                 "booked_at": _serialize_datetime(slot.get("booked_at")),
                 "price": slot.get("price"),
                 "service_type": slot.get("service_type", "walk"),
@@ -555,6 +563,9 @@ def _load_state(state: dict):
             "visitor_name": payload.get("visitor_name"),
             "visitor_email": payload.get("visitor_email"),
             "visitor_dog_breed": payload.get("visitor_dog_breed"),
+            "visitor_service_area_id": payload.get("visitor_service_area_id"),
+            "visitor_service_area_name": payload.get("visitor_service_area_name"),
+            "visitor_travel_fee": _parse_price(payload.get("visitor_travel_fee")),
             "booked_at": _parse_datetime(payload.get("booked_at")),
             "price": _parse_price(payload.get("price")),
             "service_type": payload.get("service_type", "walk"),
@@ -567,9 +578,16 @@ def _load_state(state: dict):
     next_dog_breed_id = _coerce_int(state.get("next_dog_breed_id"), _next_id_from_rows(dog_breeds))
 
     coverage_payload = state.get("coverage_areas") or []
-    coverage_areas = [dict(area) for area in coverage_payload if isinstance(area, dict)]
-    if not coverage_areas:
-        coverage_areas = [dict(area) for area in DEFAULT_COVERAGE_AREAS]
+    parsed_coverage = []
+    for area in coverage_payload:
+        if not isinstance(area, dict):
+            continue
+        data = dict(area)
+        data["travel_fee"] = _parse_price(data.get("travel_fee"))
+        parsed_coverage.append(data)
+    coverage_areas = parsed_coverage or [dict(area) for area in DEFAULT_COVERAGE_AREAS]
+    for area in coverage_areas:
+        area.setdefault("travel_fee", None)
     next_coverage_area_id = _coerce_int(
         state.get("next_coverage_area_id"),
         _next_id_from_rows(coverage_areas),
@@ -656,7 +674,10 @@ def _get_coverage_area(area_id: int):
 
 
 def _sorted_coverage_areas():
-    return sorted(coverage_areas, key=lambda area: area["name"].lower())
+    sorted_areas = sorted(coverage_areas, key=lambda area: area["name"].lower())
+    for area in sorted_areas:
+        area.setdefault("travel_fee", None)
+    return sorted_areas
 
 
 def _get_certificate(certificate_id: int):
@@ -682,6 +703,9 @@ def _serialize_slot(slot: dict):
     friendly_label = f"{service_label} · {long_date_label} at {time_label}"
     if price_label:
         friendly_label = f"{friendly_label} ({price_label})"
+    visitor_area_name = slot.get("visitor_service_area_name") or ""
+    visitor_travel_fee = _parse_price(slot.get("visitor_travel_fee"))
+    visitor_travel_fee_label = _format_price_label(visitor_travel_fee)
     return {
         "id": slot["id"],
         "start_iso": slot["start"].isoformat(),
@@ -694,6 +718,10 @@ def _serialize_slot(slot: dict):
         "visitor_name": slot.get("visitor_name") or "",
         "visitor_email": slot.get("visitor_email") or "",
         "visitor_dog_breed": slot.get("visitor_dog_breed") or "",
+        "visitor_service_area": visitor_area_name,
+        "visitor_service_area_id": slot.get("visitor_service_area_id"),
+        "visitor_travel_fee": visitor_travel_fee,
+        "visitor_travel_fee_label": visitor_travel_fee_label,
         "service_type": service_type,
         "service_label": service_label,
         "price": price_amount,
@@ -1088,6 +1116,7 @@ def index():
         current_year=datetime.utcnow().year,
         primary_nav=_build_primary_nav("home"),
         coverage_areas=_sorted_coverage_areas(),
+        format_price_label=_format_price_label,
     )
 
 
@@ -1102,6 +1131,8 @@ def bookings_page():
         home_booking_url=f"{url_for('index')}#booking",
         meet_slots=meet_slots,
         dog_breeds=_sorted_breeds(),
+        coverage_areas=_sorted_coverage_areas(),
+        format_price_label=_format_price_label,
         datetime=datetime,
     )
 
@@ -1183,6 +1214,7 @@ def admin_page():
         active_view=active_view,
         coverage_areas=_sorted_coverage_areas(),
         certificates=_sorted_certificates(),
+        format_price_label=_format_price_label,
     )
 
 
@@ -1246,24 +1278,33 @@ def save_coverage_area():
     area_id_value = request.form.get("area_id")
     name = (request.form.get("area_name") or "").strip()
     description = (request.form.get("area_description") or "").strip()
+    travel_fee = _parse_price(request.form.get("area_travel_fee"))
     if not name:
-        return redirect(url_for("admin_page", view="visitors"))
+        return redirect(url_for("admin_page", view="coverage"))
     if area_id_value:
         area = _get_coverage_area(_coerce_int(area_id_value, 0))
         if area:
             area["name"] = name
             area["description"] = description
+            area["travel_fee"] = travel_fee
     else:
-        coverage_areas.append({"id": next_coverage_area_id, "name": name, "description": description})
+        coverage_areas.append(
+            {
+                "id": next_coverage_area_id,
+                "name": name,
+                "description": description,
+                "travel_fee": travel_fee,
+            }
+        )
         next_coverage_area_id += 1
-    return redirect(url_for("admin_page", view="visitors"))
+    return redirect(url_for("admin_page", view="coverage"))
 
 
 @app.route("/admin/coverage-areas/<int:area_id>/delete", methods=["POST"])
 def delete_coverage_area(area_id: int):
     global coverage_areas
     coverage_areas = [area for area in coverage_areas if area.get("id") != area_id]
-    return redirect(url_for("admin_page", view="visitors"))
+    return redirect(url_for("admin_page", view="coverage"))
 
 
 @app.route("/admin/dog-breeds/<int:breed_id>/delete", methods=["POST"])
@@ -1480,7 +1521,11 @@ def book_appointment_slot(slot_id: int):
     name = (payload.get("name") or request.form.get("name") or "").strip()
     email = (payload.get("email") or request.form.get("email") or "").strip()
     breed_id_value = (payload.get("breed_id") or request.form.get("breed_id") or "").strip()
+    coverage_area_id_value = (
+        payload.get("coverage_area_id") or request.form.get("coverage_area_id") or ""
+    ).strip()
     breed = None
+    coverage_area = None
     if breed_id_value:
         try:
             breed_id = int(breed_id_value)
@@ -1488,16 +1533,29 @@ def book_appointment_slot(slot_id: int):
             breed_id = None
         if breed_id is not None:
             breed = _get_breed(breed_id)
+    if coverage_area_id_value:
+        try:
+            coverage_area_id = int(coverage_area_id_value)
+        except (TypeError, ValueError):
+            coverage_area_id = None
+        if coverage_area_id is not None:
+            coverage_area = _get_coverage_area(coverage_area_id)
     if not name or not email:
         return jsonify({"error": "Name and email are required"}), 400
     if not breed:
         return jsonify({"error": "Please select your dog's breed"}), 400
+    if not coverage_area:
+        return jsonify({"error": "Please select your service area"}), 400
+    travel_fee = _parse_price(coverage_area.get("travel_fee"))
     slot.update(
         {
             "is_booked": True,
             "visitor_name": name,
             "visitor_email": email,
             "visitor_dog_breed": breed["name"],
+            "visitor_service_area_id": coverage_area["id"],
+            "visitor_service_area_name": coverage_area.get("name"),
+            "visitor_travel_fee": travel_fee,
             "workflow_status": BOOKING_WORKFLOW_STATUSES[0],
             "booked_at": datetime.utcnow(),
         }
