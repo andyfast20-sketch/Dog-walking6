@@ -58,6 +58,12 @@
       button:hover {
         background: #1739a2;
       }
+      button:disabled,
+      button[disabled] {
+        background: #cbd2d9;
+        color: #475569;
+        cursor: not-allowed;
+      }
       .home-link {
         text-transform: uppercase;
         letter-spacing: 0.08em;
@@ -699,6 +705,68 @@
         color: #475569;
         cursor: not-allowed;
       }
+      .backup-card {
+        background: #fff;
+        border-radius: 20px;
+        padding: 1.5rem;
+        box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+      }
+      .backup-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1.25rem;
+      }
+      .backup-panel {
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 1rem 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+        background: #f8fafc;
+      }
+      .backup-panel h3 {
+        margin: 0;
+      }
+      .backup-panel p {
+        margin: 0;
+        color: #475569;
+      }
+      .backup-alert {
+        border-radius: 16px;
+        padding: 0.75rem 1rem;
+        background: #ecfdf5;
+        color: #065f46;
+        font-weight: 600;
+      }
+      .backup-alert--error {
+        background: #fee2e2;
+        color: #b91c1c;
+      }
+      .backup-meta {
+        border-top: 1px solid #e2e8f0;
+        padding-top: 1rem;
+        display: grid;
+        gap: 0.35rem;
+      }
+      .backup-meta strong {
+        display: block;
+        font-size: 1.1rem;
+        margin-bottom: 0.25rem;
+      }
+      .backup-meta ul {
+        margin: 0;
+        padding-left: 1.2rem;
+        color: #475569;
+      }
+      .backup-note {
+        margin: 0;
+        color: #b45309;
+        font-size: 0.9rem;
+      }
       .empty-state {
         color: #6b7280;
       }
@@ -748,6 +816,7 @@
       <nav class="view-nav" aria-label="Admin menu">
         <button type="button" class="is-active" data-open-view="menu">Main menu</button>
         <button type="button" data-open-view="autopilot">Autopilot</button>
+        <button type="button" data-open-view="backups">Save &amp; load</button>
         <button type="button" data-open-view="breeds">Dog breeds</button>
         <button type="button" data-open-view="enquiries">Enquiries</button>
         <button type="button" data-open-view="appointments">Appointments</button>
@@ -781,6 +850,33 @@
               </div>
               <div class="menu-card__meta">
                 <span class="menu-pill">Last run: {{ autopilot_status.last_run or 'Never' }}</span>
+              </div>
+            </button>
+            <button type="button" class="menu-card" data-open-view="backups">
+              <div class="menu-card__top">
+                <div>
+                  <p class="menu-card__eyebrow">Save &amp; load</p>
+                  <h3>
+                    {% if state_backup_metadata.exists %}
+                    Backup ready
+                    {% else %}
+                    No backup yet
+                    {% endif %}
+                  </h3>
+                  <p>Save your current leads, chats, and slots to reload after updates.</p>
+                </div>
+                <div class="menu-card__icon">💾</div>
+              </div>
+              <div class="menu-card__meta">
+                <span class="menu-pill">
+                  {% if state_backup_metadata.saved_at %}
+                  Saved {{ state_backup_metadata.saved_at }}
+                  {% elif state_backup_metadata.exists %}
+                  Backup file detected
+                  {% else %}
+                  Awaiting first save
+                  {% endif %}
+                </span>
               </div>
             </button>
             <button type="button" class="menu-card" data-open-view="breeds">
@@ -945,6 +1041,67 @@
               </p>
               <button type="submit">Save playbook</button>
             </form>
+          </section>
+        </section>
+
+        <section class="view" data-view="backups" aria-labelledby="backupHeading">
+          <div class="view-heading">
+            <div>
+              <p class="eyebrow">Save &amp; load</p>
+              <h2 id="backupHeading">Back up your admin data</h2>
+              <p>Capture everything currently in memory—leads, visitor logs, chats, and slots—so you can restore it after deploying new code.</p>
+            </div>
+            <button type="button" class="ghost-button" data-open-view="menu">Back to main menu</button>
+          </div>
+          <section class="backup-card">
+            {% if state_backup_message %}
+            <div class="backup-alert {% if state_backup_is_error %}backup-alert--error{% endif %}">
+              {{ state_backup_message }}
+            </div>
+            {% endif %}
+            <div class="backup-grid">
+              <div class="backup-panel">
+                <h3>Save everything</h3>
+                <p>Write the current submissions, appointments, visitors, chats, breeds, and autopilot settings to a backup file on the server.</p>
+                <form method="post" action="{{ url_for('save_admin_state') }}">
+                  <button type="submit">Save now</button>
+                </form>
+              </div>
+              <div class="backup-panel">
+                <h3>Load previous save</h3>
+                <p>Restore the last saved state. This replaces everything currently in memory.</p>
+                <form method="post" action="{{ url_for('load_admin_state') }}">
+                  <button type="submit" {% if not state_backup_metadata.exists %}disabled{% endif %}>Load backup</button>
+                </form>
+                {% if not state_backup_metadata.exists %}
+                <p class="backup-note">Create a save before attempting to load.</p>
+                {% else %}
+                <p class="backup-note">Last saved {{ state_backup_metadata.saved_at or state_backup_metadata.modified_at }}.</p>
+                {% endif %}
+              </div>
+            </div>
+            <div class="backup-meta">
+              <strong>Backup file</strong>
+              <ul>
+                <li>Name: {{ state_backup_metadata.filename }}</li>
+                <li>Status: {% if state_backup_metadata.exists %}Available{% else %}Missing{% endif %}</li>
+                {% if state_backup_metadata.size is defined %}
+                <li>Size: {{ '%.1f' | format(state_backup_metadata.size / 1024) }} KB</li>
+                {% endif %}
+              </ul>
+              {% if state_backup_metadata.counts %}
+              <strong>Included records</strong>
+              <ul>
+                <li>{{ state_backup_metadata.counts.submissions }} enquiries</li>
+                <li>{{ state_backup_metadata.counts.visitors }} visitors</li>
+                <li>{{ state_backup_metadata.counts.chats }} conversations</li>
+                <li>{{ state_backup_metadata.counts.appointments }} appointment slots</li>
+              </ul>
+              {% endif %}
+              {% if state_backup_metadata.error %}
+              <p class="backup-note">{{ state_backup_metadata.error }}</p>
+              {% endif %}
+            </div>
           </section>
         </section>
 
