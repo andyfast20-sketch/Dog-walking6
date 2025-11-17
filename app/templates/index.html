@@ -505,7 +505,7 @@
       }
       .profile-grid {
         display: grid;
-        grid-template-columns: minmax(280px, 1.1fr) minmax(260px, 0.9fr);
+        grid-template-columns: minmax(260px, 0.9fr) minmax(280px, 1.1fr);
         gap: clamp(1.5rem, 4vw, 4rem);
         align-items: stretch;
       }
@@ -558,20 +558,6 @@
         height: 1px;
         background: linear-gradient(90deg, transparent, rgba(79, 70, 229, 0.4));
       }
-      .profile-ribbons {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.75rem;
-      }
-      .profile-ribbons span {
-        padding: 0.35rem 0.85rem;
-        border-radius: 999px;
-        background: rgba(59, 130, 246, 0.12);
-        border: 1px solid rgba(59, 130, 246, 0.25);
-        font-size: 0.9rem;
-        color: #1d4ed8;
-        font-weight: 600;
-      }
       .profile-spotlight {
         display: flex;
         flex-direction: column;
@@ -579,13 +565,13 @@
       }
       .profile-card {
         border-radius: 32px;
-        background: linear-gradient(160deg, #1e1b4b, #4c1d95);
+        background: linear-gradient(160deg, #4f46e5, #a78bfa);
         padding: 1.5rem;
         display: flex;
         flex-direction: column;
         gap: 1.25rem;
         color: #f8fafc;
-        box-shadow: 0 25px 50px rgba(79, 70, 229, 0.35);
+        box-shadow: 0 25px 50px rgba(99, 102, 241, 0.3);
       }
       .profile-photo {
         border-radius: 26px;
@@ -620,20 +606,6 @@
         color: inherit;
         text-decoration: none;
         font-weight: 600;
-      }
-      .profile-quote-card {
-        border-radius: 28px;
-        padding: 1.25rem 1.5rem;
-        background: rgba(14, 165, 233, 0.1);
-        border: 1px solid rgba(56, 189, 248, 0.4);
-        color: #0f172a;
-        box-shadow: 0 20px 40px rgba(14, 165, 233, 0.18);
-        font-size: 1rem;
-      }
-      .profile-quote-card strong {
-        display: block;
-        margin-top: 0.5rem;
-        color: #0369a1;
       }
       .profile-lower {
         margin-top: clamp(1.5rem, 3vw, 2.5rem);
@@ -1003,25 +975,11 @@
         <section class="profile-section" aria-labelledby="walkerProfileTitle">
           <div class="profile-shell">
             <div class="profile-grid">
-              <div class="profile-info">
-                <small>Meet Andy</small>
-                <h2 id="walkerProfileTitle">Neighbourhood walks, luxury-level care</h2>
-                <p class="profile-story__lede">Every route is scouted at sunrise, every paw checked at drop-off, and every update delivered with concierge polish.</p>
-                <p>
-                  Fifteen years on these routes means I know every shaded lane and calm cut-through. I keep things unrushed, positive, and tailored so pups come home content and you stay worry-free.
-                </p>
-                <div class="profile-signature">Andy — Lead walker &amp; resident dog whisperer</div>
-                <div class="profile-ribbons">
-                  <span>Sunrise + twilight walks</span>
-                  <span>Solo-pup concierge</span>
-                  <span>Transparent GPS updates</span>
-                </div>
-              </div>
               <div class="profile-spotlight">
                 <article class="profile-card">
                   <div class="profile-photo">
                     <img
-                      src="https://images.unsplash.com/photo-1504593811423-6dd665756598?auto=format&fit=crop&w=640&q=80"
+                      src="https://files.catbox.moe/986gie.jpg"
                       alt="Portrait of Andy, smiling local dog walker"
                       loading="lazy"
                     />
@@ -1036,10 +994,15 @@
                     </button>
                   </div>
                 </article>
-                <div class="profile-quote-card">
-                  “Our walks feel like boutique experiences—custom playlists for anxious pups, detours to favourite stoops, and handwritten recap cards.”
-                  <strong>— Andy</strong>
-                </div>
+              </div>
+              <div class="profile-info">
+                <small>Meet Andy</small>
+                <h2 id="walkerProfileTitle">Neighbourhood walks, luxury-level care</h2>
+                <p class="profile-story__lede">Every route is scouted at sunrise, every paw checked at drop-off, and every update delivered with concierge polish.</p>
+                <p>
+                  Fifteen years on these routes means I know every shaded lane and calm cut-through. I keep things unrushed, positive, and tailored so pups come home content and you stay worry-free.
+                </p>
+                <div class="profile-signature">Andy — Lead walker &amp; resident dog whisperer</div>
               </div>
             </div>
             <div class="profile-lower">
