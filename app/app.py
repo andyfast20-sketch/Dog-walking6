@@ -26,6 +26,12 @@ app = Flask(__name__)
 PRIMARY_NAV_CONFIG = [
     {"key": "home", "label": "Home", "endpoint": "index", "url_kwargs": {}},
     {
+        "key": "bookings",
+        "label": "Bookings",
+        "endpoint": "bookings_page",
+        "url_kwargs": {},
+    },
+    {
         "key": "about",
         "label": "About",
         "endpoint": "hello_world_page",
@@ -920,6 +926,44 @@ def index():
         dog_breeds=_sorted_breeds(),
         current_year=datetime.utcnow().year,
         primary_nav=_build_primary_nav("home"),
+    )
+
+
+@app.route("/bookings", methods=["GET", "POST"])
+def bookings_page():
+    global next_submission_id
+
+    meet_submission_success = False
+    if request.method == "POST":
+        visitor_name = request.form.get("name", "").strip()
+        visitor_email = request.form.get("email", "").strip()
+        visitor_phone = request.form.get("phone", "").strip()
+        dog_name = request.form.get("dog_name", "").strip()
+        preferred_date = request.form.get("preferred_date", "").strip()
+        extra_notes = request.form.get("details", "").strip()
+
+        submission = {
+            "id": next_submission_id,
+            "name": visitor_name,
+            "email": visitor_email,
+            "phone": visitor_phone,
+            "message": (
+                "Meet & Greet Request — Dog: "
+                f"{dog_name or 'N/A'}; Preferred date: {preferred_date or 'flexible'}; "
+                f"Notes: {extra_notes or 'none provided'}"
+            ),
+            "status": STATUS_OPTIONS[0],
+        }
+        submissions.append(submission)
+        next_submission_id += 1
+        meet_submission_success = True
+
+    return render_template(
+        "bookings.html",
+        primary_nav=_build_primary_nav("bookings"),
+        home_booking_url=f"{url_for('index')}#booking",
+        meet_submission_success=meet_submission_success,
+        datetime=datetime,
     )
 
 
