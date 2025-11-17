@@ -241,6 +241,23 @@ DEFAULT_TIME_CHOICES = [
 IGNORED_USER_AGENT_KEYWORDS = ["vercel-screenshot"]
 
 AUTOPILOT_MODEL_NAME = "deepseek-chat"
+DEFAULT_COVERAGE_AREAS = [
+    {
+        "id": 1,
+        "name": "Parkside & Cathedral Quarter",
+        "description": "Leafy boulevards, museum blocks, and riverside dog runs.",
+    },
+    {
+        "id": 2,
+        "name": "Meadow Lane + Riverside",
+        "description": "Wide paths with plenty of shade and calm waterfront strolls.",
+    },
+    {
+        "id": 3,
+        "name": "Southbank & Market Streets",
+        "description": "Cobbled lanes, coffee stops, and pocket parks every few blocks.",
+    },
+]
 BUSINESS_BOX_DEFAULT = (
     "Happy Trails Dog Walking is a turnkey business-in-a-box that provides daily dog walks, "
     "vacation pet sitting, and concierge-style updates for busy pet parents in town. We focus "
@@ -249,6 +266,8 @@ BUSINESS_BOX_DEFAULT = (
     "friendly), and how to move from a chat to a booked meet-and-greet."
 )
 business_in_a_box = BUSINESS_BOX_DEFAULT
+coverage_areas = [dict(area) for area in DEFAULT_COVERAGE_AREAS]
+next_coverage_area_id = len(coverage_areas) + 1
 autopilot_enabled = False
 autopilot_status = {
     "state": "off",
@@ -430,6 +449,8 @@ def _serialize_state() -> dict:
         "next_slot_id": next_slot_id,
         "dog_breeds": [dict(breed) for breed in dog_breeds],
         "next_dog_breed_id": next_dog_breed_id,
+        "coverage_areas": [dict(area) for area in coverage_areas],
+        "next_coverage_area_id": next_coverage_area_id,
         "breed_ai_suggestions": breed_ai_suggestions,
         "business_in_a_box": business_in_a_box,
         "autopilot_enabled": autopilot_enabled,
@@ -443,6 +464,7 @@ def _load_state(state: dict):
     global chat_conversations, next_chat_message_id, appointment_slots
     global next_slot_id, dog_breeds, next_dog_breed_id
     global business_in_a_box, autopilot_enabled, autopilot_status, breed_ai_suggestions
+    global coverage_areas, next_coverage_area_id
 
     submissions = [dict(row) for row in state.get("submissions", []) if isinstance(row, dict)]
     next_submission_id = _coerce_int(state.get("next_submission_id"), _next_id_from_rows(submissions))
@@ -504,6 +526,15 @@ def _load_state(state: dict):
     dog_breeds = [dict(breed) for breed in state.get("dog_breeds", []) if isinstance(breed, dict)]
     next_dog_breed_id = _coerce_int(state.get("next_dog_breed_id"), _next_id_from_rows(dog_breeds))
 
+    coverage_payload = state.get("coverage_areas") or []
+    coverage_areas = [dict(area) for area in coverage_payload if isinstance(area, dict)]
+    if not coverage_areas:
+        coverage_areas = [dict(area) for area in DEFAULT_COVERAGE_AREAS]
+    next_coverage_area_id = _coerce_int(
+        state.get("next_coverage_area_id"),
+        _next_id_from_rows(coverage_areas),
+    )
+
     loaded_breed_ai = state.get("breed_ai_suggestions")
     breed_ai_suggestions = loaded_breed_ai if isinstance(loaded_breed_ai, dict) else None
 
@@ -539,6 +570,7 @@ def _get_state_backup_metadata() -> dict:
             "appointments": len(data.get("appointment_slots", [])),
             "visitors": len((data.get("visitor_stats") or {})),
             "chats": len((data.get("chat_conversations") or {})),
+            "coverage_areas": len(data.get("coverage_areas", [])),
         }
     except (OSError, ValueError, json.JSONDecodeError):
         metadata["error"] = "Unable to read backup details"
@@ -567,6 +599,14 @@ def _breed_name_exists(name: str) -> bool:
 
 def _sorted_breeds():
     return sorted(dog_breeds, key=lambda breed: breed["name"].lower())
+
+
+def _get_coverage_area(area_id: int):
+    return next((area for area in coverage_areas if area["id"] == area_id), None)
+
+
+def _sorted_coverage_areas():
+    return sorted(coverage_areas, key=lambda area: area["name"].lower())
 
 
 def _serialize_slot(slot: dict):
@@ -985,6 +1025,7 @@ def index():
         dog_breeds=_sorted_breeds(),
         current_year=datetime.utcnow().year,
         primary_nav=_build_primary_nav("home"),
+        coverage_areas=_sorted_coverage_areas(),
     )
 
 
@@ -1076,6 +1117,7 @@ def admin_page():
         state_backup_message=state_backup_message,
         state_backup_is_error=state_backup_is_error,
         active_view=active_view,
+        coverage_areas=_sorted_coverage_areas(),
     )
 
 
@@ -1131,6 +1173,32 @@ def add_dog_breed():
         dog_breeds.append({"id": next_dog_breed_id, "name": normalized})
         next_dog_breed_id += 1
     return redirect(url_for("admin_page", view="breeds"))
+
+
+@app.route("/admin/coverage-areas", methods=["POST"])
+def save_coverage_area():
+    global coverage_areas, next_coverage_area_id
+    area_id_value = request.form.get("area_id")
+    name = (request.form.get("area_name") or "").strip()
+    description = (request.form.get("area_description") or "").strip()
+    if not name:
+        return redirect(url_for("admin_page", view="visitors"))
+    if area_id_value:
+        area = _get_coverage_area(_coerce_int(area_id_value, 0))
+        if area:
+            area["name"] = name
+            area["description"] = description
+    else:
+        coverage_areas.append({"id": next_coverage_area_id, "name": name, "description": description})
+        next_coverage_area_id += 1
+    return redirect(url_for("admin_page", view="visitors"))
+
+
+@app.route("/admin/coverage-areas/<int:area_id>/delete", methods=["POST"])
+def delete_coverage_area(area_id: int):
+    global coverage_areas
+    coverage_areas = [area for area in coverage_areas if area.get("id") != area_id]
+    return redirect(url_for("admin_page", view="visitors"))
 
 
 @app.route("/admin/dog-breeds/<int:breed_id>/delete", methods=["POST"])
