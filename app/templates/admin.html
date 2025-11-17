@@ -199,6 +199,88 @@
         color: #94a3b8;
         font-style: italic;
       }
+      .credential-admin {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+      .credential-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 1rem;
+      }
+      .credential-card {
+        background: #fff;
+        border-radius: 18px;
+        padding: 1.25rem;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+        border: 1px solid rgba(15, 23, 42, 0.05);
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .credential-card form,
+      .credential-edit-form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .credential-card label,
+      .credential-edit-form label {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #0f172a;
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+      }
+      .credential-card input,
+      .credential-card textarea,
+      .credential-edit-form input,
+      .credential-edit-form textarea {
+        border-radius: 12px;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        padding: 0.65rem 0.75rem;
+        font-size: 0.95rem;
+        font-family: inherit;
+      }
+      .credential-card textarea,
+      .credential-edit-form textarea {
+        min-height: 80px;
+        resize: vertical;
+      }
+      .credential-list {
+        display: grid;
+        gap: 1rem;
+      }
+      .credential-list__item {
+        background: #fff;
+        border-radius: 18px;
+        padding: 1.25rem;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+        border: 1px solid rgba(15, 23, 42, 0.05);
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .credential-list__title {
+        margin: 0;
+        font-size: 1.2rem;
+      }
+      .credential-list__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+      }
+      .credential-delete-form {
+        margin-top: -0.25rem;
+      }
+      .credential-empty {
+        margin: 0;
+        color: #94a3b8;
+        font-style: italic;
+      }
       .view-heading {
         display: flex;
         flex-wrap: wrap;
@@ -933,6 +1015,7 @@
         <button type="button" data-open-view="enquiries">Enquiries</button>
         <button type="button" data-open-view="appointments">Appointments</button>
         <button type="button" data-open-view="coverage">Service area</button>
+        <button type="button" data-open-view="credentials">Credentials</button>
         <button type="button" data-open-view="visitors">Visitor insights</button>
         <button type="button" data-open-view="chat">Live chat</button>
       </nav>
@@ -1054,6 +1137,19 @@
               </div>
               <div class="menu-card__meta">
                 <span class="menu-pill">Update copy &amp; order anytime</span>
+              </div>
+            </button>
+            <button type="button" class="menu-card" data-open-view="credentials">
+              <div class="menu-card__top">
+                <div>
+                  <p class="menu-card__eyebrow">Credentials</p>
+                  <h3>{{ certificates | length }} published</h3>
+                  <p>Showcase qualifications on the About page.</p>
+                </div>
+                <div class="menu-card__icon">📜</div>
+              </div>
+              <div class="menu-card__meta">
+                <span class="menu-pill">Uploads appear instantly</span>
               </div>
             </button>
             <button type="button" class="menu-card" data-open-view="visitors">
@@ -1222,6 +1318,8 @@
                 <li>{{ state_backup_metadata.counts.visitors }} visitors</li>
                 <li>{{ state_backup_metadata.counts.chats }} conversations</li>
                 <li>{{ state_backup_metadata.counts.appointments }} appointment slots</li>
+                <li>{{ state_backup_metadata.counts.coverage_areas }} coverage areas</li>
+                <li>{{ state_backup_metadata.counts.certificates }} certificates</li>
               </ul>
               {% endif %}
               {% if state_backup_metadata.error %}
@@ -1572,6 +1670,109 @@
               {% endfor %}
               {% else %}
               <p class="coverage-admin__empty">No coverage areas published yet.</p>
+              {% endif %}
+            </div>
+          </section>
+        </section>
+
+        <section class="view" data-view="credentials" aria-labelledby="credentialHeading">
+          <div class="view-heading">
+            <div>
+              <p class="eyebrow">About page</p>
+              <h2 id="credentialHeading">Certificates &amp; qualifications</h2>
+              <p>Upload new credentials and edit existing ones. Changes appear immediately on the About page.</p>
+            </div>
+            <button type="button" class="ghost-button" data-open-view="menu">Back to main menu</button>
+          </div>
+          <section class="credential-admin">
+            <div class="credential-grid">
+              <article class="credential-card">
+                <h3>Add a certificate</h3>
+                <p style="margin: 0; color: #475569">Drop in the headline, issuer, and any links for visitors.</p>
+                <form method="post" action="{{ url_for('save_certificate') }}">
+                  <label>
+                    Title
+                    <input type="text" name="certificate_title" placeholder="e.g. Canine First Aid" required />
+                  </label>
+                  <label>
+                    Issuer
+                    <input type="text" name="certificate_issuer" placeholder="Training provider" />
+                  </label>
+                  <label>
+                    Year
+                    <input type="text" name="certificate_year" placeholder="2024" />
+                  </label>
+                  <label>
+                    Description
+                    <textarea name="certificate_description" placeholder="What this credential covers"></textarea>
+                  </label>
+                  <label>
+                    Image URL
+                    <input type="url" name="certificate_image_url" placeholder="https://..." />
+                  </label>
+                  <label>
+                    Link to certificate
+                    <input type="url" name="certificate_link_url" placeholder="https://..." />
+                  </label>
+                  <button type="submit">Publish certificate</button>
+                </form>
+              </article>
+              <article class="credential-card">
+                <h3>Tips</h3>
+                <ul style="margin: 0; padding-left: 1.1rem; color: #475569; line-height: 1.6">
+                  <li>Use square or landscape images so cards stay tidy.</li>
+                  <li>Leave the link blank if you do not have a public PDF yet.</li>
+                  <li>Update descriptions anytime—no need to re-upload.</li>
+                </ul>
+              </article>
+            </div>
+            <div class="credential-list">
+              {% if certificates %}
+              {% for certificate in certificates %}
+              <article class="credential-list__item">
+                <h3 class="credential-list__title">{{ certificate.title }}</h3>
+                <form class="credential-edit-form" method="post" action="{{ url_for('save_certificate') }}">
+                  <input type="hidden" name="certificate_id" value="{{ certificate.id }}" />
+                  <label>
+                    Title
+                    <input type="text" name="certificate_title" value="{{ certificate.title }}" required />
+                  </label>
+                  <label>
+                    Issuer
+                    <input type="text" name="certificate_issuer" value="{{ certificate.issuer }}" />
+                  </label>
+                  <label>
+                    Year
+                    <input type="text" name="certificate_year" value="{{ certificate.year }}" />
+                  </label>
+                  <label>
+                    Description
+                    <textarea name="certificate_description">{{ certificate.description }}</textarea>
+                  </label>
+                  <label>
+                    Image URL
+                    <input type="url" name="certificate_image_url" value="{{ certificate.image_url }}" />
+                  </label>
+                  <label>
+                    Link to certificate
+                    <input type="url" name="certificate_link_url" value="{{ certificate.link_url }}" />
+                  </label>
+                  <div class="credential-list__actions">
+                    <button type="submit">Save changes</button>
+                  </div>
+                </form>
+                <form
+                  class="credential-delete-form"
+                  method="post"
+                  action="{{ url_for('delete_certificate', certificate_id=certificate.id) }}"
+                  onsubmit="return confirm('Remove {{ certificate.title }}?');"
+                >
+                  <button type="submit" class="ghost-button">Delete</button>
+                </form>
+              </article>
+              {% endfor %}
+              {% else %}
+              <p class="credential-empty">No certificates published yet.</p>
               {% endif %}
             </div>
           </section>

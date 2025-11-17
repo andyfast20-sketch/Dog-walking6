@@ -76,6 +76,11 @@ PAGE_DEFINITIONS = {
         "lede": "Happy Trails Dog Walking is a concierge-style service inspired by the dogs who tugged us down these streets more than a decade ago.",
         "highlight": "Neighbors trust us with their best friends because we blend attentive care with seamless tech.",
         "hero_image": "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=900&q=80",
+        "metrics": [
+            {"label": "Years caring for Leeds pups", "value": "12+"},
+            {"label": "Monthly walks delivered", "value": "320"},
+            {"label": "Handlers on our roster", "value": "8"},
+        ],
         "sections": [
             {
                 "title": "Our promise",
@@ -220,6 +225,7 @@ ADMIN_VIEWS = {
     "autopilot",
     "backups",
     "coverage",
+    "credentials",
     "breeds",
     "enquiries",
     "appointments",
@@ -259,6 +265,35 @@ DEFAULT_COVERAGE_AREAS = [
         "description": "Cobbled lanes, coffee stops, and pocket parks every few blocks.",
     },
 ]
+DEFAULT_CERTIFICATES = [
+    {
+        "id": 1,
+        "title": "Level 3 Professional Dog Walker",
+        "issuer": "National Association of Pet Care",
+        "year": "2024",
+        "description": "Advanced canine body-language training, emergency planning, and ethical handling standards.",
+        "image_url": "https://images.unsplash.com/photo-1525253086316-d0c936c814f8?auto=format&fit=crop&w=600&q=80",
+        "link_url": "https://www.napps.org.uk/",
+    },
+    {
+        "id": 2,
+        "title": "Canine First Aid & CPR",
+        "issuer": "PetSaver Institute",
+        "year": "2023",
+        "description": "Annual recertification covering trail emergencies, paw triage, and on-lead incident management.",
+        "image_url": "https://images.unsplash.com/photo-1507149833265-60c372daea22?auto=format&fit=crop&w=600&q=80",
+        "link_url": "https://petsaver.co.uk/",
+    },
+    {
+        "id": 3,
+        "title": "Fear Free Dog Handling",
+        "issuer": "Fear Free Pets",
+        "year": "2022",
+        "description": "Techniques to reduce stress, create decompression breaks, and build trust with sensitive pups.",
+        "image_url": "https://images.unsplash.com/photo-1517423440428-a5a00ad493e8?auto=format&fit=crop&w=600&q=80",
+        "link_url": "https://fearfreepets.com/",
+    },
+]
 BUSINESS_BOX_DEFAULT = (
     "Happy Trails Dog Walking is a turnkey business-in-a-box that provides daily dog walks, "
     "vacation pet sitting, and concierge-style updates for busy pet parents in town. We focus "
@@ -269,6 +304,8 @@ BUSINESS_BOX_DEFAULT = (
 business_in_a_box = BUSINESS_BOX_DEFAULT
 coverage_areas = [dict(area) for area in DEFAULT_COVERAGE_AREAS]
 next_coverage_area_id = len(coverage_areas) + 1
+team_certificates = [dict(certificate) for certificate in DEFAULT_CERTIFICATES]
+next_certificate_id = len(team_certificates) + 1
 autopilot_enabled = False
 autopilot_status = {
     "state": "off",
@@ -452,6 +489,8 @@ def _serialize_state() -> dict:
         "next_dog_breed_id": next_dog_breed_id,
         "coverage_areas": [dict(area) for area in coverage_areas],
         "next_coverage_area_id": next_coverage_area_id,
+        "certificates": [dict(certificate) for certificate in team_certificates],
+        "next_certificate_id": next_certificate_id,
         "breed_ai_suggestions": breed_ai_suggestions,
         "business_in_a_box": business_in_a_box,
         "autopilot_enabled": autopilot_enabled,
@@ -465,7 +504,7 @@ def _load_state(state: dict):
     global chat_conversations, next_chat_message_id, appointment_slots
     global next_slot_id, dog_breeds, next_dog_breed_id
     global business_in_a_box, autopilot_enabled, autopilot_status, breed_ai_suggestions
-    global coverage_areas, next_coverage_area_id
+    global coverage_areas, next_coverage_area_id, team_certificates, next_certificate_id
 
     submissions = [dict(row) for row in state.get("submissions", []) if isinstance(row, dict)]
     next_submission_id = _coerce_int(state.get("next_submission_id"), _next_id_from_rows(submissions))
@@ -536,6 +575,15 @@ def _load_state(state: dict):
         _next_id_from_rows(coverage_areas),
     )
 
+    certificate_payload = state.get("certificates") or []
+    team_certificates = [dict(row) for row in certificate_payload if isinstance(row, dict)]
+    if not team_certificates:
+        team_certificates = [dict(certificate) for certificate in DEFAULT_CERTIFICATES]
+    next_certificate_id = _coerce_int(
+        state.get("next_certificate_id"),
+        _next_id_from_rows(team_certificates),
+    )
+
     loaded_breed_ai = state.get("breed_ai_suggestions")
     breed_ai_suggestions = loaded_breed_ai if isinstance(loaded_breed_ai, dict) else None
 
@@ -572,6 +620,7 @@ def _get_state_backup_metadata() -> dict:
             "visitors": len((data.get("visitor_stats") or {})),
             "chats": len((data.get("chat_conversations") or {})),
             "coverage_areas": len(data.get("coverage_areas", [])),
+            "certificates": len(data.get("certificates", [])),
         }
     except (OSError, ValueError, json.JSONDecodeError):
         metadata["error"] = "Unable to read backup details"
@@ -608,6 +657,18 @@ def _get_coverage_area(area_id: int):
 
 def _sorted_coverage_areas():
     return sorted(coverage_areas, key=lambda area: area["name"].lower())
+
+
+def _get_certificate(certificate_id: int):
+    return next((row for row in team_certificates if row.get("id") == certificate_id), None)
+
+
+def _sorted_certificates():
+    def _sort_key(certificate: dict):
+        year = certificate.get("year") or ""
+        return (year, certificate.get("title") or "")
+
+    return sorted(team_certificates, key=_sort_key, reverse=True)
 
 
 def _serialize_slot(slot: dict):
@@ -1050,11 +1111,13 @@ def hello_world_page(page_id: int):
     page = PAGE_DEFINITIONS.get(page_id)
     if not page:
         abort(404)
+    certificates = _sorted_certificates() if page.get("nav_key") == "about" else []
     return render_template(
         "info_page.html",
         page=page,
         home_url=url_for("index"),
         primary_nav=_build_primary_nav(page["nav_key"]),
+        certificates=certificates,
     )
 
 
@@ -1119,6 +1182,7 @@ def admin_page():
         state_backup_is_error=state_backup_is_error,
         active_view=active_view,
         coverage_areas=_sorted_coverage_areas(),
+        certificates=_sorted_certificates(),
     )
 
 
@@ -1207,6 +1271,54 @@ def delete_dog_breed(breed_id: int):
     global dog_breeds
     dog_breeds = [breed for breed in dog_breeds if breed["id"] != breed_id]
     return redirect(url_for("admin_page", view="breeds"))
+
+
+@app.route("/admin/certificates", methods=["POST"])
+def save_certificate():
+    global team_certificates, next_certificate_id
+    certificate_id_value = request.form.get("certificate_id")
+    title = (request.form.get("certificate_title") or "").strip()
+    issuer = (request.form.get("certificate_issuer") or "").strip()
+    year = (request.form.get("certificate_year") or "").strip()
+    description = (request.form.get("certificate_description") or "").strip()
+    image_url = (request.form.get("certificate_image_url") or "").strip()
+    link_url = (request.form.get("certificate_link_url") or "").strip()
+    if not title:
+        return redirect(url_for("admin_page", view="credentials"))
+    if certificate_id_value:
+        certificate = _get_certificate(_coerce_int(certificate_id_value, 0))
+        if certificate:
+            certificate.update(
+                {
+                    "title": title,
+                    "issuer": issuer,
+                    "year": year,
+                    "description": description,
+                    "image_url": image_url,
+                    "link_url": link_url,
+                }
+            )
+    else:
+        team_certificates.append(
+            {
+                "id": next_certificate_id,
+                "title": title,
+                "issuer": issuer,
+                "year": year,
+                "description": description,
+                "image_url": image_url,
+                "link_url": link_url,
+            }
+        )
+        next_certificate_id += 1
+    return redirect(url_for("admin_page", view="credentials"))
+
+
+@app.route("/admin/certificates/<int:certificate_id>/delete", methods=["POST"])
+def delete_certificate(certificate_id: int):
+    global team_certificates
+    team_certificates = [row for row in team_certificates if row.get("id") != certificate_id]
+    return redirect(url_for("admin_page", view="credentials"))
 
 
 def _extract_json_object(payload: str):
