@@ -3,167 +3,325 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Home</title>
+    <title>Happy Trails Dog Walking</title>
     <style>
       :root {
-        color-scheme: light dark;
+        font-family: "Poppins", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont,
+          "Helvetica Neue", sans-serif;
+        color: #0f172a;
+        background-color: #f6f8fb;
+      }
+      * {
+        box-sizing: border-box;
       }
       body {
-        font-family: Arial, Helvetica, sans-serif;
-        margin: 2rem;
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 2rem;
+        margin: 0;
         min-height: 100vh;
+        background: radial-gradient(circle at top, #fdf4ff 0%, #f5f7ff 30%, #eef2ff 60%, #f6f8fb 100%);
+        color: #0f172a;
+      }
+      img {
+        max-width: 100%;
+        display: block;
       }
       .hidden {
         display: none !important;
       }
-      h1 {
-        margin-bottom: 0.5rem;
-      }
-      .links,
-      form {
-        border: 1px solid #cbd2d9;
-        border-radius: 8px;
-        padding: 1.5rem;
-        background: #fff;
-        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-      }
-      .links ul {
-        list-style: none;
-        padding: 0;
-        margin: 0;
+      .site-shell {
         display: flex;
         flex-direction: column;
-        gap: 0.65rem;
+        min-height: 100vh;
       }
-      .links a {
+      .site-header {
+        position: relative;
+        overflow: hidden;
+        padding: 3rem clamp(1rem, 4vw, 4rem);
+      }
+      .site-header::after {
+        content: "";
+        position: absolute;
+        inset: 2rem 1rem auto auto;
+        width: clamp(260px, 30vw, 420px);
+        aspect-ratio: 1;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.9), transparent 65%);
+        z-index: 0;
+      }
+      .nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        position: relative;
+        z-index: 1;
+      }
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        font-weight: 700;
+        font-size: 1.2rem;
+        color: #1f3d8f;
+      }
+      .logo span {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #7f5af0, #5eead4);
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-size: 1.35rem;
+      }
+      .nav-links {
+        display: flex;
+        gap: 1.25rem;
+        font-size: 0.95rem;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .nav-links a {
         text-decoration: none;
-        color: #1f4ad1;
+        color: #0f172a;
         font-weight: 600;
       }
-      form {
+      .hero {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: clamp(2rem, 4vw, 4rem);
+        margin-top: 3rem;
+        position: relative;
+        z-index: 1;
+      }
+      .hero h1 {
+        font-size: clamp(2.5rem, 5vw, 3.75rem);
+        margin: 0 0 1rem;
+        line-height: 1.1;
+      }
+      .hero p {
+        margin: 0 0 1.25rem;
+        color: #475569;
+        font-size: 1.1rem;
+      }
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: center;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        border-radius: 999px;
+        padding: 0.9rem 1.5rem;
+        border: none;
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+      .btn-primary {
+        background: linear-gradient(135deg, #2563eb, #5eead4);
+        color: #fff;
+        box-shadow: 0 15px 40px rgba(37, 99, 235, 0.35);
+      }
+      .btn-secondary {
+        background: transparent;
+        border: 1px solid rgba(15, 23, 42, 0.2);
+        color: #0f172a;
+      }
+      .hero figure {
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 28px;
+        padding: 1.5rem;
+        box-shadow: 0 30px 80px rgba(15, 23, 42, 0.15);
+      }
+      .hero figure img {
+        border-radius: 24px;
+        object-fit: cover;
+        height: 100%;
+      }
+      .stats {
+        display: flex;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+        margin-top: 1.5rem;
+      }
+      .stat-card {
+        background: rgba(255, 255, 255, 0.85);
+        border-radius: 18px;
+        padding: 1rem 1.25rem;
+        min-width: 140px;
+        box-shadow: 0 12px 40px rgba(15, 23, 42, 0.12);
+      }
+      .stat-card strong {
+        font-size: 1.5rem;
+        display: block;
+      }
+      main {
+        flex: 1;
         display: flex;
         flex-direction: column;
-        gap: 0.85rem;
+        gap: 3rem;
+        padding: 0 clamp(1rem, 4vw, 4rem) 4rem;
+      }
+      section {
+        background: #fff;
+        border-radius: 28px;
+        padding: clamp(1.5rem, 3vw, 2.75rem);
+        box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
+      }
+      .section-heading {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        margin-bottom: 1.5rem;
+      }
+      .section-heading h2 {
+        margin: 0;
+        font-size: clamp(1.8rem, 4vw, 2.4rem);
+      }
+      .section-heading p {
+        margin: 0;
+        color: #475569;
+      }
+      .page-links {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+      }
+      .page-links a {
+        padding: 1rem 1.25rem;
+        border-radius: 18px;
+        background: linear-gradient(135deg, rgba(37, 99, 235, 0.07), rgba(94, 234, 212, 0.12));
+        text-decoration: none;
+        color: #0f172a;
+        font-weight: 600;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+      }
+      .services-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1.25rem;
+      }
+      .service-card {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 20px;
+        padding: 1.25rem;
+        background: #fff;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .service-card span {
+        font-size: 1.6rem;
+      }
+      form {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem 1.25rem;
       }
       label {
         display: flex;
         flex-direction: column;
-        font-size: 0.95rem;
         gap: 0.35rem;
         font-weight: 600;
+        font-size: 0.95rem;
       }
       input,
       textarea,
       select {
-        padding: 0.45rem 0.6rem;
-        border: 1px solid #cbd2d9;
-        border-radius: 4px;
+        padding: 0.75rem 0.9rem;
+        border-radius: 14px;
+        border: 1px solid rgba(15, 23, 42, 0.15);
         font-size: 1rem;
+        font-family: inherit;
+        background: #f8fafc;
       }
       textarea {
-        min-height: 110px;
         resize: vertical;
+        min-height: 120px;
       }
-      button {
-        width: fit-content;
-        padding: 0.55rem 1.25rem;
-        border: none;
-        background: #1f4ad1;
-        color: #fff;
-        border-radius: 999px;
-        cursor: pointer;
-        font-weight: 600;
+      form button {
+        grid-column: 1 / -1;
+        justify-self: flex-start;
       }
-      button:hover {
-        background: #1739a2;
+      .success {
+        grid-column: 1 / -1;
+        margin: 0;
+        border-radius: 18px;
+        padding: 0.85rem 1.1rem;
+        background: #ecfdf3;
+        border: 1px solid #a6f4c5;
+        color: #166534;
       }
       .booking {
-        grid-column: 1 / -1;
-        background: #fff;
-        border: 1px solid #cbd2d9;
-        border-radius: 16px;
-        padding: 1.5rem;
-        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-      }
-      .booking h1 {
-        margin: 0;
+        background: linear-gradient(135deg, #1e1b4b, #312e81);
+        color: #f8fafc;
       }
       .booking p {
-        margin: 0;
-        color: #475569;
+        color: rgba(248, 250, 252, 0.85);
       }
       .slots-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
         gap: 1rem;
+        margin-top: 1rem;
       }
       .slot-card {
-        border: 1px solid #cbd2d9;
-        border-radius: 12px;
-        padding: 1rem;
-        background: #f8fafc;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 18px;
+        padding: 1.1rem;
+        background: rgba(15, 23, 42, 0.35);
+        color: inherit;
         display: flex;
         flex-direction: column;
-        gap: 0.35rem;
-        align-items: flex-start;
+        gap: 0.25rem;
+        text-align: left;
         cursor: pointer;
-        transition: border 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+        transition: transform 0.2s ease, border 0.2s ease, background 0.2s ease;
       }
       .slot-card:hover {
-        border-color: #1f4ad1;
-        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
-        transform: translateY(-2px);
-      }
-      .slot-card.is-booked,
-      .slot-card[disabled] {
-        border-color: #e2e8f0;
-        background: #f1f5f9;
-        cursor: not-allowed;
-        opacity: 0.75;
-      }
-      .slot-card strong {
-        font-size: 1.05rem;
-      }
-      .slot-card__time {
-        font-size: 0.95rem;
+        transform: translateY(-3px);
+        border-color: #5eead4;
+        background: rgba(15, 23, 42, 0.55);
       }
       .slot-card__status {
-        padding: 0.25rem 0.5rem;
+        margin-top: 0.3rem;
+        align-self: flex-start;
+        padding: 0.2rem 0.7rem;
         border-radius: 999px;
         font-size: 0.8rem;
-        font-weight: 600;
-        background: #dcfce7;
-        color: #166534;
+        background: rgba(94, 234, 212, 0.15);
+        color: #5eead4;
+      }
+      .slot-card.is-booked {
+        background: rgba(15, 23, 42, 0.15);
+        border-color: rgba(255, 255, 255, 0.08);
+        cursor: not-allowed;
+        opacity: 0.6;
       }
       .slot-card.is-booked .slot-card__status {
-        background: #fee2e2;
-        color: #b91c1c;
-      }
-      .empty-state {
-        color: #475569;
-      }
-      .booking-hint {
-        font-size: 0.9rem;
-        color: #475569;
+        background: rgba(248, 113, 113, 0.25);
+        color: #fecaca;
       }
       .booking-success {
+        margin-top: 1rem;
         padding: 0.9rem 1rem;
-        border: 1px solid #a6f4c5;
-        border-radius: 10px;
-        background: #ecfdf3;
-        color: #166534;
-        font-weight: 600;
+        border-radius: 14px;
+        background: rgba(15, 118, 110, 0.2);
+        border: 1px solid rgba(45, 212, 191, 0.6);
+        color: #e0f2fe;
       }
       .booking-modal {
         position: fixed;
         inset: 0;
-        background: rgba(15, 23, 42, 0.5);
+        background: rgba(6, 11, 40, 0.45);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -174,47 +332,66 @@
         display: none;
       }
       .booking-modal__content {
+        width: min(420px, 90vw);
+        border-radius: 28px;
+        padding: 1.75rem;
         background: #fff;
-        width: min(420px, 100%);
-        border-radius: 16px;
-        padding: 1.5rem;
-        position: relative;
+        box-shadow: 0 40px 90px rgba(15, 23, 42, 0.25);
         display: flex;
         flex-direction: column;
         gap: 1rem;
-        box-shadow: 0 30px 80px rgba(15, 23, 42, 0.25);
+        position: relative;
       }
       .booking-modal__close {
         position: absolute;
         top: 1rem;
         right: 1rem;
-        background: transparent;
-        color: #0f172a;
-        font-size: 1.25rem;
-        padding: 0.25rem 0.5rem;
+        border: none;
+        background: rgba(15, 23, 42, 0.05);
+        border-radius: 999px;
+        width: 36px;
+        height: 36px;
+        font-size: 1.2rem;
+        cursor: pointer;
       }
       .booking-modal__error {
-        padding: 0.65rem 0.85rem;
-        border-radius: 8px;
-        background: #fee2e2;
-        color: #b91c1c;
+        padding: 0.75rem 1rem;
+        border-radius: 14px;
+        background: #fef2f2;
         border: 1px solid #fecaca;
+        color: #b91c1c;
       }
       .booking-modal__note {
-        font-size: 0.9rem;
-        color: #b91c1c;
-        margin: 0;
+        padding: 0.75rem 1rem;
+        border-radius: 14px;
+        background: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fcd34d;
       }
       body.modal-open {
         overflow: hidden;
       }
-      .success {
-        margin-top: 0.5rem;
-        padding: 0.75rem 1rem;
-        border-radius: 6px;
-        background: #ecfdf3;
-        color: #027a48;
-        border: 1px solid #a6f4c5;
+      .testimonials {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1.25rem;
+      }
+      .testimonial {
+        border-radius: 20px;
+        padding: 1.25rem;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        background: #f8fafc;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .testimonial strong {
+        color: #1f3d8f;
+      }
+      footer {
+        padding: 2.5rem clamp(1rem, 4vw, 4rem);
+        text-align: center;
+        color: #475569;
       }
       .chat-toggle {
         position: fixed;
@@ -230,7 +407,7 @@
         right: 1.5rem;
         width: min(320px, 85vw);
         background: #ffffff;
-        border-radius: 16px;
+        border-radius: 20px;
         box-shadow: 0 25px 60px rgba(15, 23, 42, 0.15);
         display: flex;
         flex-direction: column;
@@ -242,7 +419,7 @@
         display: none;
       }
       .chat-header {
-        background: linear-gradient(135deg, #1f4ad1, #5b7cfa);
+        background: linear-gradient(135deg, #2563eb, #5eead4);
         color: #fff;
         padding: 1rem 1.25rem;
         display: flex;
@@ -291,7 +468,7 @@
         font-size: 0.95rem;
       }
       .chat-message.visitor .bubble {
-        background: #1f4ad1;
+        background: #2563eb;
         color: #fff;
         border-bottom-right-radius: 4px;
       }
@@ -318,71 +495,193 @@
     </style>
   </head>
   <body>
-    <section class="links">
-      <h1>Welcome</h1>
-      <p>Explore the rest of the demo pages:</p>
-      <ul>
-        {% for link in page_links %}
-        <li><a href="{{ link.href }}">{{ link.label }}</a></li>
-        {% endfor %}
-      </ul>
-    </section>
-    <section>
-      <h1>Contact Us</h1>
-      <p>Send us a quick note and track its status right away.</p>
-      <form method="post" action="{{ form_action }}">
-        <label>
-          Name
-          <input type="text" name="name" required />
-        </label>
-        <label>
-          Email
-          <input type="email" name="email" required />
-        </label>
-        <label>
-          Phone
-          <input type="tel" name="phone" required />
-        </label>
-        <label>
-          Message
-          <textarea name="message" required></textarea>
-        </label>
-        <button type="submit">Submit</button>
-        {% if submission_success %}
-        <div class="success">Thanks! Your enquiry has been recorded.</div>
-        {% endif %}
-      </form>
-    </section>
-    <section class="booking" aria-labelledby="bookingTitle">
-      <div>
-        <h1 id="bookingTitle">Book a walk</h1>
-        <p>Select one of the available appointment slots below.</p>
-      </div>
-      {% if booking_slots %}
-      <div class="slots-grid" role="list">
-        {% for slot in booking_slots %}
-        <button
-          type="button"
-          class="slot-card {% if slot.is_booked %}is-booked{% endif %}"
-          data-slot-button
-          data-slot-id="{{ slot.id }}"
-          data-state="{% if slot.is_booked %}booked{% else %}available{% endif %}"
-          data-friendly-label="{{ slot.friendly_label }}"
-          aria-disabled="{% if slot.is_booked %}true{% else %}false{% endif %}"
-          {% if slot.is_booked %}disabled{% endif %}
-        >
-          <strong>{{ slot.date_label }}</strong>
-          <span class="slot-card__time">{{ slot.time_label }}</span>
-          <span class="slot-card__status">{% if slot.is_booked %}Booked{% else %}Available{% endif %}</span>
-        </button>
-        {% endfor %}
-      </div>
-      {% else %}
-      <p class="empty-state">No appointment slots are available yet. Please check back soon.</p>
-      {% endif %}
-      <p class="booking-hint">Once a slot is selected we'll ask for your name and email.</p>
-      <div class="booking-success hidden" id="bookingSuccess"></div>
-    </section>
+    <div class="site-shell">
+      <header class="site-header">
+        <nav class="nav">
+          <div class="logo"><span>🐾</span>Happy Trails</div>
+          {% set first_link = page_links|first %}
+          <ul class="nav-links">
+            <li><a href="#booking">Book a walk</a></li>
+            <li><a href="#contact">Contact</a></li>
+            <li><a href="{{ first_link.href if first_link else '#pages' }}">More pages</a></li>
+          </ul>
+        </nav>
+        <div class="hero">
+          <div>
+            <p style="text-transform: uppercase; letter-spacing: 0.2em; color: #6366f1; font-weight: 700">
+              Trusted by busy pet parents across town
+            </p>
+            <h1>Modern dog walking with a concierge touch.</h1>
+            <p>
+              Same-day bookings, GPS tracking, and walkers who treat every pup like their own. Schedule a
+              visit in seconds and stay in the loop from pickup to drop-off.
+            </p>
+            <div class="hero-actions">
+              <button class="btn btn-primary" onclick="document.getElementById('booking').scrollIntoView({ behavior: 'smooth' })">
+                Reserve a walk
+              </button>
+              <button class="btn btn-secondary" onclick="document.getElementById('contact').scrollIntoView({ behavior: 'smooth' })">
+                Talk with us
+              </button>
+            </div>
+            <div class="stats">
+              <div class="stat-card">
+                <strong>1,200+</strong>
+                Happy walks completed
+              </div>
+              <div class="stat-card">
+                <strong>98%</strong>
+                Five-star reviews
+              </div>
+              <div class="stat-card">
+                <strong>24/7</strong>
+                Live chat support
+              </div>
+            </div>
+          </div>
+          <figure>
+            <img src="https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=900&q=80" alt="Dog enjoying a walk" loading="lazy" />
+          </figure>
+        </div>
+      </header>
+      <main>
+        <section id="pages">
+          <div class="section-heading">
+            <p style="text-transform: uppercase; letter-spacing: 0.2em; color: #a855f7; font-weight: 700">
+              Explore
+            </p>
+            <h2>Need something else?</h2>
+            <p>Hop into our supporting pages for blocklists, submissions, and more.</p>
+          </div>
+          <div class="page-links">
+            {% for link in page_links %}
+            <a href="{{ link.href }}">{{ link.label }} <span aria-hidden="true">→</span></a>
+            {% endfor %}
+          </div>
+        </section>
+        <section>
+          <div class="section-heading">
+            <p style="text-transform: uppercase; letter-spacing: 0.2em; color: #f97316; font-weight: 700">
+              Services
+            </p>
+            <h2>Perfect walks for every pup</h2>
+            <p>Choose from flexible sessions that fit your routine.</p>
+          </div>
+          <div class="services-grid">
+            <article class="service-card">
+              <span>⏱️</span>
+              <strong>Express Visits</strong>
+              <p>20-minute check-ins with water refills, potty breaks, and belly rubs.</p>
+            </article>
+            <article class="service-card">
+              <span>🌳</span>
+              <strong>Neighborhood Tours</strong>
+              <p>45-minute strolls with photo updates, perfect for energetic pups.</p>
+            </article>
+            <article class="service-card">
+              <span>🤝</span>
+              <strong>Buddy Walks</strong>
+              <p>Pair with a pup pal for social walks and extra playtime.</p>
+            </article>
+            <article class="service-card">
+              <span>🏡</span>
+              <strong>In-home Visits</strong>
+              <p>Feeding, medication reminders, and evening tuck-ins available.</p>
+            </article>
+          </div>
+        </section>
+        <section class="booking" id="booking" aria-labelledby="bookingTitle">
+          <div class="section-heading">
+            <p style="text-transform: uppercase; letter-spacing: 0.2em; color: rgba(255, 255, 255, 0.65); font-weight: 700">
+              Booking hub
+            </p>
+            <h2 id="bookingTitle" style="color: #fff">Reserve a dog walk</h2>
+            <p>Choose a slot that fits your schedule. We'll confirm instantly.</p>
+          </div>
+          {% if booking_slots %}
+          <div class="slots-grid" role="list">
+            {% for slot in booking_slots %}
+            <button
+              type="button"
+              class="slot-card {% if slot.is_booked %}is-booked{% endif %}"
+              data-slot-button
+              data-slot-id="{{ slot.id }}"
+              data-state="{% if slot.is_booked %}booked{% else %}available{% endif %}"
+              data-friendly-label="{{ slot.friendly_label }}"
+              aria-disabled="{% if slot.is_booked %}true{% else %}false{% endif %}"
+              {% if slot.is_booked %}disabled{% endif %}
+            >
+              <strong>{{ slot.date_label }}</strong>
+              <span class="slot-card__time">{{ slot.time_label }}</span>
+              <span class="slot-card__status">{% if slot.is_booked %}Booked{% else %}Available{% endif %}</span>
+            </button>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="empty-state">No appointment slots are available yet. Please check back soon.</p>
+          {% endif %}
+          <p class="booking-hint">Once a slot is selected we'll ask for your name and email.</p>
+          <div class="booking-success hidden" id="bookingSuccess"></div>
+        </section>
+        <section id="contact">
+          <div class="section-heading">
+            <p style="text-transform: uppercase; letter-spacing: 0.2em; color: #0ea5e9; font-weight: 700">
+              Contact
+            </p>
+            <h2>Let's plan your pup's next adventure</h2>
+            <p>Leave us a note and we'll respond within the hour.</p>
+          </div>
+          <form method="post" action="{{ form_action }}">
+            <label>
+              Name
+              <input type="text" name="name" required />
+            </label>
+            <label>
+              Email
+              <input type="email" name="email" required />
+            </label>
+            <label>
+              Phone
+              <input type="tel" name="phone" required />
+            </label>
+            <label style="grid-column: 1 / -1">
+              Message
+              <textarea name="message" required></textarea>
+            </label>
+            <button type="submit" class="btn btn-primary">Submit enquiry</button>
+            {% if submission_success %}
+            <p class="success">Thanks! Your enquiry has been recorded.</p>
+            {% endif %}
+          </form>
+        </section>
+        <section>
+          <div class="section-heading">
+            <p style="text-transform: uppercase; letter-spacing: 0.2em; color: #38bdf8; font-weight: 700">
+              Stories
+            </p>
+            <h2>Pet parents love us</h2>
+            <p>Real notes from the Happy Trails community.</p>
+          </div>
+          <div class="testimonials">
+            <article class="testimonial">
+              <p>“I get a live map every time Maple goes out. It's the peace of mind I never knew I needed.”</p>
+              <strong>Sara & Maple</strong>
+            </article>
+            <article class="testimonial">
+              <p>“Flexible scheduling and the walkers genuinely adore our anxious rescue pup. Ten out of ten.”</p>
+              <strong>Chris & Tofu</strong>
+            </article>
+            <article class="testimonial">
+              <p>“Booked a walk from the airport lounge and had photos before takeoff. Incredible service.”</p>
+              <strong>Priya & Miso</strong>
+            </article>
+          </div>
+        </section>
+      </main>
+      <footer>
+        <p>© {{ current_year }} Happy Trails Dog Walking · Fully bonded & insured · Serving downtown & beyond</p>
+      </footer>
+    </div>
     <div class="booking-modal hidden" id="bookingModal" role="dialog" aria-modal="true">
       <div class="booking-modal__content">
         <button class="booking-modal__close" id="bookingModalClose" aria-label="Close booking form">
@@ -423,7 +722,7 @@
         </form>
       </div>
     </div>
-    <button class="chat-toggle" id="chatToggle" aria-expanded="false">Live Chat</button>
+    <button class="chat-toggle btn btn-primary" id="chatToggle" aria-expanded="false">Live Chat</button>
     <div class="chat-widget hidden" id="chatWidget" role="dialog" aria-label="Live chat">
       <div class="chat-header">
         <div>
