@@ -57,6 +57,16 @@ PRIMARY_NAV_CONFIG = [
     },
 ]
 
+BOOKING_SERVICE_TYPES = {
+    "walk": {"label": "Dog Walking"},
+    "meet": {"label": "Meet & Greet"},
+}
+
+BOOKING_SERVICE_TYPE_OPTIONS = [
+    ("walk", BOOKING_SERVICE_TYPES["walk"]["label"]),
+    ("meet", BOOKING_SERVICE_TYPES["meet"]["label"]),
+]
+
 PAGE_DEFINITIONS = {
     1: {
         "id": 1,
@@ -344,6 +354,36 @@ def _next_id_from_rows(rows, key: str = "id") -> int:
     return max_value + 1
 
 
+def _parse_price(value):
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    text_value = str(value).strip()
+    if not text_value:
+        return None
+    normalized = text_value.replace("$", "").replace(",", "")
+    try:
+        return float(normalized)
+    except (TypeError, ValueError):
+        return None
+
+
+def _format_price_label(value) -> str:
+    amount = _parse_price(value)
+    if amount is None:
+        return ""
+    formatted = f"${amount:,.2f}"
+    if formatted.endswith(".00"):
+        formatted = formatted[:-3]
+    return formatted
+
+
+def _service_label(value: Optional[str]) -> str:
+    service_key = value if value in BOOKING_SERVICE_TYPES else "walk"
+    return BOOKING_SERVICE_TYPES.get(service_key, BOOKING_SERVICE_TYPES["walk"])["label"]
+
+
 def _serialize_state() -> dict:
     visitor_rows = {}
     for ip_address, visitor in visitor_stats.items():
@@ -373,6 +413,8 @@ def _serialize_state() -> dict:
                 "visitor_email": slot.get("visitor_email"),
                 "visitor_dog_breed": slot.get("visitor_dog_breed"),
                 "booked_at": _serialize_datetime(slot.get("booked_at")),
+                "price": slot.get("price"),
+                "service_type": slot.get("service_type", "walk"),
             }
         )
     state = {
@@ -452,6 +494,8 @@ def _load_state(state: dict):
             "visitor_email": payload.get("visitor_email"),
             "visitor_dog_breed": payload.get("visitor_dog_breed"),
             "booked_at": _parse_datetime(payload.get("booked_at")),
+            "price": _parse_price(payload.get("price")),
+            "service_type": payload.get("service_type", "walk"),
         }
         slots.append(slot)
     appointment_slots = sorted(slots, key=lambda slot: slot["start"])
@@ -529,18 +573,29 @@ def _serialize_slot(slot: dict):
     date_label = slot["start"].strftime("%a %d %b")
     long_date_label = slot["start"].strftime("%A %d %B")
     time_label = slot["start"].strftime("%I:%M %p").lstrip("0")
+    service_type = slot.get("service_type") or "walk"
+    service_label = _service_label(service_type)
+    price_amount = _parse_price(slot.get("price"))
+    price_label = _format_price_label(price_amount)
+    friendly_label = f"{service_label} · {long_date_label} at {time_label}"
+    if price_label:
+        friendly_label = f"{friendly_label} ({price_label})"
     return {
         "id": slot["id"],
         "start_iso": slot["start"].isoformat(),
         "date_label": date_label,
         "long_date_label": long_date_label,
         "time_label": time_label,
-        "friendly_label": f"{long_date_label} at {time_label}",
+        "friendly_label": friendly_label,
         "is_booked": slot.get("is_booked", False),
         "workflow_status": slot.get("workflow_status", ""),
         "visitor_name": slot.get("visitor_name") or "",
         "visitor_email": slot.get("visitor_email") or "",
         "visitor_dog_breed": slot.get("visitor_dog_breed") or "",
+        "service_type": service_type,
+        "service_label": service_label,
+        "price": price_amount,
+        "price_label": price_label,
     }
 
 
@@ -916,7 +971,11 @@ def index():
         {"label": "Admin Page", "href": url_for("admin_page")},
     ]
     submission_success = request.args.get("submitted") == "1"
-    slot_rows = [_serialize_slot(slot) for slot in _sorted_slots()]
+    slot_rows = [
+        serialized
+        for serialized in (_serialize_slot(slot) for slot in _sorted_slots())
+        if serialized.get("service_type") == "walk"
+    ]
     return render_template(
         "index.html",
         page_links=page_links,
@@ -934,6 +993,8 @@ def bookings_page():
     global next_submission_id
 
     meet_submission_success = False
+    slot_rows = [_serialize_slot(slot) for slot in _sorted_slots()]
+    meet_slots = [slot for slot in slot_rows if slot.get("service_type") == "meet"]
     if request.method == "POST":
         visitor_name = request.form.get("name", "").strip()
         visitor_email = request.form.get("email", "").strip()
@@ -963,6 +1024,8 @@ def bookings_page():
         primary_nav=_build_primary_nav("bookings"),
         home_booking_url=f"{url_for('index')}#booking",
         meet_submission_success=meet_submission_success,
+        meet_slots=meet_slots,
+        dog_breeds=_sorted_breeds(),
         datetime=datetime,
     )
 
@@ -1023,6 +1086,7 @@ def admin_page():
         available_slots=available_slots,
         booked_slots=booked_slots,
         booking_status_options=BOOKING_WORKFLOW_STATUSES,
+        booking_service_type_options=BOOKING_SERVICE_TYPE_OPTIONS,
         time_choices=DEFAULT_TIME_CHOICES,
         today=datetime.utcnow().strftime("%Y-%m-%d"),
         autopilot_enabled=autopilot_enabled,
@@ -1209,7 +1273,14 @@ def create_appointment_slot():
     global next_slot_id
     date_value = (request.form.get("date") or "").strip()
     time_value = (request.form.get("time") or "").strip()
+    price_input = (request.form.get("price") or "").strip()
+    service_type = (request.form.get("service_type") or "walk").strip()
+    if service_type not in BOOKING_SERVICE_TYPES:
+        service_type = "walk"
     if not date_value or not time_value:
+        return redirect(url_for("admin_page"))
+    price_amount = _parse_price(price_input)
+    if price_amount is None:
         return redirect(url_for("admin_page"))
     try:
         start = datetime.strptime(f"{date_value} {time_value}", "%Y-%m-%d %H:%M")
@@ -1223,6 +1294,8 @@ def create_appointment_slot():
         "visitor_name": None,
         "visitor_email": None,
         "visitor_dog_breed": None,
+        "price": price_amount,
+        "service_type": service_type,
     }
     appointment_slots.append(slot)
     appointment_slots.sort(key=lambda entry: entry["start"])
