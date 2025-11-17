@@ -1155,6 +1155,78 @@
         font-family: inherit;
         color: #0f172a;
       }
+      .backup-history {
+        margin-top: 2rem;
+        border-top: 1px solid #e2e8f0;
+        padding-top: 1.5rem;
+      }
+      .backup-history__header {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        margin-bottom: 1rem;
+      }
+      .backup-history__header h3 {
+        margin: 0;
+        font-size: 1.1rem;
+      }
+      .backup-history__table-wrapper {
+        overflow-x: auto;
+      }
+      .backup-history__table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.95rem;
+      }
+      .backup-history__table th,
+      .backup-history__table td {
+        border-bottom: 1px solid #e2e8f0;
+        padding: 0.75rem;
+        vertical-align: top;
+        text-align: left;
+      }
+      .backup-history__table th {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #64748b;
+      }
+      .backup-history__stamp {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+      }
+      .backup-history__source {
+        font-size: 0.8rem;
+        color: #475569;
+      }
+      .backup-history__path {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+      }
+      .backup-history__path code {
+        word-break: break-all;
+        background: #f1f5f9;
+        padding: 0.25rem 0.4rem;
+        border-radius: 0.25rem;
+        font-size: 0.85rem;
+      }
+      .backup-history__actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+      .backup-history__empty {
+        font-size: 0.9rem;
+        color: #475569;
+        margin: 0;
+      }
+      .ghost-button--danger {
+        color: #b91c1c;
+        border-color: #fecaca;
+      }
       .empty-state {
         color: #6b7280;
       }
@@ -1772,6 +1844,70 @@
               <p class="backup-note">{{ state_backup_metadata.error }}</p>
               {% endif %}
             </div>
+            <section class="backup-history">
+              <div class="backup-history__header">
+                <h3>Save history</h3>
+                <p class="muted">
+                  Every manual and auto save is tracked here so you can load a specific snapshot or clear entries you no
+                  longer need.
+                </p>
+              </div>
+              <p
+                id="backupHistoryEmptyState"
+                class="backup-history__empty {% if backup_history_rows %}hidden{% endif %}"
+              >
+                No saves recorded yet. Manual saves and auto saves will show up here.
+              </p>
+              {% if backup_history_rows %}
+              <div class="backup-history__table-wrapper">
+                <table class="backup-history__table" aria-label="Backup history">
+                  <thead>
+                    <tr>
+                      <th scope="col">Saved at</th>
+                      <th scope="col">File path</th>
+                      <th scope="col">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody data-backup-history-body>
+                    {% for entry in backup_history_rows %}
+                    <tr data-entry-id="{{ entry.id }}">
+                      <td>
+                        <div class="backup-history__stamp">
+                          <strong>{{ entry.saved_at_label }}</strong>
+                          <span class="backup-history__source">{{ entry.source_label }}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="backup-history__path">
+                          <code>{{ entry.file_path or 'Path unavailable' }}</code>
+                          {% if entry.file_path %}
+                          <button
+                            type="button"
+                            class="ghost-button ghost-button--small"
+                            data-copy-history-path="{{ entry.file_path }}"
+                          >
+                            Copy path
+                          </button>
+                          {% endif %}
+                        </div>
+                      </td>
+                      <td>
+                        <div class="backup-history__actions">
+                          <form method="post" action="{{ url_for('load_backup_history_entry', entry_id=entry.id) }}">
+                            <button type="submit">Load backup</button>
+                          </form>
+                          <form method="post" action="{{ url_for('delete_backup_history_entry', entry_id=entry.id) }}">
+                            <button type="submit" class="ghost-button ghost-button--danger">Delete</button>
+                          </form>
+                        </div>
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              {% endif %}
+            </section>
           </section>
         </section>
 
@@ -2564,6 +2700,78 @@
         const triggers = Array.from(document.querySelectorAll("[data-open-view]"));
         const initialView = {{ active_view | tojson }};
         let activeView = initialView || "menu";
+        const historyTableBody = document.querySelector("[data-backup-history-body]");
+        const historyEmptyState = document.getElementById("backupHistoryEmptyState");
+
+        function addHistoryRow(entry) {
+          if (!historyTableBody || !entry || historyTableBody.querySelector(`[data-entry-id="${entry.id}"]`)) {
+            return;
+          }
+          if (historyEmptyState) {
+            historyEmptyState.classList.add("hidden");
+          }
+          const row = document.createElement("tr");
+          row.dataset.entryId = entry.id;
+
+          const stampCell = document.createElement("td");
+          const stamp = document.createElement("div");
+          stamp.className = "backup-history__stamp";
+          const savedAt = document.createElement("strong");
+          savedAt.textContent = entry.saved_at_label || entry.saved_at || "Just now";
+          const source = document.createElement("span");
+          source.className = "backup-history__source";
+          source.textContent = entry.source_label || entry.source || "Auto save";
+          stamp.appendChild(savedAt);
+          stamp.appendChild(source);
+          stampCell.appendChild(stamp);
+
+          const pathCell = document.createElement("td");
+          const pathWrapper = document.createElement("div");
+          pathWrapper.className = "backup-history__path";
+          const pathCode = document.createElement("code");
+          pathCode.textContent = entry.file_path || "Path unavailable";
+          pathWrapper.appendChild(pathCode);
+          if (entry.file_path) {
+            const copyBtn = document.createElement("button");
+            copyBtn.type = "button";
+            copyBtn.className = "ghost-button ghost-button--small";
+            copyBtn.dataset.copyHistoryPath = entry.file_path;
+            copyBtn.textContent = "Copy path";
+            pathWrapper.appendChild(copyBtn);
+          }
+          pathCell.appendChild(pathWrapper);
+
+          const actionCell = document.createElement("td");
+          const actionWrapper = document.createElement("div");
+          actionWrapper.className = "backup-history__actions";
+          if (entry.load_url) {
+            const loadForm = document.createElement("form");
+            loadForm.method = "post";
+            loadForm.action = entry.load_url;
+            const loadButton = document.createElement("button");
+            loadButton.type = "submit";
+            loadButton.textContent = "Load backup";
+            loadForm.appendChild(loadButton);
+            actionWrapper.appendChild(loadForm);
+          }
+          if (entry.delete_url) {
+            const deleteForm = document.createElement("form");
+            deleteForm.method = "post";
+            deleteForm.action = entry.delete_url;
+            const deleteButton = document.createElement("button");
+            deleteButton.type = "submit";
+            deleteButton.className = "ghost-button ghost-button--danger";
+            deleteButton.textContent = "Delete";
+            deleteForm.appendChild(deleteButton);
+            actionWrapper.appendChild(deleteForm);
+          }
+          actionCell.appendChild(actionWrapper);
+
+          row.appendChild(stampCell);
+          row.appendChild(pathCell);
+          row.appendChild(actionCell);
+          historyTableBody.prepend(row);
+        }
 
         function setActiveView(viewName) {
           if (!viewName) {
@@ -2662,6 +2870,9 @@
               } else {
                 updateStatus("Auto save is running.");
               }
+              if (payload && payload.history_entry) {
+                addHistoryRow(payload.history_entry);
+              }
             } catch (error) {
               console.warn("Auto save failed", error);
               updateStatus("Auto save paused (network issue).");
@@ -2726,6 +2937,33 @@
             });
           }
         }
+
+        document.addEventListener("click", async (event) => {
+          const historyCopyButton = event.target.closest("[data-copy-history-path]");
+          if (!historyCopyButton) {
+            return;
+          }
+          const pathValue = historyCopyButton.dataset.copyHistoryPath;
+          if (!pathValue) {
+            return;
+          }
+          event.preventDefault();
+          const originalText = historyCopyButton.textContent;
+          try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              await navigator.clipboard.writeText(pathValue);
+              historyCopyButton.textContent = "Copied!";
+            } else {
+              historyCopyButton.textContent = pathValue;
+            }
+          } catch (error) {
+            console.warn("Unable to copy history path", error);
+            historyCopyButton.textContent = pathValue;
+          }
+          setTimeout(() => {
+            historyCopyButton.textContent = originalText;
+          }, 2000);
+        });
       })();
     </script>
 

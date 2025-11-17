@@ -272,6 +272,8 @@ dog_breeds = []
 next_dog_breed_id = 1
 breed_ai_suggestions = None
 meet_greet_enabled = True
+backup_history = []
+next_backup_history_id = 1
 
 ADMIN_VIEWS = {
     "menu",
@@ -418,7 +420,102 @@ def _existing_backup_path() -> Optional[str]:
     return None
 
 
-def _write_state_backup() -> bool:
+def _write_backup_history_snapshot(directory: str, payload: dict) -> Optional[str]:
+    timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    base_name = f"state_backup_{timestamp}"
+    attempt = 0
+    while attempt < 5:
+        suffix = f"_{attempt}" if attempt else ""
+        filename = f"{base_name}{suffix}.json"
+        path = os.path.join(directory, filename)
+        if os.path.exists(path):
+            attempt += 1
+            continue
+        try:
+            with open(path, "w", encoding="utf-8") as snapshot_file:
+                json.dump(payload, snapshot_file, indent=2)
+        except OSError:
+            return None
+        return path
+    return None
+
+
+def _describe_backup_source(source: Optional[str]) -> str:
+    if source == "auto":
+        return "Auto save"
+    if source == "manual":
+        return "Manual save"
+    if source:
+        return source.replace("_", " ").title()
+    return "Manual save"
+
+
+def _format_backup_history_timestamp(value) -> str:
+    if isinstance(value, datetime):
+        return value.strftime("%b %d, %Y %H:%M UTC")
+    return str(value)
+
+
+def _record_backup_history(primary_path: str, snapshot_path: Optional[str], source: str, saved_at_value) -> dict:
+    global backup_history, next_backup_history_id
+
+    timestamp = _parse_datetime(saved_at_value) or datetime.utcnow()
+    entry = {
+        "id": next_backup_history_id,
+        "file_path": snapshot_path or primary_path,
+        "primary_path": primary_path,
+        "snapshot_path": snapshot_path,
+        "saved_at": timestamp,
+        "source": source or "manual",
+    }
+    backup_history.insert(0, entry)
+    next_backup_history_id += 1
+    return entry
+
+
+def _serialize_backup_history_entry(entry: dict) -> dict:
+    return {
+        "id": entry.get("id"),
+        "file_path": entry.get("file_path"),
+        "primary_path": entry.get("primary_path"),
+        "snapshot_path": entry.get("snapshot_path"),
+        "saved_at": _serialize_datetime(entry.get("saved_at")),
+        "source": entry.get("source"),
+    }
+
+
+def _present_backup_history_entry(entry: dict, include_urls: bool = False) -> dict:
+    if not entry:
+        return {}
+    payload = {
+        "id": entry.get("id"),
+        "file_path": entry.get("file_path"),
+        "saved_at": _serialize_datetime(entry.get("saved_at")),
+        "saved_at_label": _format_backup_history_timestamp(entry.get("saved_at")),
+        "source": entry.get("source"),
+        "source_label": _describe_backup_source(entry.get("source")),
+    }
+    if include_urls and entry.get("id") is not None:
+        payload["load_url"] = url_for("load_backup_history_entry", entry_id=entry["id"])
+        payload["delete_url"] = url_for("delete_backup_history_entry", entry_id=entry["id"])
+    return payload
+
+
+def _get_backup_history_entry(entry_id: int):
+    return next((entry for entry in backup_history if entry.get("id") == entry_id), None)
+
+
+def _remove_backup_history_entry(entry_id: int):
+    global backup_history
+
+    entry = _get_backup_history_entry(entry_id)
+    if not entry:
+        return None
+    backup_history = [item for item in backup_history if item.get("id") != entry_id]
+    return entry
+
+
+def _write_state_backup(source: str = "manual") -> Optional[dict]:
     """Attempt to persist the serialized state to disk."""
 
     global _active_backup_directory
@@ -434,9 +531,11 @@ def _write_state_backup() -> bool:
                 json.dump(state_payload, backup_file, indent=2)
         except OSError:
             continue
+        snapshot_path = _write_backup_history_snapshot(directory, state_payload)
+        history_entry = _record_backup_history(path, snapshot_path, source, state_payload.get("saved_at"))
         _active_backup_directory = directory
-        return True
-    return False
+        return {"path": path, "history_path": snapshot_path, "history_entry": history_entry}
+    return None
 
 
 def _serialize_datetime(value):
@@ -629,6 +728,8 @@ def _serialize_state() -> dict:
         "meet_greet_enabled": _meet_greet_setting(),
         "auto_save_enabled": auto_save_enabled,
         "auto_save_last_run": _serialize_datetime(auto_save_last_run),
+        "backup_history": [_serialize_backup_history_entry(entry) for entry in backup_history],
+        "next_backup_history_id": next_backup_history_id,
     }
     return state
 
@@ -641,6 +742,7 @@ def _load_state(state: dict):
     global coverage_areas, next_coverage_area_id, team_certificates, next_certificate_id
     global site_photos, site_service_notice, meet_greet_enabled
     global auto_save_enabled, auto_save_last_run
+    global backup_history, next_backup_history_id
 
     submissions = [dict(row) for row in state.get("submissions", []) if isinstance(row, dict)]
     next_submission_id = _coerce_int(state.get("next_submission_id"), _next_id_from_rows(submissions))
@@ -766,6 +868,29 @@ def _load_state(state: dict):
     meet_greet_enabled = bool(state.get("meet_greet_enabled", True))
     auto_save_enabled = bool(state.get("auto_save_enabled", False))
     auto_save_last_run = _parse_datetime(state.get("auto_save_last_run"))
+
+    history_entries = []
+    for payload in state.get("backup_history", []):
+        if not isinstance(payload, dict):
+            continue
+        entry = {
+            "id": _coerce_int(payload.get("id"), _next_id_from_rows(history_entries)),
+            "file_path": payload.get("file_path"),
+            "primary_path": payload.get("primary_path") or payload.get("file_path"),
+            "snapshot_path": payload.get("snapshot_path"),
+            "saved_at": _parse_datetime(payload.get("saved_at")) or datetime.utcnow(),
+            "source": payload.get("source") or "manual",
+        }
+        if not entry["file_path"]:
+            entry["file_path"] = entry["primary_path"]
+        history_entries.append(entry)
+    history_entries.sort(key=lambda item: item.get("saved_at"), reverse=True)
+    backup_history = history_entries
+    max_existing_id = max((entry.get("id", 0) or 0) for entry in backup_history) if backup_history else 0
+    next_backup_history_id = _coerce_int(
+        state.get("next_backup_history_id"),
+        max_existing_id + 1,
+    )
 
 
 def _get_state_backup_metadata() -> dict:
@@ -1347,9 +1472,22 @@ def admin_page():
         "import_failed": "Uploaded backup could not be processed.",
         "import_missing": "Please choose a backup file before uploading.",
         "import_invalid": "Uploaded file was not recognized as a valid backup.",
+        "history_loaded": "Backup loaded from history.",
+        "history_missing": "That backup entry was not found.",
+        "history_load_failed": "Unable to load the selected history backup.",
+        "history_deleted": "History entry deleted.",
     }
     state_backup_message = state_messages.get(state_action)
-    error_actions = {"save_failed", "load_failed", "missing", "import_failed", "import_invalid", "import_missing"}
+    error_actions = {
+        "save_failed",
+        "load_failed",
+        "missing",
+        "import_failed",
+        "import_invalid",
+        "import_missing",
+        "history_load_failed",
+        "history_missing",
+    }
     state_backup_is_error = state_action in error_actions
     return render_template(
         "admin.html",
@@ -1391,6 +1529,7 @@ def admin_page():
         meet_greet_enabled=_meet_greet_setting(),
         auto_save_enabled=auto_save_enabled,
         auto_save_last_run=auto_save_last_run,
+        backup_history_rows=[_present_backup_history_entry(entry) for entry in backup_history],
     )
 
 
@@ -1411,7 +1550,7 @@ def update_site_photo():
 
 @app.route("/admin/state/save", methods=["POST"])
 def save_admin_state():
-    if not _write_state_backup():
+    if not _write_state_backup(source="manual"):
         return redirect(url_for("admin_page", state_action="save_failed", view="backups"))
     return redirect(url_for("admin_page", state_action="saved", view="backups"))
 
@@ -1430,10 +1569,47 @@ def run_auto_save():
 
     if not auto_save_enabled:
         return jsonify({"saved": False, "reason": "disabled"}), 400
-    if not _write_state_backup():
+    result = _write_state_backup(source="auto")
+    if not result:
         return jsonify({"saved": False, "reason": "write_failed"}), 500
-    auto_save_last_run = datetime.utcnow()
-    return jsonify({"saved": True, "saved_at": auto_save_last_run.isoformat()})
+    history_entry = result.get("history_entry")
+    if history_entry and isinstance(history_entry.get("saved_at"), datetime):
+        auto_save_last_run = history_entry["saved_at"]
+    else:
+        auto_save_last_run = datetime.utcnow()
+    payload = {"saved": True, "saved_at": auto_save_last_run.isoformat()}
+    if history_entry:
+        payload["history_entry"] = _present_backup_history_entry(history_entry, include_urls=True)
+    return jsonify(payload)
+
+
+@app.route("/admin/state/history/<int:entry_id>/load", methods=["POST"])
+def load_backup_history_entry(entry_id: int):
+    entry = _get_backup_history_entry(entry_id)
+    if not entry or not entry.get("file_path") or not os.path.exists(entry["file_path"]):
+        return redirect(url_for("admin_page", state_action="history_missing", view="backups"))
+    try:
+        with open(entry["file_path"], "r", encoding="utf-8") as backup_file:
+            data = json.load(backup_file)
+    except (OSError, json.JSONDecodeError):
+        return redirect(url_for("admin_page", state_action="history_load_failed", view="backups"))
+    _load_state(data)
+    return redirect(url_for("admin_page", state_action="history_loaded", view="backups"))
+
+
+@app.route("/admin/state/history/<int:entry_id>/delete", methods=["POST"])
+def delete_backup_history_entry(entry_id: int):
+    entry = _remove_backup_history_entry(entry_id)
+    if not entry:
+        return redirect(url_for("admin_page", state_action="history_missing", view="backups"))
+    snapshot_path = entry.get("file_path")
+    primary_path = entry.get("primary_path")
+    if snapshot_path and snapshot_path != primary_path and os.path.exists(snapshot_path):
+        try:
+            os.remove(snapshot_path)
+        except OSError:
+            pass
+    return redirect(url_for("admin_page", state_action="history_deleted", view="backups"))
 
 
 @app.route("/admin/state/load", methods=["POST"])
