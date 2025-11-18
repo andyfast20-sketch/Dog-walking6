@@ -116,6 +116,21 @@ def test_state_backup_includes_history_entries(tmp_path, monkeypatch, app_module
     assert history_rows[0]["storage_label"] == history_entry["storage_label"]
 
 
+def test_state_backup_updates_auto_export(tmp_path, monkeypatch, app_module):
+    db_path = tmp_path / "snapshots.sqlite3"
+    monkeypatch.setenv("DOG_WALKING_BACKUP_DB_PATH", str(db_path))
+    monkeypatch.setattr(app_module, "_backup_directory_candidates", lambda: [str(tmp_path)])
+    monkeypatch.setattr(app_module, "_cached_export_file_path", None)
+
+    result = app_module._write_state_backup()
+
+    assert result is not None
+    export_path = tmp_path / app_module.STATE_EXPORT_FILENAME
+    assert export_path.exists(), "auto export file should be refreshed after a snapshot"
+    saved_payload = json.loads(export_path.read_text(encoding="utf-8"))
+    assert saved_payload.get("backup_history"), "auto export should include history data"
+
+
 def test_download_route_writes_export_file(tmp_path, monkeypatch, app_module):
     monkeypatch.setattr(app_module, "_backup_directory_candidates", lambda: [str(tmp_path)])
     client = app_module.app.test_client()

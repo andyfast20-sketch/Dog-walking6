@@ -433,6 +433,22 @@ def _state_export_file_path() -> str:
     return _cached_export_file_path
 
 
+def _write_state_export_payload(payload_text: str) -> Optional[str]:
+    """Persist the serialized state to the auto-restore JSON file."""
+
+    export_path = _state_export_file_path()
+    try:
+        directory = os.path.dirname(export_path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        with open(export_path, "w", encoding="utf-8") as export_file:
+            export_file.write(payload_text)
+    except OSError:
+        app.logger.warning("Unable to write admin export to %s", export_path)
+        return None
+    return export_path
+
+
 def _state_backup_db_path() -> str:
     """Return a writeable path for the sqlite backup database."""
 
@@ -651,6 +667,7 @@ def _write_state_backup(source: str = "manual") -> Optional[dict]:
                 "UPDATE state_backups SET payload = ? WHERE id = ?",
                 (payload_text, storage_id),
             )
+            _write_state_export_payload(payload_text)
     except sqlite3.Error:
         return None
 
@@ -1785,12 +1802,7 @@ def download_admin_state():
     """Provide the current in-memory state as a downloadable JSON file."""
 
     payload = json.dumps(_serialize_state(), indent=2)
-    export_path = _state_export_file_path()
-    try:
-        with open(export_path, "w", encoding="utf-8") as export_file:
-            export_file.write(payload)
-    except OSError:
-        app.logger.warning("Unable to write admin export to %s", export_path)
+    _write_state_export_payload(payload)
     timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
     filename = f"dog-walking-admin-{timestamp}.json"
     headers = {
