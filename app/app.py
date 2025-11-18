@@ -382,7 +382,9 @@ auto_save_last_run: Optional[datetime] = None
 SERVICE_NOTICE_DEFAULT_TEXT = "Website under construction - Do not place any bookings."
 site_service_notice = {"enabled": False, "message": SERVICE_NOTICE_DEFAULT_TEXT}
 STATE_BACKUP_DB_FILENAME = "state_backups.sqlite3"
+STATE_EXPORT_FILENAME = "latest_admin_export.json"
 _cached_backup_db_path: Optional[str] = None
+_cached_export_file_path: Optional[str] = None
 
 
 def _backup_directory_candidates():
@@ -403,6 +405,32 @@ def _backup_directory_candidates():
         if directory and directory not in directories:
             directories.append(directory)
     return directories
+
+
+def _state_export_file_path() -> str:
+    """Return a writeable path for the JSON export file."""
+
+    global _cached_export_file_path
+    if _cached_export_file_path:
+        directory = os.path.dirname(_cached_export_file_path)
+        if directory and os.path.isdir(directory):
+            return _cached_export_file_path
+        _cached_export_file_path = None
+
+    for directory in _backup_directory_candidates():
+        if not directory:
+            continue
+        try:
+            os.makedirs(directory, exist_ok=True)
+        except OSError:
+            continue
+        if os.access(directory, os.W_OK):
+            _cached_export_file_path = os.path.join(directory, STATE_EXPORT_FILENAME)
+            return _cached_export_file_path
+
+    fallback_directory = tempfile.gettempdir()
+    _cached_export_file_path = os.path.join(fallback_directory, STATE_EXPORT_FILENAME)
+    return _cached_export_file_path
 
 
 def _state_backup_db_path() -> str:
@@ -1001,6 +1029,8 @@ def _get_state_backup_metadata() -> dict:
         "database_path": database_path,
         "directory": os.path.dirname(database_path) if database_path else "",
         "total_snapshots": _count_backup_rows(),
+        "export_path": _state_export_file_path(),
+        "export_filename": STATE_EXPORT_FILENAME,
     }
     if not row:
         return metadata
@@ -1585,6 +1615,8 @@ def admin_page():
         "import_failed": "Uploaded backup could not be processed.",
         "import_missing": "Please choose a backup file before uploading.",
         "import_invalid": "Uploaded file was not recognized as a valid backup.",
+        "auto_import_missing": "No saved download was found to restore automatically.",
+        "auto_import_failed": "Automatic restore failed. Please upload the JSON file manually.",
         "history_loaded": "Backup loaded from history.",
         "history_missing": "That backup entry was not found.",
         "history_load_failed": "Unable to load the selected history backup.",
@@ -1598,6 +1630,8 @@ def admin_page():
         "import_failed",
         "import_invalid",
         "import_missing",
+        "auto_import_missing",
+        "auto_import_failed",
         "history_load_failed",
         "history_missing",
     }
@@ -1751,6 +1785,12 @@ def download_admin_state():
     """Provide the current in-memory state as a downloadable JSON file."""
 
     payload = json.dumps(_serialize_state(), indent=2)
+    export_path = _state_export_file_path()
+    try:
+        with open(export_path, "w", encoding="utf-8") as export_file:
+            export_file.write(payload)
+    except OSError:
+        app.logger.warning("Unable to write admin export to %s", export_path)
     timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
     filename = f"dog-walking-admin-{timestamp}.json"
     headers = {
@@ -1765,11 +1805,22 @@ def import_admin_state():
     """Allow admins to upload a JSON backup and restore it immediately."""
 
     uploaded = request.files.get("state_file")
-    if not uploaded or not uploaded.filename:
-        return redirect(url_for("admin_page", state_action="import_missing", view="backups"))
-    try:
-        raw_bytes = uploaded.read()
-    except OSError:
+    raw_bytes = None
+    if uploaded and uploaded.filename:
+        try:
+            raw_bytes = uploaded.read()
+        except OSError:
+            return redirect(url_for("admin_page", state_action="import_failed", view="backups"))
+    else:
+        export_path = _state_export_file_path()
+        if not os.path.exists(export_path):
+            return redirect(url_for("admin_page", state_action="auto_import_missing", view="backups"))
+        try:
+            with open(export_path, "rb") as export_file:
+                raw_bytes = export_file.read()
+        except OSError:
+            return redirect(url_for("admin_page", state_action="auto_import_failed", view="backups"))
+    if raw_bytes is None:
         return redirect(url_for("admin_page", state_action="import_failed", view="backups"))
     try:
         payload = raw_bytes.decode("utf-8")

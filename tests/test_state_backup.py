@@ -114,3 +114,42 @@ def test_state_backup_includes_history_entries(tmp_path, monkeypatch, app_module
     history_entry = result["history_entry"]
     assert history_rows[0]["id"] == history_entry["id"]
     assert history_rows[0]["storage_label"] == history_entry["storage_label"]
+
+
+def test_download_route_writes_export_file(tmp_path, monkeypatch, app_module):
+    monkeypatch.setattr(app_module, "_backup_directory_candidates", lambda: [str(tmp_path)])
+    client = app_module.app.test_client()
+
+    response = client.get("/admin/state/download")
+
+    assert response.status_code == 200
+    export_path = tmp_path / app_module.STATE_EXPORT_FILENAME
+    assert export_path.exists()
+    saved_payload = json.loads(export_path.read_text(encoding="utf-8"))
+    assert "chat_conversations" in saved_payload
+
+
+def test_import_route_restores_from_auto_export(tmp_path, monkeypatch, app_module):
+    monkeypatch.setattr(app_module, "_backup_directory_candidates", lambda: [str(tmp_path)])
+    export_path = tmp_path / app_module.STATE_EXPORT_FILENAME
+    state = app_module._serialize_state()
+    state["meet_greet_enabled"] = False
+    export_path.write_text(json.dumps(state), encoding="utf-8")
+    app_module.meet_greet_enabled = True
+    client = app_module.app.test_client()
+
+    response = client.post("/admin/state/import", data={}, content_type="multipart/form-data")
+
+    assert response.status_code == 302
+    assert "state_action=imported" in response.headers.get("Location", "")
+    assert app_module.meet_greet_enabled is False
+
+
+def test_import_route_reports_missing_auto_export(tmp_path, monkeypatch, app_module):
+    monkeypatch.setattr(app_module, "_backup_directory_candidates", lambda: [str(tmp_path)])
+    client = app_module.app.test_client()
+
+    response = client.post("/admin/state/import", data={}, content_type="multipart/form-data")
+
+    assert response.status_code == 302
+    assert "state_action=auto_import_missing" in response.headers.get("Location", "")
