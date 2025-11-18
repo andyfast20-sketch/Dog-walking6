@@ -1900,6 +1900,13 @@
                   <button type="submit">Download backup</button>
                 </form>
                 <p class="backup-note">Downloads mirror what's in memory at the moment you click.</p>
+                {% if state_backup_metadata.export_path %}
+                <p class="backup-note">
+                  We'll also save a copy to
+                  <code>{{ state_backup_metadata.export_path }}</code>
+                  for automatic restores.
+                </p>
+                {% endif %}
               </div>
               <div class="backup-panel">
                 <h3>Upload &amp; restore</h3>
@@ -1918,11 +1925,16 @@
                     {% if state_backup_metadata.directory %}
                     data-backup-dir="{{ state_backup_metadata.directory }}"
                     {% endif %}
-                    required
                   />
                   <button type="submit">Upload &amp; restore</button>
                 </form>
                 <p class="backup-note">Use this when a teammate sends you their export.</p>
+                {% if state_backup_metadata.export_path %}
+                <p class="backup-note">
+                  Leave the file picker blank to restore the saved download from
+                  <code>{{ state_backup_metadata.export_path }}</code>.
+                </p>
+                {% endif %}
               </div>
             </div>
             <div class="backup-meta">
