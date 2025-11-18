@@ -382,6 +382,7 @@ auto_save_last_run: Optional[datetime] = None
 SERVICE_NOTICE_DEFAULT_TEXT = "Website under construction - Do not place any bookings."
 site_service_notice = {"enabled": False, "message": SERVICE_NOTICE_DEFAULT_TEXT}
 STATE_BACKUP_DB_FILENAME = "state_backups.sqlite3"
+_cached_backup_db_path: Optional[str] = None
 
 
 def _backup_directory_candidates():
@@ -405,14 +406,42 @@ def _backup_directory_candidates():
 
 
 def _state_backup_db_path() -> str:
+    """Return a writeable path for the sqlite backup database."""
+
     override = os.environ.get("DOG_WALKING_BACKUP_DB_PATH")
     if override:
         return os.path.abspath(override)
+
+    global _cached_backup_db_path
+    if _cached_backup_db_path:
+        directory = os.path.dirname(_cached_backup_db_path)
+        if not directory or os.path.exists(directory):
+            return _cached_backup_db_path
+        _cached_backup_db_path = None
+
+    for directory in _backup_directory_candidates():
+        if not directory:
+            continue
+        try:
+            os.makedirs(directory, exist_ok=True)
+        except OSError:
+            continue
+        candidate_path = os.path.join(directory, STATE_BACKUP_DB_FILENAME)
+        try:
+            with open(candidate_path, "a", encoding="utf-8"):
+                pass
+        except OSError:
+            continue
+        _cached_backup_db_path = candidate_path
+        return candidate_path
+
+    fallback_directory = tempfile.gettempdir()
     try:
-        os.makedirs(app.instance_path, exist_ok=True)
+        os.makedirs(fallback_directory, exist_ok=True)
     except OSError:
         pass
-    return os.path.join(app.instance_path, STATE_BACKUP_DB_FILENAME)
+    _cached_backup_db_path = os.path.join(fallback_directory, STATE_BACKUP_DB_FILENAME)
+    return _cached_backup_db_path
 
 
 def _ensure_backup_db_initialized():
