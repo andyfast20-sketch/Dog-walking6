@@ -1467,6 +1467,7 @@ def index():
         current_year=datetime.utcnow().year,
         primary_nav=_build_primary_nav("home"),
         coverage_areas=_sorted_coverage_areas(),
+        format_price_label=_format_price_label,
         home_hero_image=_get_photo_url("home_hero"),
         home_profile_image=_get_photo_url("home_profile"),
         service_notice=_service_notice_state(),
