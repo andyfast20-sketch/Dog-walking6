@@ -419,6 +419,16 @@ def _state_backup_db_path() -> str:
             return _cached_backup_db_path
         _cached_backup_db_path = None
 
+    # Prefer any existing database file, even if it lives in a legacy directory.
+    for directory in _backup_directory_candidates():
+        if not directory:
+            continue
+        candidate_path = os.path.join(directory, STATE_BACKUP_DB_FILENAME)
+        if os.path.isfile(candidate_path):
+            _cached_backup_db_path = candidate_path
+            return candidate_path
+
+    # Fall back to the first directory where we can create and write the file.
     for directory in _backup_directory_candidates():
         if not directory:
             continue

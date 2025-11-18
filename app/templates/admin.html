@@ -59,6 +59,19 @@
       button:hover {
         background: #1739a2;
       }
+      .link-button {
+        background: transparent;
+        color: #1f4ad1;
+        padding: 0;
+        border: none;
+        border-radius: 0;
+        text-decoration: underline;
+        font-weight: 600;
+      }
+      .link-button:hover {
+        background: transparent;
+        color: #0f2f8d;
+      }
       button:disabled,
       button[disabled] {
         background: #cbd2d9;
@@ -121,6 +134,9 @@
         background: #1f4ad1;
         color: #fff;
         border-color: #1f4ad1;
+      }
+      .snapshot-summary__trigger {
+        margin-top: 0.2rem;
       }
       .admin-main {
         display: flex;
@@ -199,6 +215,76 @@
         margin: 0;
         color: #94a3b8;
         font-style: italic;
+      }
+      .snapshot-summary {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.55);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        z-index: 70;
+      }
+      .snapshot-summary[hidden] {
+        display: none;
+      }
+      .snapshot-summary__dialog {
+        background: #fff;
+        border-radius: 20px;
+        padding: 1.5rem;
+        width: min(420px, 100%);
+        box-shadow: 0 25px 65px rgba(15, 23, 42, 0.25);
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      .snapshot-summary__dialog h4 {
+        margin: 0;
+      }
+      .snapshot-summary__dialog p {
+        margin: 0;
+        color: #475569;
+      }
+      .snapshot-summary__header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+      }
+      .snapshot-summary__close {
+        background: rgba(148, 163, 184, 0.2);
+        color: #0f172a;
+        border-radius: 999px;
+        width: 2.5rem;
+        height: 2.5rem;
+        font-size: 1.4rem;
+        line-height: 1;
+        padding: 0;
+      }
+      .snapshot-summary__close:hover {
+        background: rgba(148, 163, 184, 0.35);
+      }
+      .snapshot-summary__list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 0.4rem;
+      }
+      .snapshot-summary__list li {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        font-size: 0.95rem;
+        color: #0f172a;
+      }
+      .snapshot-summary__list strong {
+        font-size: 1.05rem;
+      }
+      .snapshot-summary__footer {
+        font-size: 0.85rem;
+        color: #94a3b8;
       }
       .photo-admin {
         display: flex;
@@ -1758,6 +1844,11 @@
                   Create a save before attempting to load.
                   {% endif %}
                 </p>
+                {% if state_backup_metadata.exists %}
+                <button type="button" class="link-button snapshot-summary__trigger" data-snapshot-summary-open>
+                  See what will be loaded
+                </button>
+                {% endif %}
               </div>
               <div class="backup-panel">
                 <h3>3. Let auto save babysit</h3>
@@ -2714,6 +2805,67 @@
       </main>
     </div>
 
+    {% if state_backup_metadata.exists %}
+    {% set counts = state_backup_metadata.counts or {} %}
+    <div class="snapshot-summary" data-snapshot-summary hidden>
+      <div class="snapshot-summary__dialog" role="dialog" aria-modal="true" aria-labelledby="snapshotSummaryTitle">
+        <div class="snapshot-summary__header">
+          <div>
+            <p class="eyebrow">Latest snapshot</p>
+            <h4 id="snapshotSummaryTitle">Here's what will be restored</h4>
+          </div>
+          <button
+            type="button"
+            class="snapshot-summary__close"
+            aria-label="Close snapshot summary"
+            data-snapshot-summary-close
+          >
+            &times;
+          </button>
+        </div>
+        <p>
+          Loading now will replace your current dashboard with the save from
+          {{ state_backup_metadata.saved_at or 'your previous session' }}.
+        </p>
+        <ul class="snapshot-summary__list">
+          <li>
+            <span>Enquiries</span>
+            <strong>{{ counts.get('submissions', 0) }}</strong>
+          </li>
+          <li>
+            <span>Meet &amp; greet slots</span>
+            <strong>{{ counts.get('appointments', 0) }}</strong>
+          </li>
+          <li>
+            <span>Visitors</span>
+            <strong>{{ counts.get('visitors', 0) }}</strong>
+          </li>
+          <li>
+            <span>Chats</span>
+            <strong>{{ counts.get('chats', 0) }}</strong>
+          </li>
+          <li>
+            <span>Dog breeds</span>
+            <strong>{{ counts.get('dog_breeds', 0) }}</strong>
+          </li>
+          <li>
+            <span>Site photos</span>
+            <strong>{{ counts.get('site_photos', 0) }}</strong>
+          </li>
+          <li>
+            <span>Coverage areas</span>
+            <strong>{{ counts.get('coverage_areas', 0) }}</strong>
+          </li>
+          <li>
+            <span>Team certificates</span>
+            <strong>{{ counts.get('certificates', 0) }}</strong>
+          </li>
+        </ul>
+        <p class="snapshot-summary__footer">Click outside this card or press Esc to close.</p>
+      </div>
+    </div>
+    {% endif %}
+
     <script>
       (function () {
         const views = Array.from(document.querySelectorAll("[data-view]"));
@@ -2959,6 +3111,51 @@
               }, 2000);
             });
           }
+        }
+
+        const snapshotSummary = document.querySelector("[data-snapshot-summary]");
+        if (snapshotSummary) {
+          const openButtons = document.querySelectorAll("[data-snapshot-summary-open]");
+          const closeButton = snapshotSummary.querySelector("[data-snapshot-summary-close]");
+
+          function closeSummary() {
+            snapshotSummary.setAttribute("hidden", "hidden");
+            snapshotSummary.classList.remove("is-visible");
+          }
+
+          function openSummary() {
+            snapshotSummary.removeAttribute("hidden");
+            snapshotSummary.classList.add("is-visible");
+            if (closeButton) {
+              closeButton.focus();
+            }
+          }
+
+          openButtons.forEach((button) => {
+            button.addEventListener("click", (event) => {
+              event.preventDefault();
+              openSummary();
+            });
+          });
+
+          if (closeButton) {
+            closeButton.addEventListener("click", (event) => {
+              event.preventDefault();
+              closeSummary();
+            });
+          }
+
+          snapshotSummary.addEventListener("click", (event) => {
+            if (event.target === snapshotSummary) {
+              closeSummary();
+            }
+          });
+
+          document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" && !snapshotSummary.hasAttribute("hidden")) {
+              closeSummary();
+            }
+          });
         }
 
       })();
