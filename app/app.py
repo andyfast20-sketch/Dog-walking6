@@ -420,7 +420,7 @@ def _existing_backup_path() -> Optional[str]:
     return None
 
 
-def _write_backup_history_snapshot(directory: str, payload: dict) -> Optional[str]:
+def _reserve_backup_history_snapshot_path(directory: str) -> Optional[str]:
     timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
     base_name = f"state_backup_{timestamp}"
     attempt = 0
@@ -431,11 +431,6 @@ def _write_backup_history_snapshot(directory: str, payload: dict) -> Optional[st
         if os.path.exists(path):
             attempt += 1
             continue
-        try:
-            with open(path, "w", encoding="utf-8") as snapshot_file:
-                json.dump(payload, snapshot_file, indent=2)
-        except OSError:
-            return None
         return path
     return None
 
@@ -518,7 +513,7 @@ def _remove_backup_history_entry(entry_id: int):
 def _write_state_backup(source: str = "manual") -> Optional[dict]:
     """Attempt to persist the serialized state to disk."""
 
-    global _active_backup_directory
+    global _active_backup_directory, next_backup_history_id
     state_payload = _serialize_state()
     for directory in _backup_directory_candidates():
         try:
@@ -526,13 +521,28 @@ def _write_state_backup(source: str = "manual") -> Optional[dict]:
         except OSError:
             continue
         path = os.path.join(directory, STATE_BACKUP_FILENAME)
+        snapshot_path = _reserve_backup_history_snapshot_path(directory)
+        history_entry = _record_backup_history(path, snapshot_path, source, state_payload.get("saved_at"))
+        state_payload_with_history = dict(state_payload)
+        state_payload_with_history["backup_history"] = [
+            _serialize_backup_history_entry(entry) for entry in backup_history
+        ]
+        state_payload_with_history["next_backup_history_id"] = next_backup_history_id
         try:
             with open(path, "w", encoding="utf-8") as backup_file:
-                json.dump(state_payload, backup_file, indent=2)
+                json.dump(state_payload_with_history, backup_file, indent=2)
         except OSError:
+            _remove_backup_history_entry(history_entry["id"])
+            next_backup_history_id -= 1
             continue
-        snapshot_path = _write_backup_history_snapshot(directory, state_payload)
-        history_entry = _record_backup_history(path, snapshot_path, source, state_payload.get("saved_at"))
+        if snapshot_path:
+            try:
+                with open(snapshot_path, "w", encoding="utf-8") as snapshot_file:
+                    json.dump(state_payload_with_history, snapshot_file, indent=2)
+            except OSError:
+                snapshot_path = None
+                history_entry["file_path"] = history_entry["primary_path"]
+                history_entry["snapshot_path"] = None
         _active_backup_directory = directory
         return {"path": path, "history_path": snapshot_path, "history_entry": history_entry}
     return None

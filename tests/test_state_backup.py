@@ -1,4 +1,5 @@
 import importlib
+import json
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -92,3 +93,20 @@ def test_backup_candidates_include_project_root_and_folder(app_module):
     candidates = app_module._backup_directory_candidates()
     assert str(project_root) in candidates
     assert str(project_root / "backups") in candidates
+
+
+def test_state_backup_includes_history_entries(tmp_path, monkeypatch, app_module):
+    monkeypatch.setattr(app_module, "_backup_directory_candidates", lambda: [str(tmp_path)])
+
+    result = app_module._write_state_backup()
+
+    backup_path = tmp_path / app_module.STATE_BACKUP_FILENAME
+    assert backup_path.exists()
+    with open(backup_path, "r", encoding="utf-8") as backup_file:
+        data = json.load(backup_file)
+
+    history_rows = data.get("backup_history", [])
+    assert history_rows, "backup file should include history entries"
+    history_entry = result["history_entry"]
+    assert history_rows[0]["id"] == history_entry["id"]
+    assert history_rows[0]["file_path"] == history_entry["file_path"]
