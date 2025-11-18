@@ -18,6 +18,9 @@
   let eventSource = null;
   let reconnectTimer = null;
   let isOpen = false;
+  let flickerTimeout = null;
+  const prefersReducedMotion =
+    window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   function generateVisitorId() {
     if (window.crypto && window.crypto.randomUUID) {
@@ -183,8 +186,33 @@
     }
   }
 
+  function cancelFlicker() {
+    if (flickerTimeout) {
+      clearTimeout(flickerTimeout);
+      flickerTimeout = null;
+    }
+  }
+
+  function scheduleFlicker() {
+    if (prefersReducedMotion) {
+      return;
+    }
+    const minDelay = 6000;
+    const maxDelay = 16000;
+    const delay = Math.random() * (maxDelay - minDelay) + minDelay;
+    flickerTimeout = window.setTimeout(() => {
+      toggle.classList.add("is-flickering");
+      setTimeout(() => toggle.classList.remove("is-flickering"), 500);
+      scheduleFlicker();
+    }, delay);
+  }
+
   connectStream();
-  window.addEventListener("beforeunload", () => disconnectStream(false));
+  scheduleFlicker();
+  window.addEventListener("beforeunload", () => {
+    cancelFlicker();
+    disconnectStream(false);
+  });
 
   toggle.addEventListener("click", () => setOpen(!isOpen));
   closeBtn.addEventListener("click", () => setOpen(false));
