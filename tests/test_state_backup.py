@@ -4,6 +4,9 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+import json
+import sqlite3
+
 import pytest
 
 
@@ -96,17 +99,18 @@ def test_backup_candidates_include_project_root_and_folder(app_module):
 
 
 def test_state_backup_includes_history_entries(tmp_path, monkeypatch, app_module):
-    monkeypatch.setattr(app_module, "_backup_directory_candidates", lambda: [str(tmp_path)])
+    db_path = tmp_path / "snapshots.sqlite3"
+    monkeypatch.setenv("DOG_WALKING_BACKUP_DB_PATH", str(db_path))
 
     result = app_module._write_state_backup()
 
-    backup_path = tmp_path / app_module.STATE_BACKUP_FILENAME
-    assert backup_path.exists()
-    with open(backup_path, "r", encoding="utf-8") as backup_file:
-        data = json.load(backup_file)
-
+    assert db_path.exists()
+    with sqlite3.connect(str(db_path)) as connection:
+        row = connection.execute("SELECT payload FROM state_backups ORDER BY id DESC LIMIT 1").fetchone()
+    assert row is not None
+    data = json.loads(row[0])
     history_rows = data.get("backup_history", [])
-    assert history_rows, "backup file should include history entries"
+    assert history_rows, "snapshot should include history entries"
     history_entry = result["history_entry"]
     assert history_rows[0]["id"] == history_entry["id"]
-    assert history_rows[0]["file_path"] == history_entry["file_path"]
+    assert history_rows[0]["storage_label"] == history_entry["storage_label"]

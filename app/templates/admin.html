@@ -1200,19 +1200,6 @@
         font-size: 0.8rem;
         color: #475569;
       }
-      .backup-history__path {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        align-items: center;
-      }
-      .backup-history__path code {
-        word-break: break-all;
-        background: #f1f5f9;
-        padding: 0.25rem 0.4rem;
-        border-radius: 0.25rem;
-        font-size: 0.85rem;
-      }
       .backup-history__actions {
         display: flex;
         gap: 0.5rem;
@@ -1717,32 +1704,67 @@
               data-auto-save-url="{{ url_for('run_auto_save') }}"
               data-auto-save-last-run="{{ auto_save_last_run.isoformat() if auto_save_last_run else '' }}"
             ></div>
-            <div class="backup-grid">
-              <div class="backup-panel">
-                <h3>Save everything</h3>
+            <div class="backup-hero">
+              <div>
+                <p class="eyebrow">Mission critical</p>
+                <h3>Save to the on-server vault before making big changes.</h3>
                 <p>
-                  Write the current submissions, appointments, visitors, chats, breeds, autopilot settings, and service notice
-                  status to a backup file on the server.
+                  Every click of “Save now” stores your dashboard in a durable SQLite database so you can restore it even
+                  after redeploys or server restarts.
                 </p>
+                <ol class="backup-hero__list">
+                  <li>Save before experimenting.</li>
+                  <li>Load if anything looks off.</li>
+                  <li>Download for off-site peace of mind.</li>
+                </ol>
+              </div>
+              <div class="backup-hero__meta">
+                <p class="backup-hero__status">
+                  <span>Last snapshot</span>
+                  <strong>{{ state_backup_metadata.saved_at or 'Not yet saved' }}</strong>
+                </p>
+                <p class="backup-hero__status">
+                  <span>Snapshots in vault</span>
+                  <strong>{{ state_backup_metadata.total_snapshots or 0 }}</strong>
+                </p>
+                <p class="backup-hero__status">
+                  <span>Database location</span>
+                  <code>{{ state_backup_metadata.database_path }}</code>
+                </p>
+              </div>
+            </div>
+            <div class="backup-grid">
+              <div class="backup-panel backup-panel--primary">
+                <h3>1. Save everything to the vault</h3>
+                <p>Lock in every enquiry, booking, chat, and setting with a single click.</p>
                 <form method="post" action="{{ url_for('save_admin_state') }}">
                   <button type="submit">Save now</button>
                 </form>
+                <p class="backup-note">You cannot over-save—more entries mean more restore points.</p>
               </div>
               <div class="backup-panel">
-                <h3>Load previous save</h3>
-                <p>Restore the last saved state. This replaces everything currently in memory.</p>
+                <h3>2. Load a stored snapshot</h3>
+                <p>
+                  Pull the latest saved state directly from the database. Everything currently in memory will be replaced, so
+                  announce to other admins before loading.
+                </p>
                 <form method="post" action="{{ url_for('load_admin_state') }}">
-                  <button type="submit" {% if not state_backup_metadata.exists %}disabled{% endif %}>Load backup</button>
+                  <button type="submit" {% if not state_backup_metadata.exists %}disabled{% endif %}>Load latest snapshot</button>
                 </form>
-                {% if not state_backup_metadata.exists %}
-                <p class="backup-note">Create a save before attempting to load.</p>
-                {% else %}
-                <p class="backup-note">Last saved {{ state_backup_metadata.saved_at or state_backup_metadata.modified_at }}.</p>
-                {% endif %}
+                <p class="backup-note">
+                  {% if state_backup_metadata.exists %}
+                  Last saved {{ state_backup_metadata.saved_at }}
+                  {% else %}
+                  Create a save before attempting to load.
+                  {% endif %}
+                </p>
               </div>
               <div class="backup-panel">
-                <h3>Auto save</h3>
-                <p>Keep the current dashboard safe while you work. We'll save once a minute while this tab stays open.</p>
+                <h3>3. Let auto save babysit</h3>
+                <p>
+                  We'll write to the snapshot database once a minute while this page is open so no lead slips through the
+                  cracks.
+                </p>
                 <form method="post" action="{{ url_for('toggle_auto_save_setting') }}" class="autopilot-card__toggle-form">
                   <label class="toggle-switch">
                     <input
@@ -1764,7 +1786,7 @@
                 </form>
                 <p class="muted" id="autoSaveStatus" aria-live="polite">
                   {% if auto_save_enabled %}
-                  Auto save will keep running while you're on this page.
+                  Auto save is writing entries to the vault.
                   {% else %}
                   Turn on auto save to back up changes every minute.
                   {% endif %}
@@ -1781,16 +1803,16 @@
             </div>
             <div class="backup-grid">
               <div class="backup-panel">
-                <h3>Download a copy</h3>
-                <p>Grab a JSON file that mirrors everything currently in the admin memory and store it locally.</p>
+                <h3>Download a JSON copy</h3>
+                <p>Grab a portable snapshot before deploying or sending data to auditors.</p>
                 <form method="get" action="{{ url_for('download_admin_state') }}">
                   <button type="submit">Download backup</button>
                 </form>
-                <p class="backup-note">Perfect for keeping a copy before redeploying or switching machines.</p>
+                <p class="backup-note">Downloads mirror what's in memory at the moment you click.</p>
               </div>
               <div class="backup-panel">
-                <h3>Upload and restore</h3>
-                <p>Import any JSON backup you previously downloaded. This overwrites the live dashboard data.</p>
+                <h3>Upload &amp; restore</h3>
+                <p>Import a JSON export to immediately overwrite the in-memory dashboard.</p>
                 <form
                   method="post"
                   action="{{ url_for('import_admin_state') }}"
@@ -1809,23 +1831,27 @@
                   />
                   <button type="submit">Upload &amp; restore</button>
                 </form>
-                {% if state_backup_metadata.directory %}
-                <p class="backup-note">
-                  Last backup folder:
-                  <code>{{ state_backup_metadata.directory }}</code>
-                  <button type="button" class="ghost-button ghost-button--small" data-copy-backup-path>Copy path</button>
-                </p>
-                {% endif %}
+                <p class="backup-note">Use this when a teammate sends you their export.</p>
               </div>
             </div>
             <div class="backup-meta">
-              <strong>Backup file</strong>
+              <strong>Snapshot vault details</strong>
               <ul>
-                <li>Name: {{ state_backup_metadata.filename }}</li>
-                <li>Status: {% if state_backup_metadata.exists %}Available{% else %}Missing{% endif %}</li>
-                {% if state_backup_metadata.size is defined %}
-                <li>Size: {{ '%.1f' | format(state_backup_metadata.size / 1024) }} KB</li>
-                {% endif %}
+                <li>Engine: SQLite database ({{ state_backup_metadata.filename }})</li>
+                <li>Status: {% if state_backup_metadata.exists %}Ready to load{% else %}Awaiting first save{% endif %}</li>
+                <li>Snapshots stored: {{ state_backup_metadata.total_snapshots or 0 }}</li>
+                <li>
+                  Location:
+                  <code>{{ state_backup_metadata.database_path }}</code>
+                  <button
+                    type="button"
+                    class="ghost-button ghost-button--small"
+                    data-copy-backup-path
+                    data-copy-backup-value="{{ state_backup_metadata.database_path }}"
+                  >
+                    Copy path
+                  </button>
+                </li>
               </ul>
               {% if state_backup_metadata.counts %}
               <strong>Included records</strong>
@@ -1864,7 +1890,7 @@
                   <thead>
                     <tr>
                       <th scope="col">Saved at</th>
-                      <th scope="col">File path</th>
+                      <th scope="col">Stored snapshot</th>
                       <th scope="col">Actions</th>
                     </tr>
                   </thead>
@@ -1878,16 +1904,11 @@
                         </div>
                       </td>
                       <td>
-                        <div class="backup-history__path">
-                          <code>{{ entry.file_path or 'Path unavailable' }}</code>
-                          {% if entry.file_path %}
-                          <button
-                            type="button"
-                            class="ghost-button ghost-button--small"
-                            data-copy-history-path="{{ entry.file_path }}"
-                          >
-                            Copy path
-                          </button>
+                        <div class="backup-history__storage">
+                          <strong>{{ entry.storage_label or 'Snapshot' }}</strong>
+                          <span class="backup-history__chip">{{ entry.storage_type or 'database' }}</span>
+                          {% if entry.legacy_path %}
+                          <code>{{ entry.legacy_path }}</code>
                           {% endif %}
                         </div>
                       </td>
@@ -2726,20 +2747,21 @@
           stampCell.appendChild(stamp);
 
           const pathCell = document.createElement("td");
-          const pathWrapper = document.createElement("div");
-          pathWrapper.className = "backup-history__path";
-          const pathCode = document.createElement("code");
-          pathCode.textContent = entry.file_path || "Path unavailable";
-          pathWrapper.appendChild(pathCode);
-          if (entry.file_path) {
-            const copyBtn = document.createElement("button");
-            copyBtn.type = "button";
-            copyBtn.className = "ghost-button ghost-button--small";
-            copyBtn.dataset.copyHistoryPath = entry.file_path;
-            copyBtn.textContent = "Copy path";
-            pathWrapper.appendChild(copyBtn);
+          const storageWrapper = document.createElement("div");
+          storageWrapper.className = "backup-history__storage";
+          const storageLabel = document.createElement("strong");
+          storageLabel.textContent = entry.storage_label || "Snapshot";
+          storageWrapper.appendChild(storageLabel);
+          const chip = document.createElement("span");
+          chip.className = "backup-history__chip";
+          chip.textContent = entry.storage_type || "database";
+          storageWrapper.appendChild(chip);
+          if (entry.legacy_path) {
+            const legacyCode = document.createElement("code");
+            legacyCode.textContent = entry.legacy_path;
+            storageWrapper.appendChild(legacyCode);
           }
-          pathCell.appendChild(pathWrapper);
+          pathCell.appendChild(storageWrapper);
 
           const actionCell = document.createElement("td");
           const actionWrapper = document.createElement("div");
@@ -2917,19 +2939,20 @@
             backupUploadInput.setAttribute("data-working-directory", lastDir);
           }
           const copyButton = document.querySelector("[data-copy-backup-path]");
-          if (copyButton && lastDir) {
+          const copyValue = (copyButton && copyButton.dataset.copyBackupValue) || lastDir;
+          if (copyButton && copyValue) {
             copyButton.addEventListener("click", async () => {
               const originalText = copyButton.textContent;
               try {
                 if (navigator.clipboard && navigator.clipboard.writeText) {
-                  await navigator.clipboard.writeText(lastDir);
+                  await navigator.clipboard.writeText(copyValue);
                 } else {
                   throw new Error("Clipboard API unavailable");
                 }
                 copyButton.textContent = "Copied!";
               } catch (error) {
                 console.warn("Unable to copy backup path", error);
-                copyButton.textContent = lastDir;
+                copyButton.textContent = copyValue;
               }
               setTimeout(() => {
                 copyButton.textContent = originalText;
@@ -2938,32 +2961,6 @@
           }
         }
 
-        document.addEventListener("click", async (event) => {
-          const historyCopyButton = event.target.closest("[data-copy-history-path]");
-          if (!historyCopyButton) {
-            return;
-          }
-          const pathValue = historyCopyButton.dataset.copyHistoryPath;
-          if (!pathValue) {
-            return;
-          }
-          event.preventDefault();
-          const originalText = historyCopyButton.textContent;
-          try {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-              await navigator.clipboard.writeText(pathValue);
-              historyCopyButton.textContent = "Copied!";
-            } else {
-              historyCopyButton.textContent = pathValue;
-            }
-          } catch (error) {
-            console.warn("Unable to copy history path", error);
-            historyCopyButton.textContent = pathValue;
-          }
-          setTimeout(() => {
-            historyCopyButton.textContent = originalText;
-          }, 2000);
-        });
       })();
     </script>
 
