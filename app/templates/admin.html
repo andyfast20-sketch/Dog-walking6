@@ -135,9 +135,6 @@
         color: #fff;
         border-color: #1f4ad1;
       }
-      .snapshot-summary__trigger {
-        margin-top: 0.2rem;
-      }
       .admin-main {
         display: flex;
         flex-direction: column;
@@ -215,76 +212,6 @@
         margin: 0;
         color: #94a3b8;
         font-style: italic;
-      }
-      .snapshot-summary {
-        position: fixed;
-        inset: 0;
-        background: rgba(15, 23, 42, 0.55);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 1.5rem;
-        z-index: 70;
-      }
-      .snapshot-summary[hidden] {
-        display: none;
-      }
-      .snapshot-summary__dialog {
-        background: #fff;
-        border-radius: 20px;
-        padding: 1.5rem;
-        width: min(420px, 100%);
-        box-shadow: 0 25px 65px rgba(15, 23, 42, 0.25);
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-      }
-      .snapshot-summary__dialog h4 {
-        margin: 0;
-      }
-      .snapshot-summary__dialog p {
-        margin: 0;
-        color: #475569;
-      }
-      .snapshot-summary__header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 1rem;
-      }
-      .snapshot-summary__close {
-        background: rgba(148, 163, 184, 0.2);
-        color: #0f172a;
-        border-radius: 999px;
-        width: 2.5rem;
-        height: 2.5rem;
-        font-size: 1.4rem;
-        line-height: 1;
-        padding: 0;
-      }
-      .snapshot-summary__close:hover {
-        background: rgba(148, 163, 184, 0.35);
-      }
-      .snapshot-summary__list {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-        display: grid;
-        gap: 0.4rem;
-      }
-      .snapshot-summary__list li {
-        display: flex;
-        justify-content: space-between;
-        gap: 1rem;
-        font-size: 0.95rem;
-        color: #0f172a;
-      }
-      .snapshot-summary__list strong {
-        font-size: 1.05rem;
-      }
-      .snapshot-summary__footer {
-        font-size: 0.85rem;
-        color: #94a3b8;
       }
       .photo-admin {
         display: flex;
@@ -1228,74 +1155,6 @@
         font-size: 0.85rem;
         word-break: break-all;
       }
-      .backup-upload {
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-      }
-      .backup-upload input[type="file"] {
-        border: 1px dashed #cbd5f5;
-        padding: 0.55rem;
-        border-radius: 12px;
-        background: #fff;
-        font-family: inherit;
-        color: #0f172a;
-      }
-      .backup-history {
-        margin-top: 2rem;
-        border-top: 1px solid #e2e8f0;
-        padding-top: 1.5rem;
-      }
-      .backup-history__header {
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-        margin-bottom: 1rem;
-      }
-      .backup-history__header h3 {
-        margin: 0;
-        font-size: 1.1rem;
-      }
-      .backup-history__table-wrapper {
-        overflow-x: auto;
-      }
-      .backup-history__table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.95rem;
-      }
-      .backup-history__table th,
-      .backup-history__table td {
-        border-bottom: 1px solid #e2e8f0;
-        padding: 0.75rem;
-        vertical-align: top;
-        text-align: left;
-      }
-      .backup-history__table th {
-        font-size: 0.8rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: #64748b;
-      }
-      .backup-history__stamp {
-        display: flex;
-        flex-direction: column;
-        gap: 0.2rem;
-      }
-      .backup-history__source {
-        font-size: 0.8rem;
-        color: #475569;
-      }
-      .backup-history__actions {
-        display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-      }
-      .backup-history__empty {
-        font-size: 0.9rem;
-        color: #475569;
-        margin: 0;
-      }
       .ghost-button--danger {
         color: #b91c1c;
         border-color: #fecaca;
@@ -1773,7 +1632,7 @@
             <div>
               <p class="eyebrow">Save &amp; load</p>
               <h2 id="backupHeading">Back up your admin data</h2>
-              <p>Capture everything currently in memory—leads, visitor logs, chats, and slots—so you can restore it after deploying new code.</p>
+              <p>Download a single JSON file named <code>{{ state_backup_metadata.export_filename }}</code> and reload it whenever you need to recover this dashboard.</p>
             </div>
             <button type="button" class="ghost-button" data-open-view="menu">Back to main menu</button>
           </div>
@@ -1783,255 +1642,85 @@
               {{ state_backup_message }}
             </div>
             {% endif %}
-            <div
-              id="autoSaveController"
-              class="hidden"
-              data-auto-save-enabled="{{ 'true' if auto_save_enabled else 'false' }}"
-              data-auto-save-url="{{ url_for('run_auto_save') }}"
-              data-auto-save-last-run="{{ auto_save_last_run.isoformat() if auto_save_last_run else '' }}"
-            ></div>
             <div class="backup-hero">
               <div>
                 <p class="eyebrow">Mission critical</p>
-                <h3>Save to the on-server vault before making big changes.</h3>
+                <h3>Keep “andy” close.</h3>
                 <p>
-                  Every click of “Save now” stores your dashboard in a durable SQLite database so you can restore it even
-                  after redeploys or server restarts.
+                  Clicking “Download backup” writes the current in-memory state to <code>{{ state_backup_metadata.export_path }}</code>
+                  and sends the JSON file to your browser. Each download overwrites the same file so there's only one source of truth.
                 </p>
                 <ol class="backup-hero__list">
-                  <li>Save before experimenting.</li>
-                  <li>Load if anything looks off.</li>
-                  <li>Download for off-site peace of mind.</li>
+                  <li>Download before experimenting.</li>
+                  <li>Keep the downloaded <code>{{ state_backup_metadata.export_filename }}</code> somewhere safe.</li>
+                  <li>Restore with the Upload &amp; restore button.</li>
                 </ol>
               </div>
               <div class="backup-hero__meta">
                 <p class="backup-hero__status">
-                  <span>Last snapshot</span>
+                  <span>Last backup written</span>
                   <strong>{{ state_backup_metadata.saved_at or 'Not yet saved' }}</strong>
                 </p>
                 <p class="backup-hero__status">
-                  <span>Snapshots in vault</span>
-                  <strong>{{ state_backup_metadata.total_snapshots or 0 }}</strong>
+                  <span>File name</span>
+                  <strong>{{ state_backup_metadata.export_filename }}</strong>
                 </p>
                 <p class="backup-hero__status">
-                  <span>Database location</span>
-                  <code>{{ state_backup_metadata.database_path }}</code>
-                </p>
-              </div>
-            </div>
-            <div class="backup-grid">
-              <div class="backup-panel backup-panel--primary">
-                <h3>1. Save everything to the vault</h3>
-                <p>Lock in every enquiry, booking, chat, and setting with a single click.</p>
-                <form method="post" action="{{ url_for('save_admin_state') }}">
-                  <button type="submit">Save now</button>
-                </form>
-                <p class="backup-note">You cannot over-save—more entries mean more restore points.</p>
-              </div>
-              <div class="backup-panel">
-                <h3>2. Load a stored snapshot</h3>
-                <p>
-                  Pull the latest saved state directly from the database. Everything currently in memory will be replaced, so
-                  announce to other admins before loading.
-                </p>
-                <form method="post" action="{{ url_for('load_admin_state') }}">
-                  <button type="submit" {% if not state_backup_metadata.exists %}disabled{% endif %}>Load latest snapshot</button>
-                </form>
-                <p class="backup-note">
-                  {% if state_backup_metadata.exists %}
-                  Last saved {{ state_backup_metadata.saved_at }}
-                  {% else %}
-                  Create a save before attempting to load.
-                  {% endif %}
-                </p>
-                {% if state_backup_metadata.exists %}
-                <button type="button" class="link-button snapshot-summary__trigger" data-snapshot-summary-open>
-                  See what will be loaded
-                </button>
-                {% endif %}
-              </div>
-              <div class="backup-panel">
-                <h3>3. Let auto save babysit</h3>
-                <p>
-                  We'll write to the snapshot database once a minute while this page is open so no lead slips through the
-                  cracks.
-                </p>
-                <form method="post" action="{{ url_for('toggle_auto_save_setting') }}" class="autopilot-card__toggle-form">
-                  <label class="toggle-switch">
-                    <input
-                      type="checkbox"
-                      name="enabled"
-                      value="1"
-                      {% if auto_save_enabled %}checked{% endif %}
-                      onchange="this.form.submit()"
-                      aria-label="Toggle auto save"
-                    />
-                    <span class="toggle-slider" aria-hidden="true"></span>
-                    <span class="toggle-state">{{ 'On' if auto_save_enabled else 'Off' }}</span>
-                  </label>
-                  <noscript>
-                    <button type="submit" name="enabled" value="{{ 0 if auto_save_enabled else 1 }}">
-                      {{ 'Disable' if auto_save_enabled else 'Enable' }} auto save
-                    </button>
-                  </noscript>
-                </form>
-                <p class="muted" id="autoSaveStatus" aria-live="polite">
-                  {% if auto_save_enabled %}
-                  Auto save is writing entries to the vault.
-                  {% else %}
-                  Turn on auto save to back up changes every minute.
-                  {% endif %}
-                </p>
-                <p class="backup-note" id="autoSaveLastRun">
-                  Last auto save:
-                  {% if auto_save_last_run %}
-                  {{ auto_save_last_run.strftime('%b %d, %Y %H:%M UTC') }}
-                  {% else %}
-                  Not yet
-                  {% endif %}
+                  <span>Stored at</span>
+                  <code>{{ state_backup_metadata.export_path }}</code>
                 </p>
               </div>
             </div>
             <div class="backup-grid">
               <div class="backup-panel">
-                <h3>Download a JSON copy</h3>
-                <p>Grab a portable snapshot before deploying or sending data to auditors.</p>
+                <h3>Download the backup</h3>
+                <p>Grab a JSON export of everything you see in the admin (submissions, chats, visitors, slots, settings).</p>
                 <form method="get" action="{{ url_for('download_admin_state') }}">
                   <button type="submit">Download backup</button>
                 </form>
-                <p class="backup-note">Downloads mirror what's in memory at the moment you click.</p>
+                <p class="backup-note">
+                  Each download overwrites <code>{{ state_backup_metadata.export_filename }}</code> at the server path below before sending it to you.
+                </p>
                 {% if state_backup_metadata.export_path %}
                 <p class="backup-note">
-                  We'll also save a copy to
-                  <code>{{ state_backup_metadata.export_path }}</code>
-                  for automatic restores.
+                  The current server copy lives at <code>{{ state_backup_metadata.export_path }}</code>.
                 </p>
                 {% endif %}
               </div>
               <div class="backup-panel">
                 <h3>Upload &amp; restore</h3>
-                <p>Import a JSON export to immediately overwrite the in-memory dashboard.</p>
-                <form
-                  method="post"
-                  action="{{ url_for('import_admin_state') }}"
-                  enctype="multipart/form-data"
-                  class="backup-upload"
-                >
-                  <input
-                    id="backupUploadInput"
-                    type="file"
-                    name="state_file"
-                    accept="application/json,.json"
-                    {% if state_backup_metadata.directory %}
-                    data-backup-dir="{{ state_backup_metadata.directory }}"
-                    {% endif %}
-                  />
-                  <button type="submit">Upload &amp; restore</button>
+                <p>Reload everything from the same <code>{{ state_backup_metadata.export_filename }}</code> file you just downloaded.</p>
+                <form method="post" action="{{ url_for('import_admin_state') }}">
+                  <button type="submit" {% if not state_backup_metadata.exists %}disabled{% endif %}>Upload &amp; restore</button>
                 </form>
-                <p class="backup-note">Use this when a teammate sends you their export.</p>
-                {% if state_backup_metadata.export_path %}
                 <p class="backup-note">
-                  Leave the file picker blank to restore the saved download from
-                  <code>{{ state_backup_metadata.export_path }}</code>.
+                  {% if state_backup_metadata.exists %}
+                  We'll pull the copy saved at <code>{{ state_backup_metadata.export_path }}</code> so you don't have to pick a file manually.
+                  {% else %}
+                  Download a backup first so we know where to load it from.
+                  {% endif %}
                 </p>
-                {% endif %}
               </div>
             </div>
             <div class="backup-meta">
-              <strong>Snapshot vault details</strong>
+              <strong>Backup file details</strong>
               <ul>
-                <li>Engine: SQLite database ({{ state_backup_metadata.filename }})</li>
-                <li>Status: {% if state_backup_metadata.exists %}Ready to load{% else %}Awaiting first save{% endif %}</li>
-                <li>Snapshots stored: {{ state_backup_metadata.total_snapshots or 0 }}</li>
+                <li>Filename: {{ state_backup_metadata.export_filename }}</li>
+                <li>Status: {% if state_backup_metadata.exists %}Ready to restore{% else %}Awaiting first download{% endif %}</li>
                 <li>
                   Location:
-                  <code>{{ state_backup_metadata.database_path }}</code>
+                  <code>{{ state_backup_metadata.export_path }}</code>
                   <button
                     type="button"
                     class="ghost-button ghost-button--small"
                     data-copy-backup-path
-                    data-copy-backup-value="{{ state_backup_metadata.database_path }}"
+                    data-copy-backup-value="{{ state_backup_metadata.export_path }}"
                   >
                     Copy path
                   </button>
                 </li>
               </ul>
-              {% if state_backup_metadata.counts %}
-              <strong>Included records</strong>
-              <ul>
-                <li>{{ state_backup_metadata.counts.submissions }} enquiries</li>
-                <li>{{ state_backup_metadata.counts.visitors }} visitors</li>
-                <li>{{ state_backup_metadata.counts.chats }} conversations</li>
-                <li>{{ state_backup_metadata.counts.dog_breeds }} dog breeds</li>
-                <li>{{ state_backup_metadata.counts.site_photos }} site photos</li>
-                <li>{{ state_backup_metadata.counts.appointments }} appointment slots</li>
-                <li>{{ state_backup_metadata.counts.coverage_areas }} coverage areas</li>
-                <li>{{ state_backup_metadata.counts.certificates }} certificates</li>
-              </ul>
-              {% endif %}
-              {% if state_backup_metadata.error %}
-              <p class="backup-note">{{ state_backup_metadata.error }}</p>
-              {% endif %}
             </div>
-            <section class="backup-history">
-              <div class="backup-history__header">
-                <h3>Save history</h3>
-                <p class="muted">
-                  Every manual and auto save is tracked here so you can load a specific snapshot or clear entries you no
-                  longer need.
-                </p>
-              </div>
-              <p
-                id="backupHistoryEmptyState"
-                class="backup-history__empty {% if backup_history_rows %}hidden{% endif %}"
-              >
-                No saves recorded yet. Manual saves and auto saves will show up here.
-              </p>
-              {% if backup_history_rows %}
-              <div class="backup-history__table-wrapper">
-                <table class="backup-history__table" aria-label="Backup history">
-                  <thead>
-                    <tr>
-                      <th scope="col">Saved at</th>
-                      <th scope="col">Stored snapshot</th>
-                      <th scope="col">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody data-backup-history-body>
-                    {% for entry in backup_history_rows %}
-                    <tr data-entry-id="{{ entry.id }}">
-                      <td>
-                        <div class="backup-history__stamp">
-                          <strong>{{ entry.saved_at_label }}</strong>
-                          <span class="backup-history__source">{{ entry.source_label }}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <div class="backup-history__storage">
-                          <strong>{{ entry.storage_label or 'Snapshot' }}</strong>
-                          <span class="backup-history__chip">{{ entry.storage_type or 'database' }}</span>
-                          {% if entry.legacy_path %}
-                          <code>{{ entry.legacy_path }}</code>
-                          {% endif %}
-                        </div>
-                      </td>
-                      <td>
-                        <div class="backup-history__actions">
-                          <form method="post" action="{{ url_for('load_backup_history_entry', entry_id=entry.id) }}">
-                            <button type="submit">Load backup</button>
-                          </form>
-                          <form method="post" action="{{ url_for('delete_backup_history_entry', entry_id=entry.id) }}">
-                            <button type="submit" class="ghost-button ghost-button--danger">Delete</button>
-                          </form>
-                        </div>
-                      </td>
-                    </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
-              {% endif %}
-            </section>
           </section>
         </section>
 
@@ -2817,67 +2506,6 @@
       </main>
     </div>
 
-    {% if state_backup_metadata.exists %}
-    {% set counts = state_backup_metadata.counts or {} %}
-    <div class="snapshot-summary" data-snapshot-summary hidden>
-      <div class="snapshot-summary__dialog" role="dialog" aria-modal="true" aria-labelledby="snapshotSummaryTitle">
-        <div class="snapshot-summary__header">
-          <div>
-            <p class="eyebrow">Latest snapshot</p>
-            <h4 id="snapshotSummaryTitle">Here's what will be restored</h4>
-          </div>
-          <button
-            type="button"
-            class="snapshot-summary__close"
-            aria-label="Close snapshot summary"
-            data-snapshot-summary-close
-          >
-            &times;
-          </button>
-        </div>
-        <p>
-          Loading now will replace your current dashboard with the save from
-          {{ state_backup_metadata.saved_at or 'your previous session' }}.
-        </p>
-        <ul class="snapshot-summary__list">
-          <li>
-            <span>Enquiries</span>
-            <strong>{{ counts.get('submissions', 0) }}</strong>
-          </li>
-          <li>
-            <span>Meet &amp; greet slots</span>
-            <strong>{{ counts.get('appointments', 0) }}</strong>
-          </li>
-          <li>
-            <span>Visitors</span>
-            <strong>{{ counts.get('visitors', 0) }}</strong>
-          </li>
-          <li>
-            <span>Chats</span>
-            <strong>{{ counts.get('chats', 0) }}</strong>
-          </li>
-          <li>
-            <span>Dog breeds</span>
-            <strong>{{ counts.get('dog_breeds', 0) }}</strong>
-          </li>
-          <li>
-            <span>Site photos</span>
-            <strong>{{ counts.get('site_photos', 0) }}</strong>
-          </li>
-          <li>
-            <span>Coverage areas</span>
-            <strong>{{ counts.get('coverage_areas', 0) }}</strong>
-          </li>
-          <li>
-            <span>Team certificates</span>
-            <strong>{{ counts.get('certificates', 0) }}</strong>
-          </li>
-        </ul>
-        <p class="snapshot-summary__footer">Click outside this card or press Esc to close.</p>
-      </div>
-    </div>
-    {% endif %}
-
     <script>
       (function () {
         const views = Array.from(document.querySelectorAll("[data-view]"));
@@ -2885,80 +2513,6 @@
         const triggers = Array.from(document.querySelectorAll("[data-open-view]"));
         const initialView = {{ active_view | tojson }};
         let activeView = initialView || "menu";
-        const historyTableBody = document.querySelector("[data-backup-history-body]");
-        const historyEmptyState = document.getElementById("backupHistoryEmptyState");
-
-        function addHistoryRow(entry) {
-          if (!historyTableBody || !entry || historyTableBody.querySelector(`[data-entry-id="${entry.id}"]`)) {
-            return;
-          }
-          if (historyEmptyState) {
-            historyEmptyState.classList.add("hidden");
-          }
-          const row = document.createElement("tr");
-          row.dataset.entryId = entry.id;
-
-          const stampCell = document.createElement("td");
-          const stamp = document.createElement("div");
-          stamp.className = "backup-history__stamp";
-          const savedAt = document.createElement("strong");
-          savedAt.textContent = entry.saved_at_label || entry.saved_at || "Just now";
-          const source = document.createElement("span");
-          source.className = "backup-history__source";
-          source.textContent = entry.source_label || entry.source || "Auto save";
-          stamp.appendChild(savedAt);
-          stamp.appendChild(source);
-          stampCell.appendChild(stamp);
-
-          const pathCell = document.createElement("td");
-          const storageWrapper = document.createElement("div");
-          storageWrapper.className = "backup-history__storage";
-          const storageLabel = document.createElement("strong");
-          storageLabel.textContent = entry.storage_label || "Snapshot";
-          storageWrapper.appendChild(storageLabel);
-          const chip = document.createElement("span");
-          chip.className = "backup-history__chip";
-          chip.textContent = entry.storage_type || "database";
-          storageWrapper.appendChild(chip);
-          if (entry.legacy_path) {
-            const legacyCode = document.createElement("code");
-            legacyCode.textContent = entry.legacy_path;
-            storageWrapper.appendChild(legacyCode);
-          }
-          pathCell.appendChild(storageWrapper);
-
-          const actionCell = document.createElement("td");
-          const actionWrapper = document.createElement("div");
-          actionWrapper.className = "backup-history__actions";
-          if (entry.load_url) {
-            const loadForm = document.createElement("form");
-            loadForm.method = "post";
-            loadForm.action = entry.load_url;
-            const loadButton = document.createElement("button");
-            loadButton.type = "submit";
-            loadButton.textContent = "Load backup";
-            loadForm.appendChild(loadButton);
-            actionWrapper.appendChild(loadForm);
-          }
-          if (entry.delete_url) {
-            const deleteForm = document.createElement("form");
-            deleteForm.method = "post";
-            deleteForm.action = entry.delete_url;
-            const deleteButton = document.createElement("button");
-            deleteButton.type = "submit";
-            deleteButton.className = "ghost-button ghost-button--danger";
-            deleteButton.textContent = "Delete";
-            deleteForm.appendChild(deleteButton);
-            actionWrapper.appendChild(deleteForm);
-          }
-          actionCell.appendChild(actionWrapper);
-
-          row.appendChild(stampCell);
-          row.appendChild(pathCell);
-          row.appendChild(actionCell);
-          historyTableBody.prepend(row);
-        }
-
         function setActiveView(viewName) {
           if (!viewName) {
             viewName = "menu";
@@ -3001,172 +2555,23 @@
           });
         }
 
-        const autoSaveController = document.getElementById("autoSaveController");
-        if (autoSaveController) {
-          const autoSaveEnabled = autoSaveController.dataset.autoSaveEnabled === "true";
-          const autoSaveUrl = autoSaveController.dataset.autoSaveUrl;
-          const initialLastRun = autoSaveController.dataset.autoSaveLastRun || "";
-          const statusEl = document.getElementById("autoSaveStatus");
-          const lastRunEl = document.getElementById("autoSaveLastRun");
-          const intervalMs = 60 * 1000;
-          let autoSaveTimer = null;
-          let autoSaveInFlight = false;
-
-          function setLastRunText(timestamp) {
-            if (!lastRunEl) {
-              return;
-            }
-            if (!timestamp) {
-              lastRunEl.textContent = "Last auto save: Not yet";
-              return;
-            }
-            const parsed = new Date(timestamp);
-            if (Number.isNaN(parsed.getTime())) {
-              lastRunEl.textContent = `Last auto save: ${timestamp}`;
-              return;
-            }
-            lastRunEl.textContent = `Last auto save: ${parsed.toLocaleString()}`;
-          }
-
-          function updateStatus(text) {
-            if (statusEl && text) {
-              statusEl.textContent = text;
-            }
-          }
-
-          async function runAutoSave() {
-            if (!autoSaveEnabled || autoSaveInFlight || document.visibilityState === "hidden") {
-              return;
-            }
-            if (!autoSaveUrl) {
-              return;
-            }
-            autoSaveInFlight = true;
-            updateStatus("Auto saving your dashboard...");
+        const copyButton = document.querySelector("[data-copy-backup-path]");
+        if (copyButton && copyButton.dataset.copyBackupValue) {
+          copyButton.addEventListener("click", async () => {
+            const originalText = copyButton.textContent;
             try {
-              const response = await fetch(autoSaveUrl, { method: "POST" });
-              if (!response.ok) {
-                updateStatus("Auto save paused. We'll retry soon.");
-                return;
-              }
-              const payload = await response.json().catch(() => ({}));
-              if (payload && payload.saved_at) {
-                setLastRunText(payload.saved_at);
-                updateStatus("Everything's saved.");
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(copyButton.dataset.copyBackupValue);
               } else {
-                updateStatus("Auto save is running.");
+                throw new Error("Clipboard API unavailable");
               }
-              if (payload && payload.history_entry) {
-                addHistoryRow(payload.history_entry);
-              }
+              copyButton.textContent = "Copied!";
             } catch (error) {
-              console.warn("Auto save failed", error);
-              updateStatus("Auto save paused (network issue).");
-            } finally {
-              autoSaveInFlight = false;
+              console.warn("Unable to copy backup path", error);
             }
-          }
-
-          function stopAutoSaveTimer() {
-            if (autoSaveTimer) {
-              clearInterval(autoSaveTimer);
-              autoSaveTimer = null;
-            }
-          }
-
-          function startAutoSaveTimer() {
-            if (!autoSaveEnabled || document.visibilityState === "hidden") {
-              return;
-            }
-            stopAutoSaveTimer();
-            autoSaveTimer = setInterval(runAutoSave, intervalMs);
-            runAutoSave();
-          }
-
-          setLastRunText(initialLastRun);
-          if (autoSaveEnabled) {
-            startAutoSaveTimer();
-            document.addEventListener("visibilitychange", () => {
-              stopAutoSaveTimer();
-              if (document.visibilityState === "visible") {
-                startAutoSaveTimer();
-              }
-            });
-          }
-        }
-
-        const backupUploadInput = document.getElementById("backupUploadInput");
-        if (backupUploadInput) {
-          const lastDir = backupUploadInput.dataset.backupDir;
-          if (lastDir) {
-            backupUploadInput.setAttribute("nwworkingdir", lastDir);
-            backupUploadInput.setAttribute("data-working-directory", lastDir);
-          }
-          const copyButton = document.querySelector("[data-copy-backup-path]");
-          const copyValue = (copyButton && copyButton.dataset.copyBackupValue) || lastDir;
-          if (copyButton && copyValue) {
-            copyButton.addEventListener("click", async () => {
-              const originalText = copyButton.textContent;
-              try {
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                  await navigator.clipboard.writeText(copyValue);
-                } else {
-                  throw new Error("Clipboard API unavailable");
-                }
-                copyButton.textContent = "Copied!";
-              } catch (error) {
-                console.warn("Unable to copy backup path", error);
-                copyButton.textContent = copyValue;
-              }
-              setTimeout(() => {
-                copyButton.textContent = originalText;
-              }, 2000);
-            });
-          }
-        }
-
-        const snapshotSummary = document.querySelector("[data-snapshot-summary]");
-        if (snapshotSummary) {
-          const openButtons = document.querySelectorAll("[data-snapshot-summary-open]");
-          const closeButton = snapshotSummary.querySelector("[data-snapshot-summary-close]");
-
-          function closeSummary() {
-            snapshotSummary.setAttribute("hidden", "hidden");
-            snapshotSummary.classList.remove("is-visible");
-          }
-
-          function openSummary() {
-            snapshotSummary.removeAttribute("hidden");
-            snapshotSummary.classList.add("is-visible");
-            if (closeButton) {
-              closeButton.focus();
-            }
-          }
-
-          openButtons.forEach((button) => {
-            button.addEventListener("click", (event) => {
-              event.preventDefault();
-              openSummary();
-            });
-          });
-
-          if (closeButton) {
-            closeButton.addEventListener("click", (event) => {
-              event.preventDefault();
-              closeSummary();
-            });
-          }
-
-          snapshotSummary.addEventListener("click", (event) => {
-            if (event.target === snapshotSummary) {
-              closeSummary();
-            }
-          });
-
-          document.addEventListener("keydown", (event) => {
-            if (event.key === "Escape" && !snapshotSummary.hasAttribute("hidden")) {
-              closeSummary();
-            }
+            setTimeout(() => {
+              copyButton.textContent = originalText;
+            }, 2000);
           });
         }
 
