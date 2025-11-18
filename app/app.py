@@ -1,6 +1,7 @@
 import json
 import os
 import queue
+import sqlite3
 import tempfile
 import threading
 import urllib.error
@@ -380,20 +381,7 @@ auto_save_enabled = False
 auto_save_last_run: Optional[datetime] = None
 SERVICE_NOTICE_DEFAULT_TEXT = "Website under construction - Do not place any bookings."
 site_service_notice = {"enabled": False, "message": SERVICE_NOTICE_DEFAULT_TEXT}
-STATE_BACKUP_FILENAME = "state_backup.json"
-_active_backup_directory = None
-
-# When admins request a manual backup we attempt to mirror the Windows-style
-# behaviour of saving the file directly to ``D:\andy1``.  This makes it easy
-# for a user to rely on a predictable location regardless of where the project
-# is running from.  The behaviour can also be customized for tests or other
-# environments through the ``DOG_WALKING_FIXED_BACKUP_PATH`` environment
-# variable.
-MANUAL_BACKUP_OVERRIDE_PATH = os.environ.get("DOG_WALKING_FIXED_BACKUP_PATH")
-if not MANUAL_BACKUP_OVERRIDE_PATH and os.name == "nt":
-    MANUAL_BACKUP_OVERRIDE_PATH = r"D:\\andy1"
-if MANUAL_BACKUP_OVERRIDE_PATH:
-    MANUAL_BACKUP_OVERRIDE_PATH = os.path.normpath(MANUAL_BACKUP_OVERRIDE_PATH)
+STATE_BACKUP_DB_FILENAME = "state_backups.sqlite3"
 
 
 def _backup_directory_candidates():
@@ -416,46 +404,67 @@ def _backup_directory_candidates():
     return directories
 
 
-def _manual_backup_path() -> Optional[str]:
-    """Return the fixed manual backup path when configured."""
-
-    return MANUAL_BACKUP_OVERRIDE_PATH
-
-
-def _existing_backup_path() -> Optional[str]:
-    """Return the path for the backup file if it already exists."""
-
-    global _active_backup_directory
-    manual_path = _manual_backup_path()
-    if manual_path and os.path.exists(manual_path):
-        directory = os.path.dirname(manual_path) or os.getcwd()
-        _active_backup_directory = directory
-        return manual_path
-    if _active_backup_directory:
-        path = os.path.join(_active_backup_directory, STATE_BACKUP_FILENAME)
-        if os.path.exists(path):
-            return path
-    for directory in _backup_directory_candidates():
-        path = os.path.join(directory, STATE_BACKUP_FILENAME)
-        if os.path.exists(path):
-            _active_backup_directory = directory
-            return path
-    return None
+def _state_backup_db_path() -> str:
+    override = os.environ.get("DOG_WALKING_BACKUP_DB_PATH")
+    if override:
+        return os.path.abspath(override)
+    try:
+        os.makedirs(app.instance_path, exist_ok=True)
+    except OSError:
+        pass
+    return os.path.join(app.instance_path, STATE_BACKUP_DB_FILENAME)
 
 
-def _reserve_backup_history_snapshot_path(directory: str) -> Optional[str]:
-    timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-    base_name = f"state_backup_{timestamp}"
-    attempt = 0
-    while attempt < 5:
-        suffix = f"_{attempt}" if attempt else ""
-        filename = f"{base_name}{suffix}.json"
-        path = os.path.join(directory, filename)
-        if os.path.exists(path):
-            attempt += 1
-            continue
-        return path
-    return None
+def _ensure_backup_db_initialized():
+    path = _state_backup_db_path()
+    directory = os.path.dirname(path)
+    if directory:
+        try:
+            os.makedirs(directory, exist_ok=True)
+        except OSError:
+            pass
+    with sqlite3.connect(path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS state_backups (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                saved_at TEXT NOT NULL,
+                source TEXT NOT NULL,
+                payload TEXT NOT NULL
+            )
+            """
+        )
+
+
+def _fetch_backup_row(storage_id: Optional[int] = None):
+    _ensure_backup_db_initialized()
+    path = _state_backup_db_path()
+    with sqlite3.connect(path) as connection:
+        connection.row_factory = sqlite3.Row
+        if storage_id is None:
+            return connection.execute(
+                "SELECT id, saved_at, source, payload FROM state_backups ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+        return connection.execute(
+            "SELECT id, saved_at, source, payload FROM state_backups WHERE id = ?",
+            (storage_id,),
+        ).fetchone()
+
+
+def _count_backup_rows() -> int:
+    _ensure_backup_db_initialized()
+    path = _state_backup_db_path()
+    with sqlite3.connect(path) as connection:
+        return connection.execute("SELECT COUNT(*) FROM state_backups").fetchone()[0]
+
+
+def _delete_backup_row(storage_id: Optional[int]):
+    if storage_id is None:
+        return
+    _ensure_backup_db_initialized()
+    path = _state_backup_db_path()
+    with sqlite3.connect(path) as connection:
+        connection.execute("DELETE FROM state_backups WHERE id = ?", (storage_id,))
 
 
 def _describe_backup_source(source: Optional[str]) -> str:
@@ -474,17 +483,25 @@ def _format_backup_history_timestamp(value) -> str:
     return str(value)
 
 
-def _record_backup_history(primary_path: str, snapshot_path: Optional[str], source: str, saved_at_value) -> dict:
+def _record_backup_history(
+    storage_label: str,
+    source: str,
+    saved_at_value,
+    *,
+    storage_id: Optional[int] = None,
+    storage_type: str = "database",
+) -> dict:
     global backup_history, next_backup_history_id
 
     timestamp = _parse_datetime(saved_at_value) or datetime.utcnow()
     entry = {
         "id": next_backup_history_id,
-        "file_path": snapshot_path or primary_path,
-        "primary_path": primary_path,
-        "snapshot_path": snapshot_path,
+        "storage_label": storage_label,
+        "storage_id": storage_id,
+        "storage_type": storage_type,
         "saved_at": timestamp,
         "source": source or "manual",
+        "legacy_path": None,
     }
     backup_history.insert(0, entry)
     next_backup_history_id += 1
@@ -494,9 +511,10 @@ def _record_backup_history(primary_path: str, snapshot_path: Optional[str], sour
 def _serialize_backup_history_entry(entry: dict) -> dict:
     return {
         "id": entry.get("id"),
-        "file_path": entry.get("file_path"),
-        "primary_path": entry.get("primary_path"),
-        "snapshot_path": entry.get("snapshot_path"),
+        "storage_label": entry.get("storage_label"),
+        "storage_id": entry.get("storage_id"),
+        "storage_type": entry.get("storage_type"),
+        "legacy_path": entry.get("legacy_path"),
         "saved_at": _serialize_datetime(entry.get("saved_at")),
         "source": entry.get("source"),
     }
@@ -507,7 +525,9 @@ def _present_backup_history_entry(entry: dict, include_urls: bool = False) -> di
         return {}
     payload = {
         "id": entry.get("id"),
-        "file_path": entry.get("file_path"),
+        "storage_label": entry.get("storage_label"),
+        "storage_type": entry.get("storage_type"),
+        "legacy_path": entry.get("legacy_path"),
         "saved_at": _serialize_datetime(entry.get("saved_at")),
         "saved_at_label": _format_backup_history_timestamp(entry.get("saved_at")),
         "source": entry.get("source"),
@@ -533,47 +553,41 @@ def _remove_backup_history_entry(entry_id: int):
     return entry
 
 
-def _write_state_backup(source: str = "manual", override_path: Optional[str] = None) -> Optional[dict]:
-    """Attempt to persist the serialized state to disk."""
+def _write_state_backup(source: str = "manual") -> Optional[dict]:
+    """Persist the serialized state to the managed database."""
 
-    global _active_backup_directory, next_backup_history_id
     state_payload = _serialize_state()
-    candidate_locations = []
-    if override_path:
-        override_directory = os.path.dirname(override_path) or os.getcwd()
-        candidate_locations.append((override_directory, override_path, False))
-    for directory in _backup_directory_candidates():
-        candidate_locations.append((directory, os.path.join(directory, STATE_BACKUP_FILENAME), True))
-    for directory, path, allow_snapshots in candidate_locations:
-        try:
-            os.makedirs(directory, exist_ok=True)
-        except OSError:
-            continue
-        snapshot_path = _reserve_backup_history_snapshot_path(directory) if allow_snapshots else None
-        history_entry = _record_backup_history(path, snapshot_path, source, state_payload.get("saved_at"))
-        state_payload_with_history = dict(state_payload)
-        state_payload_with_history["backup_history"] = [
-            _serialize_backup_history_entry(entry) for entry in backup_history
-        ]
-        state_payload_with_history["next_backup_history_id"] = next_backup_history_id
-        try:
-            with open(path, "w", encoding="utf-8") as backup_file:
-                json.dump(state_payload_with_history, backup_file, indent=2)
-        except OSError:
-            _remove_backup_history_entry(history_entry["id"])
-            next_backup_history_id -= 1
-            continue
-        if snapshot_path:
-            try:
-                with open(snapshot_path, "w", encoding="utf-8") as snapshot_file:
-                    json.dump(state_payload_with_history, snapshot_file, indent=2)
-            except OSError:
-                snapshot_path = None
-                history_entry["file_path"] = history_entry["primary_path"]
-                history_entry["snapshot_path"] = None
-        _active_backup_directory = directory
-        return {"path": path, "history_path": snapshot_path, "history_entry": history_entry}
-    return None
+    try:
+        _ensure_backup_db_initialized()
+        path = _state_backup_db_path()
+        with sqlite3.connect(path) as connection:
+            cursor = connection.execute(
+                "INSERT INTO state_backups (saved_at, source, payload) VALUES (?, ?, ?)",
+                (state_payload.get("saved_at"), source or "manual", "{}"),
+            )
+            storage_id = cursor.lastrowid
+            storage_label = f"Snapshot #{storage_id} (database)"
+            history_entry = _record_backup_history(
+                storage_label,
+                source,
+                state_payload.get("saved_at"),
+                storage_id=storage_id,
+                storage_type="database",
+            )
+            state_payload_with_history = dict(state_payload)
+            state_payload_with_history["backup_history"] = [
+                _serialize_backup_history_entry(entry) for entry in backup_history
+            ]
+            state_payload_with_history["next_backup_history_id"] = next_backup_history_id
+            payload_text = json.dumps(state_payload_with_history, indent=2)
+            connection.execute(
+                "UPDATE state_backups SET payload = ? WHERE id = ?",
+                (payload_text, storage_id),
+            )
+    except sqlite3.Error:
+        return None
+
+    return {"history_entry": history_entry, "storage_id": storage_id}
 
 
 def _serialize_datetime(value):
@@ -911,16 +925,24 @@ def _load_state(state: dict):
     for payload in state.get("backup_history", []):
         if not isinstance(payload, dict):
             continue
+        storage_label = payload.get("storage_label")
+        if not storage_label:
+            # Backwards compatibility with file-based backups
+            storage_label = payload.get("file_path") or payload.get("primary_path") or "Legacy snapshot"
+        storage_type = payload.get("storage_type")
+        if not storage_type:
+            storage_type = "file" if payload.get("file_path") else "database"
         entry = {
             "id": _coerce_int(payload.get("id"), _next_id_from_rows(history_entries)),
-            "file_path": payload.get("file_path"),
-            "primary_path": payload.get("primary_path") or payload.get("file_path"),
-            "snapshot_path": payload.get("snapshot_path"),
+            "storage_label": storage_label,
+            "storage_id": payload.get("storage_id"),
+            "storage_type": storage_type,
             "saved_at": _parse_datetime(payload.get("saved_at")) or datetime.utcnow(),
             "source": payload.get("source") or "manual",
+            "legacy_path": payload.get("legacy_path")
+            or payload.get("file_path")
+            or payload.get("primary_path"),
         }
-        if not entry["file_path"]:
-            entry["file_path"] = entry["primary_path"]
         history_entries.append(entry)
     history_entries.sort(key=lambda item: item.get("saved_at"), reverse=True)
     backup_history = history_entries
@@ -932,33 +954,46 @@ def _load_state(state: dict):
 
 
 def _get_state_backup_metadata() -> dict:
-    path = _existing_backup_path()
+    row = _fetch_backup_row()
+    database_path = _state_backup_db_path()
     metadata = {
-        "exists": path is not None,
-        "filename": os.path.basename(path or STATE_BACKUP_FILENAME),
+        "exists": row is not None,
+        "filename": STATE_BACKUP_DB_FILENAME,
+        "database_path": database_path,
+        "directory": os.path.dirname(database_path) if database_path else "",
+        "total_snapshots": _count_backup_rows(),
     }
-    if not metadata["exists"]:
+    if not row:
         return metadata
-    metadata["directory"] = os.path.dirname(path)
-    metadata["size"] = os.path.getsize(path)
-    metadata["modified_at"] = datetime.fromtimestamp(os.path.getmtime(path)).isoformat()
+    metadata["saved_at"] = row["saved_at"]
+    metadata["latest_snapshot_id"] = row["id"]
     try:
-        with open(path, "r", encoding="utf-8") as backup_file:
-            data = json.load(backup_file)
-        metadata["saved_at"] = data.get("saved_at")
+        payload = json.loads(row["payload"])
         metadata["counts"] = {
-            "submissions": len(data.get("submissions", [])),
-            "appointments": len(data.get("appointment_slots", [])),
-            "visitors": len((data.get("visitor_stats") or {})),
-            "chats": len((data.get("chat_conversations") or {})),
-            "dog_breeds": len(data.get("dog_breeds", [])),
-            "site_photos": len((data.get("site_photos") or {})),
-            "coverage_areas": len(data.get("coverage_areas", [])),
-            "certificates": len(data.get("certificates", [])),
+            "submissions": len(payload.get("submissions", [])),
+            "appointments": len(payload.get("appointment_slots", [])),
+            "visitors": len((payload.get("visitor_stats") or {})),
+            "chats": len((payload.get("chat_conversations") or {})),
+            "dog_breeds": len(payload.get("dog_breeds", [])),
+            "site_photos": len((payload.get("site_photos") or {})),
+            "coverage_areas": len(payload.get("coverage_areas", [])),
+            "certificates": len(payload.get("certificates", [])),
         }
-    except (OSError, ValueError, json.JSONDecodeError):
-        metadata["error"] = "Unable to read backup details"
+    except (ValueError, json.JSONDecodeError):
+        metadata["error"] = "Latest snapshot could not be read"
     return metadata
+
+
+def _load_state_from_database(storage_id: Optional[int] = None) -> bool:
+    row = _fetch_backup_row(storage_id)
+    if not row:
+        return False
+    try:
+        payload = json.loads(row["payload"])
+    except (TypeError, json.JSONDecodeError):
+        return False
+    _load_state(payload)
+    return True
 
 
 def _get_submission(submission_id: int):
@@ -1588,7 +1623,7 @@ def update_site_photo():
 
 @app.route("/admin/state/save", methods=["POST"])
 def save_admin_state():
-    result = _write_state_backup(source="manual", override_path=_manual_backup_path())
+    result = _write_state_backup(source="manual")
     if not result:
         return redirect(url_for("admin_page", state_action="save_failed", view="backups"))
     return redirect(url_for("admin_page", state_action="saved", view="backups"))
@@ -1625,10 +1660,18 @@ def run_auto_save():
 @app.route("/admin/state/history/<int:entry_id>/load", methods=["POST"])
 def load_backup_history_entry(entry_id: int):
     entry = _get_backup_history_entry(entry_id)
-    if not entry or not entry.get("file_path") or not os.path.exists(entry["file_path"]):
+    if not entry:
+        return redirect(url_for("admin_page", state_action="history_missing", view="backups"))
+    storage_id = entry.get("storage_id")
+    if storage_id:
+        if not _load_state_from_database(storage_id):
+            return redirect(url_for("admin_page", state_action="history_load_failed", view="backups"))
+        return redirect(url_for("admin_page", state_action="history_loaded", view="backups"))
+    legacy_path = entry.get("legacy_path")
+    if not legacy_path or not os.path.exists(legacy_path):
         return redirect(url_for("admin_page", state_action="history_missing", view="backups"))
     try:
-        with open(entry["file_path"], "r", encoding="utf-8") as backup_file:
+        with open(legacy_path, "r", encoding="utf-8") as backup_file:
             data = json.load(backup_file)
     except (OSError, json.JSONDecodeError):
         return redirect(url_for("admin_page", state_action="history_load_failed", view="backups"))
@@ -1641,11 +1684,13 @@ def delete_backup_history_entry(entry_id: int):
     entry = _remove_backup_history_entry(entry_id)
     if not entry:
         return redirect(url_for("admin_page", state_action="history_missing", view="backups"))
-    snapshot_path = entry.get("file_path")
-    primary_path = entry.get("primary_path")
-    if snapshot_path and snapshot_path != primary_path and os.path.exists(snapshot_path):
+    storage_id = entry.get("storage_id")
+    if storage_id:
+        _delete_backup_row(storage_id)
+    legacy_path = entry.get("legacy_path")
+    if legacy_path and os.path.exists(legacy_path):
         try:
-            os.remove(snapshot_path)
+            os.remove(legacy_path)
         except OSError:
             pass
     return redirect(url_for("admin_page", state_action="history_deleted", view="backups"))
@@ -1653,15 +1698,11 @@ def delete_backup_history_entry(entry_id: int):
 
 @app.route("/admin/state/load", methods=["POST"])
 def load_admin_state():
-    path = _existing_backup_path()
-    if not path or not os.path.exists(path):
+    row = _fetch_backup_row()
+    if not row:
         return redirect(url_for("admin_page", state_action="missing", view="backups"))
-    try:
-        with open(path, "r", encoding="utf-8") as backup_file:
-            data = json.load(backup_file)
-    except (OSError, json.JSONDecodeError):
+    if not _load_state_from_database(row["id"]):
         return redirect(url_for("admin_page", state_action="load_failed", view="backups"))
-    _load_state(data)
     return redirect(url_for("admin_page", state_action="loaded", view="backups"))
 
 
