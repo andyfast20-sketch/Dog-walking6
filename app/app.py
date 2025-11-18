@@ -382,7 +382,7 @@ auto_save_last_run: Optional[datetime] = None
 SERVICE_NOTICE_DEFAULT_TEXT = "Website under construction - Do not place any bookings."
 site_service_notice = {"enabled": False, "message": SERVICE_NOTICE_DEFAULT_TEXT}
 STATE_BACKUP_DB_FILENAME = "state_backups.sqlite3"
-STATE_EXPORT_FILENAME = "latest_admin_export.json"
+STATE_EXPORT_FILENAME = "andy.json"
 _cached_backup_db_path: Optional[str] = None
 _cached_export_file_path: Optional[str] = None
 
@@ -1038,35 +1038,25 @@ def _load_state(state: dict):
 
 
 def _get_state_backup_metadata() -> dict:
-    row = _fetch_backup_row()
-    database_path = _state_backup_db_path()
+    export_path = _state_export_file_path()
     metadata = {
-        "exists": row is not None,
-        "filename": STATE_BACKUP_DB_FILENAME,
-        "database_path": database_path,
-        "directory": os.path.dirname(database_path) if database_path else "",
-        "total_snapshots": _count_backup_rows(),
-        "export_path": _state_export_file_path(),
+        "exists": False,
+        "filename": STATE_EXPORT_FILENAME,
+        "database_path": export_path,
+        "directory": os.path.dirname(export_path) if export_path else "",
+        "total_snapshots": 0,
+        "export_path": export_path,
         "export_filename": STATE_EXPORT_FILENAME,
     }
-    if not row:
+    if not export_path:
         return metadata
-    metadata["saved_at"] = row["saved_at"]
-    metadata["latest_snapshot_id"] = row["id"]
-    try:
-        payload = json.loads(row["payload"])
-        metadata["counts"] = {
-            "submissions": len(payload.get("submissions", [])),
-            "appointments": len(payload.get("appointment_slots", [])),
-            "visitors": len((payload.get("visitor_stats") or {})),
-            "chats": len((payload.get("chat_conversations") or {})),
-            "dog_breeds": len(payload.get("dog_breeds", [])),
-            "site_photos": len((payload.get("site_photos") or {})),
-            "coverage_areas": len(payload.get("coverage_areas", [])),
-            "certificates": len(payload.get("certificates", [])),
-        }
-    except (ValueError, json.JSONDecodeError):
-        metadata["error"] = "Latest snapshot could not be read"
+    if os.path.exists(export_path):
+        metadata["exists"] = True
+        try:
+            saved_at = datetime.utcfromtimestamp(os.path.getmtime(export_path))
+            metadata["saved_at"] = saved_at.strftime("%b %d, %Y %H:%M UTC")
+        except OSError:
+            pass
     return metadata
 
 
@@ -1693,7 +1683,6 @@ def admin_page():
         meet_greet_enabled=_meet_greet_setting(),
         auto_save_enabled=auto_save_enabled,
         auto_save_last_run=auto_save_last_run,
-        backup_history_rows=[_present_backup_history_entry(entry) for entry in backup_history],
     )
 
 
@@ -1803,8 +1792,7 @@ def download_admin_state():
 
     payload = json.dumps(_serialize_state(), indent=2)
     _write_state_export_payload(payload)
-    timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-    filename = f"dog-walking-admin-{timestamp}.json"
+    filename = STATE_EXPORT_FILENAME
     headers = {
         "Content-Disposition": f"attachment; filename={filename}",
         "Cache-Control": "no-store",
