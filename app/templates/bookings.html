@@ -152,6 +152,22 @@
         margin: 0;
         font-weight: 600;
       }
+      .inline-note {
+        display: block;
+        margin-top: 0.75rem;
+        font-size: 0.95rem;
+        color: #0369a1;
+        font-weight: 600;
+      }
+      .info-banner {
+        margin-bottom: 1.25rem;
+        padding: 0.9rem 1.2rem;
+        border-radius: 18px;
+        background: rgba(191, 219, 254, 0.4);
+        border: 1px solid rgba(14, 165, 233, 0.45);
+        color: #0c4a6e;
+        font-weight: 600;
+      }
       @media (max-width: 640px) {
         .primary-nav {
           flex-direction: column;
@@ -222,6 +238,10 @@
         gap: 0.75rem;
         background: linear-gradient(135deg, rgba(226, 232, 240, 0.45), rgba(255, 255, 255, 0.9));
       }
+      .option-card.is-muted {
+        border-style: dashed;
+        background: linear-gradient(135deg, rgba(191, 219, 254, 0.35), rgba(255, 255, 255, 0.95));
+      }
       .option-card h3 {
         margin: 0;
         font-size: 1.4rem;
@@ -229,6 +249,12 @@
       .option-card p {
         margin: 0;
         color: #475569;
+      }
+      .option-card__note {
+        margin: 0;
+        font-size: 0.9rem;
+        color: #0e7490;
+        font-weight: 500;
       }
       .option-card a {
         align-self: flex-start;
@@ -544,11 +570,10 @@
             <p class="eyebrow">Bookings</p>
             <h1>Choose the perfect first step for your pup.</h1>
             <p>
-              {% if meet_greet_enabled %}
               Book a walk instantly or schedule a concierge-style meet &amp; greet so we can learn every quirk,
               routine, and cuddle cue before services begin.
-              {% else %}
-              Book a walk instantly and we'll confirm faster than your pup can fetch a leash.
+              {% if not meet_greet_enabled %}
+              <span class="inline-note">Meet &amp; greet bookings stay available here even when the homepage CTA is turned off.</span>
               {% endif %}
             </p>
             <div class="options-grid">
@@ -557,13 +582,14 @@
                 <p>Grab an available time from our live calendar and get instant confirmation.</p>
                 <a href="{{ home_booking_url }}">Browse walk times</a>
               </div>
-              {% if meet_greet_enabled %}
-              <div class="option-card">
+              <div class="option-card {% if not meet_greet_enabled %}is-muted{% endif %}">
                 <h3>Book a Meet &amp; Greet</h3>
                 <p>Invite us over for a relaxed 30-minute visit where we connect with your dog and walk your setup.</p>
+                {% if not meet_greet_enabled %}
+                <p class="option-card__note">This option is hidden from the homepage, but you can still reserve a time on this page.</p>
+                {% endif %}
                 <a class="secondary" href="#meetSlots">Browse available slots</a>
               </div>
-              {% endif %}
             </div>
           </div>
           <figure>
@@ -573,8 +599,10 @@
             />
           </figure>
         </section>
-        {% if meet_greet_enabled %}
         <section id="meetSlots">
+          {% if not meet_greet_enabled %}
+          <div class="info-banner" role="status">Meet &amp; greet scheduling remains available here even when the public CTA is switched off.</div>
+          {% endif %}
           <div class="eyebrow" style="color: #0ea5e9">Live openings</div>
           <h2 style="margin-top: 0">Reserve a meet &amp; greet time</h2>
           <p style="color: #475569">Pick the concierge visit that fits your schedule. We'll confirm instantly.</p>
@@ -660,7 +688,6 @@
             </div>
           </div>
         </section>
-        {% endif %}
       </main>
       <footer>&copy; {{ datetime.utcnow().year }} Happy Trails Dog Walking. All rights reserved.</footer>
     </div>
