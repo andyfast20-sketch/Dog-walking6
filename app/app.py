@@ -383,6 +383,18 @@ site_service_notice = {"enabled": False, "message": SERVICE_NOTICE_DEFAULT_TEXT}
 STATE_BACKUP_FILENAME = "state_backup.json"
 _active_backup_directory = None
 
+# When admins request a manual backup we attempt to mirror the Windows-style
+# behaviour of saving the file directly to ``D:\andy1``.  This makes it easy
+# for a user to rely on a predictable location regardless of where the project
+# is running from.  The behaviour can also be customized for tests or other
+# environments through the ``DOG_WALKING_FIXED_BACKUP_PATH`` environment
+# variable.
+MANUAL_BACKUP_OVERRIDE_PATH = os.environ.get("DOG_WALKING_FIXED_BACKUP_PATH")
+if not MANUAL_BACKUP_OVERRIDE_PATH and os.name == "nt":
+    MANUAL_BACKUP_OVERRIDE_PATH = r"D:\\andy1"
+if MANUAL_BACKUP_OVERRIDE_PATH:
+    MANUAL_BACKUP_OVERRIDE_PATH = os.path.normpath(MANUAL_BACKUP_OVERRIDE_PATH)
+
 
 def _backup_directory_candidates():
     """Return a list of writeable directories we can attempt for backups."""
@@ -404,10 +416,21 @@ def _backup_directory_candidates():
     return directories
 
 
+def _manual_backup_path() -> Optional[str]:
+    """Return the fixed manual backup path when configured."""
+
+    return MANUAL_BACKUP_OVERRIDE_PATH
+
+
 def _existing_backup_path() -> Optional[str]:
     """Return the path for the backup file if it already exists."""
 
     global _active_backup_directory
+    manual_path = _manual_backup_path()
+    if manual_path and os.path.exists(manual_path):
+        directory = os.path.dirname(manual_path) or os.getcwd()
+        _active_backup_directory = directory
+        return manual_path
     if _active_backup_directory:
         path = os.path.join(_active_backup_directory, STATE_BACKUP_FILENAME)
         if os.path.exists(path):
@@ -510,18 +533,23 @@ def _remove_backup_history_entry(entry_id: int):
     return entry
 
 
-def _write_state_backup(source: str = "manual") -> Optional[dict]:
+def _write_state_backup(source: str = "manual", override_path: Optional[str] = None) -> Optional[dict]:
     """Attempt to persist the serialized state to disk."""
 
     global _active_backup_directory, next_backup_history_id
     state_payload = _serialize_state()
+    candidate_locations = []
+    if override_path:
+        override_directory = os.path.dirname(override_path) or os.getcwd()
+        candidate_locations.append((override_directory, override_path, False))
     for directory in _backup_directory_candidates():
+        candidate_locations.append((directory, os.path.join(directory, STATE_BACKUP_FILENAME), True))
+    for directory, path, allow_snapshots in candidate_locations:
         try:
             os.makedirs(directory, exist_ok=True)
         except OSError:
             continue
-        path = os.path.join(directory, STATE_BACKUP_FILENAME)
-        snapshot_path = _reserve_backup_history_snapshot_path(directory)
+        snapshot_path = _reserve_backup_history_snapshot_path(directory) if allow_snapshots else None
         history_entry = _record_backup_history(path, snapshot_path, source, state_payload.get("saved_at"))
         state_payload_with_history = dict(state_payload)
         state_payload_with_history["backup_history"] = [
@@ -1560,7 +1588,8 @@ def update_site_photo():
 
 @app.route("/admin/state/save", methods=["POST"])
 def save_admin_state():
-    if not _write_state_backup(source="manual"):
+    result = _write_state_backup(source="manual", override_path=_manual_backup_path())
+    if not result:
         return redirect(url_for("admin_page", state_action="save_failed", view="backups"))
     return redirect(url_for("admin_page", state_action="saved", view="backups"))
 
