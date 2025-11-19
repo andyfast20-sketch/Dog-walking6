@@ -2554,6 +2554,9 @@
           navButtons.forEach((button) => {
             button.classList.toggle("is-active", button.dataset.openView === viewName);
           });
+          document.dispatchEvent(
+            new CustomEvent("admin:view-changed", { detail: { view: viewName } })
+          );
         }
 
         triggers.forEach((trigger) => {
@@ -2628,6 +2631,7 @@
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         let audioCtx = null;
         let audioUnlocked = false;
+        let previousWaitingCount = 0;
         if (!messagesEl || !form) {
           return;
         }
@@ -2864,6 +2868,10 @@
 
         function updateWaitingState() {
           const waitingCount = unreadVisitors.size;
+          if (waitingCount > previousWaitingCount && !chatWindowOpen) {
+            playNotificationSound();
+          }
+          previousWaitingCount = waitingCount;
           setIndicator(waitingCount > 0, waitingCount);
           updateChatStatus(waitingCount);
           updateConversationSelect();
@@ -3068,6 +3076,13 @@
           updateWaitingState();
         }
 
+        document.addEventListener("admin:view-changed", (event) => {
+          const viewName = event?.detail?.view || "";
+          if (viewName !== "chat") {
+            closeChatWindow();
+          }
+        });
+
         const unlockEvents = [openButton, closeButton, form];
         unlockEvents.forEach((element) => {
           if (!element) return;
@@ -3186,6 +3201,7 @@
           }
           activeVisitorId = getDefaultVisitor();
           updateFormState();
+          previousWaitingCount = unreadVisitors.size;
           updateWaitingState();
         }
 
