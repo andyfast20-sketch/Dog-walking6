@@ -1600,6 +1600,37 @@ def _pending_conversation_count() -> int:
     )
 
 
+def _safe_last_visit(visitor: dict) -> datetime:
+    """Return a sortable last_visit value even when malformed data is present."""
+
+    last_visit = visitor.get("last_visit")
+    if isinstance(last_visit, datetime):
+        return last_visit
+    parsed = _parse_datetime(last_visit)
+    if isinstance(parsed, datetime):
+        return parsed
+    first_visit = visitor.get("first_visit")
+    if isinstance(first_visit, datetime):
+        return first_visit
+    parsed_first = _parse_datetime(first_visit)
+    if isinstance(parsed_first, datetime):
+        return parsed_first
+    return datetime.min
+
+
+def _normalize_visitor(visitor: dict) -> dict:
+    """Ensure visitor metadata always includes datetime values for templates."""
+
+    normalized = dict(visitor)
+    normalized["first_visit"] = _parse_datetime(normalized.get("first_visit")) or datetime.utcnow()
+    normalized["last_visit"] = _parse_datetime(normalized.get("last_visit")) or normalized["first_visit"]
+    normalized.setdefault("visits", 0)
+    normalized.setdefault("location", "Unknown")
+    normalized.setdefault("user_agent", "Unknown")
+    normalized.setdefault("accept_language", "Unknown")
+    return normalized
+
+
 def _mark_conversation_as_read(visitor_id: Optional[str] = None):
     targets = []
     if visitor_id:
@@ -1831,11 +1862,11 @@ def hello_world_page(page_id: int):
 def admin_page():
     requested_view = (request.args.get("view") or "menu").strip().lower()
     active_view = requested_view if requested_view in ADMIN_VIEWS else "menu"
-    visitor_rows = sorted(
-        visitor_stats.items(),
-        key=lambda item: item[1]["last_visit"],
-        reverse=True,
-    )
+    visitor_rows = []
+    for ip_address, visitor in visitor_stats.items():
+        normalized = _normalize_visitor(visitor)
+        visitor_rows.append((ip_address, normalized))
+    visitor_rows.sort(key=lambda item: _safe_last_visit(item[1]), reverse=True)
     conversation_rows = [
         data for data in (_serialize_conversation(cid) for cid in chat_conversations)
         if data is not None
