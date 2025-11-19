@@ -543,6 +543,20 @@ def _write_state_export_payload(payload_text: str) -> Optional[str]:
     return export_path
 
 
+def _read_state_export_payload() -> Optional[str]:
+    """Load the serialized state from the auto-restore JSON file when available."""
+
+    export_path = _state_export_file_path()
+    if not os.path.exists(export_path):
+        return None
+    try:
+        with open(export_path, "r", encoding="utf-8") as export_file:
+            return export_file.read()
+    except OSError:
+        app.logger.warning("Unable to read admin export from %s", export_path)
+        return None
+
+
 def _state_backup_db_path() -> str:
     """Return a writeable path for the sqlite backup database."""
 
@@ -798,6 +812,8 @@ def load_data(
 ) -> bool:
     if storage_id is None:
         payload_text = _kv_get(_latest_state_key())
+        if not payload_text:
+            payload_text = _read_state_export_payload()
         if not payload_text:
             return False
     else:

@@ -188,3 +188,17 @@ def test_import_route_accepts_uploaded_file(app_module):
     assert response.status_code == 302
     assert "state_action=imported" in response.headers.get("Location", "")
     assert app_module.meet_greet_enabled is False
+
+
+def test_load_data_falls_back_to_auto_export(tmp_path, monkeypatch, app_module):
+    monkeypatch.setattr(app_module, "_backup_directory_candidates", lambda: [str(tmp_path)])
+    monkeypatch.setattr(app_module, "_cached_export_file_path", None)
+    state = app_module._serialize_state()
+    state["dog_breeds"] = [{"id": 99, "name": "Pocket Beagle"}]
+    export_path = tmp_path / app_module.STATE_EXPORT_FILENAME
+    export_path.write_text(json.dumps(state), encoding="utf-8")
+    monkeypatch.setattr(app_module, "_kv_get", lambda key: None)
+    app_module.dog_breeds = []
+
+    assert app_module.load_data() is True
+    assert any(breed["name"] == "Pocket Beagle" for breed in app_module.dog_breeds)
