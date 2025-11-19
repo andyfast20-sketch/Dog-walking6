@@ -37,3 +37,23 @@ def test_admin_page_skips_invalid_visitors():
     assert response.status_code == 200
     assert b"Admin" in response.data
 
+
+def test_admin_page_handles_malformed_conversations():
+    module = importlib.import_module("app.app")
+    module.chat_conversations = {
+        "abc123": {
+            "visitor_id": "abc123",
+            "ip_address": "203.0.113.55",
+            "created_at": "not-a-date",
+            "messages": "totally-not-a-list",
+        }
+    }
+
+    client = module.app.test_client()
+
+    response = client.get("/admin")
+
+    assert response.status_code == 200
+    assert b"Admin" in response.data
+    module.chat_conversations = {}
+

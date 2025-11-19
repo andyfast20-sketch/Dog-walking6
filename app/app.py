@@ -1575,10 +1575,13 @@ def _serialize_conversation(visitor_id: str):
         for message in messages
         if isinstance(message, dict)
     )
+    created_at = conversation.get("created_at")
+    if not isinstance(created_at, datetime):
+        created_at = _parse_datetime(created_at) or datetime.utcnow()
     return {
         "visitor_id": visitor_id,
         "ip_address": conversation.get("ip_address", "Unknown"),
-        "created_at": conversation.get("created_at", datetime.utcnow()).isoformat(),
+        "created_at": created_at.isoformat(),
         "unread": unread,
         "message_count": len(messages),
     }
@@ -1599,14 +1602,21 @@ def _all_messages():
 
 
 def _pending_conversation_count() -> int:
-    return sum(
-        1
-        for conversation in chat_conversations.values()
+    pending = 0
+    for conversation in chat_conversations.values():
+        if not isinstance(conversation, dict):
+            continue
+        messages = conversation.get("messages") or []
+        if not isinstance(messages, (list, tuple)):
+            messages = []
         if any(
-            message["sender"] == "visitor" and not message.get("seen_by_admin", False)
-            for message in conversation["messages"]
-        )
-    )
+            isinstance(message, dict)
+            and message.get("sender") == "visitor"
+            and not message.get("seen_by_admin", False)
+            for message in messages
+        ):
+            pending += 1
+    return pending
 
 
 def _safe_last_visit(visitor: dict) -> datetime:
