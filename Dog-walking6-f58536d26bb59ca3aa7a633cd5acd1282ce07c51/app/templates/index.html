@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Happy Trails Dog Walking</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chat-widget.css') }}" />
+    <style>
+      :root {
+        font-family: "Poppins", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont,
+          "Helvetica Neue", sans-serif;
+        color: #0f172a;
+        background-color: #f6f8fb;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(circle at top, #fdf4ff 0%, #f5f7ff 30%, #eef2ff 60%, #f6f8fb 100%);
+        color: #0f172a;
+      }
+      img {
+        max-width: 100%;
+        display: block;
+      }
+      .hidden {
+        display: none !important;
+      }
+      .site-shell {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+      .site-header {
+        position: relative;
+        overflow: hidden;
+        padding: 0 clamp(1rem, 4vw, 4rem) clamp(3.5rem, 6vw, 5rem);
+      }
+      .site-header::after {
+        content: "";
+        position: absolute;
+        inset: 2rem 1rem auto auto;
+        width: clamp(260px, 30vw, 420px);
+        aspect-ratio: 1;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.9), transparent 65%);
+        z-index: 0;
+      }
+      .primary-nav {
+        position: sticky;
+        top: 0;
+        left: 0;
+        width: 100%;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1.1rem clamp(1rem, 3vw, 2.5rem);
+        margin-bottom: clamp(1.5rem, 4vw, 3rem);
+        border-radius: 0;
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(49, 46, 129, 0.92));
+        border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+        box-shadow: 0 30px 60px rgba(15, 23, 42, 0.35);
+        backdrop-filter: blur(10px);
+        overflow: hidden;
+      }
+      .primary-nav::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at 10% 50%, rgba(94, 234, 212, 0.35), transparent 55%),
+          radial-gradient(circle at 80% 20%, rgba(236, 72, 153, 0.3), transparent 50%);
+        opacity: 0.9;
+        mix-blend-mode: screen;
+        z-index: -1;
+      }
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        font-weight: 700;
+        font-size: 1.2rem;
+        color: #f8fafc;
+        letter-spacing: 0.02em;
+        text-decoration: none;
+      }
+      .logo span {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, rgba(94, 234, 212, 0.8), rgba(236, 72, 153, 0.9));
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-size: 1.35rem;
+      }
+      .nav-links {
+        display: flex;
+        gap: 1.25rem;
+        font-size: 0.95rem;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .nav-links a {
+        text-decoration: none;
+        color: rgba(248, 250, 252, 0.85);
+        font-weight: 600;
+        position: relative;
+        padding-bottom: 0.3rem;
+      }
+      .nav-links a:hover,
+      .nav-links a:focus-visible {
+        color: #fff;
+      }
+      .nav-links a::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        height: 3px;
+        width: 0;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #5eead4, #a5b4fc, #f472b6);
+        transition: width 0.3s ease;
+      }
+      .nav-links a:hover::after,
+      .nav-links a.is-active::after {
+        width: 100%;
+      }
+      .nav-cta {
+        text-decoration: none;
+        font-size: 0.9rem;
+        font-weight: 600;
+        padding: 0.65rem 1.25rem;
+        border-radius: 999px;
+        color: #0f172a;
+        background: #fef3c7;
+        box-shadow: 0 12px 30px rgba(252, 211, 77, 0.35);
+        border: 1px solid rgba(253, 230, 138, 0.8);
+      }
+      .nav-cta:hover,
+      .nav-cta:focus-visible {
+        background: #fde68a;
+        box-shadow: 0 20px 35px rgba(252, 211, 77, 0.45);
+      }
+      .service-banner {
+        width: 100%;
+        margin: 0 auto clamp(1.5rem, 3vw, 2.5rem);
+        padding: 0.9rem 1.25rem;
+        border-radius: 18px;
+        background: rgba(254, 215, 170, 0.95);
+        border: 1px solid rgba(251, 146, 60, 0.4);
+        color: #7c2d12;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        box-shadow: 0 15px 35px rgba(249, 115, 22, 0.25);
+      }
+      .service-banner span {
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.75rem;
+        color: rgba(124, 45, 18, 0.9);
+      }
+      .service-banner p {
+        margin: 0;
+        font-weight: 600;
+      }
+      @media (max-width: 640px) {
+        .primary-nav {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 0.75rem;
+        }
+        .nav-links {
+          flex-wrap: wrap;
+        }
+        .nav-cta {
+          align-self: stretch;
+          text-align: center;
+        }
+      }
+      .hero {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: clamp(2rem, 4vw, 4rem);
+        margin-top: 3rem;
+        position: relative;
+        z-index: 1;
+      }
+      .hero h1 {
+        font-size: clamp(2.5rem, 5vw, 3.75rem);
+        margin: 0 0 1rem;
+        line-height: 1.1;
+      }
+      .hero p {
+        margin: 0 0 1.25rem;
+        color: #475569;
+        font-size: 1.1rem;
+      }
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: center;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        border-radius: 999px;
+        padding: 0.9rem 1.5rem;
+        border: none;
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+      .btn-primary {
+        background: linear-gradient(135deg, #2563eb, #5eead4);
+        color: #fff;
+        box-shadow: 0 15px 40px rgba(37, 99, 235, 0.35);
+      }
+      .btn-secondary {
+        background: transparent;
+        border: 1px solid rgba(15, 23, 42, 0.2);
+        color: #0f172a;
+      }
+      .btn-admin {
+        background: rgba(15, 23, 42, 0.9);
+        color: #f8fafc;
+        border: 1px solid rgba(15, 23, 42, 0.15);
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.25);
+      }
+      .hero figure {
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 28px;
+        padding: 1.5rem;
+        box-shadow: 0 30px 80px rgba(15, 23, 42, 0.15);
+      }
+      .hero figure img {
+        border-radius: 24px;
+        object-fit: cover;
+        height: 100%;
+      }
+      .stats {
+        display: flex;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+        margin-top: 1.5rem;
+      }
+      .stat-card {
+        background: rgba(255, 255, 255, 0.85);
+        border-radius: 18px;
+        padding: 1rem 1.25rem;
+        min-width: 140px;
+        box-shadow: 0 12px 40px rgba(15, 23, 42, 0.12);
+      }
+      .stat-card strong {
+        font-size: 1.5rem;
+        display: block;
+      }
+      main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 3rem;
+        padding: 0 clamp(1rem, 4vw, 4rem) 4rem;
+      }
+      section {
+        background: #fff;
+        border-radius: 28px;
+        padding: clamp(1.5rem, 3vw, 2.75rem);
+        box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
+      }
+      .section-heading {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        margin-bottom: 1.5rem;
+      }
+      .section-heading h2 {
+        margin: 0;
+        font-size: clamp(1.8rem, 4vw, 2.4rem);
+      }
+      .section-heading p {
+        margin: 0;
+        color: #475569;
+      }
+      .page-links {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+      }
+      .page-links a {
+        padding: 1rem 1.25rem;
+        border-radius: 18px;
+        background: linear-gradient(135deg, rgba(37, 99, 235, 0.07), rgba(94, 234, 212, 0.12));
+        text-decoration: none;
+        color: #0f172a;
+        font-weight: 600;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+      }
+      .services-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1.25rem;
+      }
+      .service-card {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 20px;
+        padding: 1.25rem;
+        background: #fff;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .service-card span {
+        font-size: 1.6rem;
+      }
+      .faq-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1.25rem;
+      }
+      .faq-card {
+        border-radius: 20px;
+        padding: 1.25rem 1.5rem;
+        background: linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(244, 114, 182, 0.18));
+        border: 1px solid rgba(14, 165, 233, 0.25);
+        color: #0f172a;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+      }
+      .faq-card h3 {
+        margin: 0 0 0.35rem;
+        font-size: 1.1rem;
+      }
+      .faq-card p {
+        margin: 0;
+        color: #1f2937;
+      }
+      form {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem 1.25rem;
+      }
+      label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        font-weight: 600;
+        font-size: 0.95rem;
+      }
+      input,
+      textarea,
+      select {
+        padding: 0.75rem 0.9rem;
+        border-radius: 14px;
+        border: 1px solid rgba(15, 23, 42, 0.15);
+        font-size: 1rem;
+        font-family: inherit;
+        background: #f8fafc;
+      }
+      textarea {
+        resize: vertical;
+        min-height: 120px;
+      }
+      form button {
+        grid-column: 1 / -1;
+        justify-self: flex-start;
+      }
+      .success {
+        grid-column: 1 / -1;
+        margin: 0;
+        border-radius: 18px;
+        padding: 0.85rem 1.1rem;
+        background: #ecfdf3;
+        border: 1px solid #a6f4c5;
+        color: #166534;
+      }
+      .booking {
+        background: linear-gradient(135deg, #0f172a, #0f2f57, #115e59);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        box-shadow: 0 30px 80px rgba(15, 23, 42, 0.28);
+        color: #f8fafc;
+      }
+      .booking p {
+        color: rgba(248, 250, 252, 0.85);
+      }
+      .slots-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+      }
+      .slot-card {
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 18px;
+        padding: 1.1rem;
+        background: rgba(15, 23, 42, 0.35);
+        color: inherit;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        text-align: left;
+        cursor: pointer;
+        transition: transform 0.2s ease, border 0.2s ease, background 0.2s ease;
+      }
+      .slot-card:hover {
+        transform: translateY(-3px);
+        border-color: #5eead4;
+        background: rgba(15, 23, 42, 0.55);
+      }
+      .slot-card__status {
+        margin-top: 0.3rem;
+        align-self: flex-start;
+        padding: 0.2rem 0.7rem;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        background: rgba(94, 234, 212, 0.15);
+        color: #5eead4;
+      }
+      .slot-card__service {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: rgba(248, 250, 252, 0.8);
+      }
+      .slot-card__price {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #fef9c3;
+      }
+      .slot-card.is-booked {
+        background: rgba(15, 23, 42, 0.15);
+        border-color: rgba(255, 255, 255, 0.08);
+        cursor: not-allowed;
+        opacity: 0.6;
+      }
+      .slot-card.is-booked .slot-card__status {
+        background: rgba(248, 113, 113, 0.25);
+        color: #fecaca;
+      }
+      .booking-success {
+        margin-top: 1rem;
+        padding: 0.9rem 1rem;
+        border-radius: 14px;
+        background: rgba(15, 118, 110, 0.2);
+        border: 1px solid rgba(45, 212, 191, 0.6);
+        color: #e0f2fe;
+      }
+      .booking-modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(6, 11, 40, 0.45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        z-index: 20;
+      }
+      .booking-modal.hidden {
+        display: none;
+      }
+      .booking-modal__content {
+        width: min(420px, 90vw);
+        border-radius: 28px;
+        padding: 1.75rem;
+        background: #fff;
+        box-shadow: 0 40px 90px rgba(15, 23, 42, 0.25);
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        position: relative;
+      }
+      .booking-modal__close {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        border: none;
+        background: rgba(15, 23, 42, 0.05);
+        border-radius: 999px;
+        width: 36px;
+        height: 36px;
+        font-size: 1.2rem;
+        cursor: pointer;
+      }
+      .booking-modal__error {
+        padding: 0.75rem 1rem;
+        border-radius: 14px;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #b91c1c;
+      }
+      .booking-modal__note {
+        padding: 0.75rem 1rem;
+        border-radius: 14px;
+        background: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fcd34d;
+      }
+      .profile-section {
+        padding: 0;
+        background: transparent;
+      }
+      .profile-shell {
+        border-radius: 40px;
+        padding: clamp(1.5rem, 3vw, 3.5rem);
+        background: radial-gradient(circle at 15% 20%, rgba(59, 130, 246, 0.2), transparent 45%),
+          radial-gradient(circle at 80% 0%, rgba(251, 113, 133, 0.2), transparent 40%),
+          linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(226, 232, 255, 0.92));
+        border: 1px solid rgba(99, 102, 241, 0.18);
+        box-shadow: 0 30px 70px rgba(15, 23, 42, 0.18);
+        position: relative;
+        overflow: hidden;
+      }
+      .profile-shell::after {
+        content: "";
+        position: absolute;
+        inset: auto -20% -60% auto;
+        width: clamp(240px, 32vw, 420px);
+        height: clamp(240px, 32vw, 420px);
+        background: radial-gradient(circle, rgba(79, 70, 229, 0.25), transparent 65%);
+        z-index: 0;
+        pointer-events: none;
+      }
+      .profile-shell > * {
+        position: relative;
+        z-index: 1;
+      }
+      .profile-grid {
+        display: grid;
+        grid-template-columns: minmax(260px, 0.9fr) minmax(280px, 1.1fr);
+        gap: clamp(1.5rem, 4vw, 4rem);
+        align-items: stretch;
+      }
+      @media (max-width: 900px) {
+        .profile-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .profile-info {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 32px;
+        padding: clamp(1.5rem, 3vw, 2.9rem);
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+        box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
+      }
+      .profile-info small {
+        letter-spacing: 0.25em;
+        text-transform: uppercase;
+        color: #6366f1;
+        font-weight: 700;
+      }
+      .profile-info h2 {
+        margin: 0;
+        font-size: clamp(2.2rem, 4.5vw, 3rem);
+        color: #0f172a;
+      }
+      .profile-info p {
+        color: #475569;
+        font-size: 1.05rem;
+        margin: 0;
+        line-height: 1.65;
+      }
+      .profile-story__lede {
+        font-size: 1.2rem;
+        color: #0f172a;
+        font-weight: 600;
+      }
+      .profile-signature {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-weight: 600;
+        color: #0f172a;
+      }
+      .profile-signature::before {
+        content: "";
+        flex: 0 0 40px;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(79, 70, 229, 0.4));
+      }
+      .profile-spotlight {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+      .profile-card {
+        border-radius: 32px;
+        background: linear-gradient(160deg, #4f46e5, #a78bfa);
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+        color: #f8fafc;
+        box-shadow: 0 25px 50px rgba(99, 102, 241, 0.3);
+      }
+      .profile-photo {
+        border-radius: 26px;
+        overflow: hidden;
+        box-shadow: 0 15px 35px rgba(15, 23, 42, 0.35);
+        position: relative;
+      }
+      .profile-photo img {
+        width: 100%;
+        height: 340px;
+        object-fit: cover;
+        display: block;
+      }
+      .profile-photo__tag {
+        position: absolute;
+        bottom: 1rem;
+        left: 1rem;
+        background: rgba(15, 23, 42, 0.75);
+        padding: 0.35rem 0.75rem;
+        border-radius: 999px;
+        font-size: 0.85rem;
+      }
+      .profile-contact {
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+      }
+      .profile-contact strong {
+        font-size: 1.1rem;
+      }
+      .profile-contact a {
+        color: inherit;
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .profile-lower {
+        margin-top: clamp(1.5rem, 3vw, 2.5rem);
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 1.5rem;
+      }
+      .profile-metrics {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 1rem;
+      }
+      .profile-metric {
+        border-radius: 24px;
+        border: 1px solid rgba(79, 70, 229, 0.18);
+        padding: 1.15rem;
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(16, 185, 129, 0.12));
+        text-align: center;
+      }
+      .profile-metric strong {
+        display: block;
+        font-size: 1.4rem;
+        color: #1f3d8f;
+      }
+      .profile-highlight-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1.25rem;
+        align-items: stretch;
+        padding: clamp(1.25rem, 3vw, 2rem);
+        border-radius: 32px;
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 64, 175, 0.9));
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        box-shadow: 0 30px 60px rgba(15, 23, 42, 0.25);
+      }
+      .profile-highlights {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 1rem;
+      }
+      .profile-highlights li {
+        display: flex;
+        gap: 0.8rem;
+        border-radius: 24px;
+        padding: 1rem 1.2rem;
+        background: rgba(15, 23, 42, 0.35);
+        border: 1px solid rgba(248, 250, 252, 0.15);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        color: #f8fafc;
+      }
+      .profile-highlights strong {
+        display: block;
+        margin-bottom: 0.25rem;
+        color: #f8fafc;
+      }
+      .profile-highlights span {
+        font-size: 1.35rem;
+        color: #fde68a;
+      }
+      .profile-highlights p {
+        margin: 0;
+        color: rgba(241, 245, 249, 0.85);
+        font-size: 0.95rem;
+      }
+      .badge-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        align-content: flex-start;
+      }
+      .badge {
+        border-radius: 999px;
+        padding: 0.45rem 0.95rem;
+        border: 1px solid rgba(248, 250, 252, 0.35);
+        background: rgba(15, 23, 42, 0.45);
+        color: #f8fafc;
+        font-weight: 600;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+      }
+      .profile-side {
+        display: contents;
+      }
+      .coverage-section {
+        margin-top: clamp(2rem, 5vw, 4rem);
+      }
+      .coverage-shell {
+        border-radius: 32px;
+        padding: clamp(1.5rem, 3vw, 3rem);
+        background: linear-gradient(135deg, #eef2ff 5%, #f1f5ff 35%, #feeafe 78%, #ffe4f7 100%);
+        color: #0f172a;
+        box-shadow: 0 25px 70px rgba(244, 114, 182, 0.2);
+        border: 1px solid rgba(236, 72, 153, 0.25);
+        position: relative;
+        overflow: hidden;
+        z-index: 0;
+      }
+      .coverage-shell::after {
+        content: "";
+        position: absolute;
+        inset: 1rem auto auto 55%;
+        width: clamp(180px, 30vw, 320px);
+        height: clamp(180px, 30vw, 320px);
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.7), transparent 70%);
+        filter: blur(0.5px);
+        pointer-events: none;
+        z-index: 0;
+      }
+      .coverage-shell > * {
+        position: relative;
+        z-index: 1;
+      }
+      .coverage-eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+        color: #4f46e5;
+        font-weight: 700;
+        margin: 0 0 0.6rem;
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+      }
+      .coverage-eyebrow::after {
+        content: "";
+        width: 28px;
+        height: 3px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #4f46e5, #ec4899);
+        opacity: 0.85;
+      }
+      .coverage-shell h3 {
+        margin: 0;
+        font-size: clamp(1.8rem, 3vw, 2.4rem);
+        color: #0f172a;
+      }
+      .coverage-shell p {
+        margin: 0;
+        color: #475569;
+      }
+      .coverage-card {
+        border-radius: 28px;
+        padding: 1.5rem;
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      .coverage-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 1rem;
+      }
+      @media (min-width: 900px) {
+        .coverage-list {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+      .coverage-list li {
+        padding: 1rem 1.1rem;
+        border-radius: 22px;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 18px 35px rgba(79, 70, 229, 0.08);
+        min-height: 160px;
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+      }
+      .coverage-list strong {
+        display: block;
+        margin-bottom: 0.2rem;
+        color: #0f172a;
+      }
+      .coverage-list span {
+        color: #475569;
+      }
+      .coverage-list .coverage-fee {
+        display: inline-flex;
+        align-items: center;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #0f172a;
+        background: rgba(14, 165, 233, 0.18);
+        border-radius: 999px;
+        padding: 0.1rem 0.6rem;
+        margin-left: 0.5rem;
+      }
+      body.modal-open {
+        overflow: hidden;
+      }
+      .meet-greet {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: clamp(1.5rem, 3vw, 3rem);
+        align-items: stretch;
+      }
+      .meet-greet__card {
+        border-radius: 24px;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        background: #f8fafc;
+        padding: clamp(1.25rem, 2vw, 2rem);
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        box-shadow: 0 18px 40px rgba(14, 116, 144, 0.08);
+      }
+      .meet-greet__card h3 {
+        margin: 0;
+        font-size: 1.3rem;
+      }
+      .meet-greet__badge {
+        align-self: flex-start;
+        padding: 0.35rem 0.8rem;
+        border-radius: 999px;
+        background: rgba(14, 116, 144, 0.12);
+        color: #0e7490;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font-size: 0.75rem;
+      }
+      .meet-greet__list {
+        margin: 0;
+        padding-left: 1.25rem;
+        color: #475569;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+      .meet-greet__note {
+        margin: 0;
+        color: #1f2937;
+        font-size: 1rem;
+      }
+      .meet-greet__perks {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 0.75rem;
+      }
+      .meet-greet__perk {
+        border-radius: 18px;
+        padding: 1rem 1.1rem;
+        background: rgba(59, 130, 246, 0.08);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+      }
+      .meet-greet__perk strong {
+        display: block;
+        margin-bottom: 0.2rem;
+      }
+      footer {
+        padding: 2.5rem clamp(1rem, 4vw, 4rem);
+        text-align: center;
+        color: #475569;
+      }
+      .admin-cta {
+        margin-bottom: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="site-shell">
+      <header class="site-header">
+        <nav class="primary-nav" aria-label="Primary">
+          <a class="logo" href="{{ url_for('index') }}"><span>🐾</span>Happy Paws</a>
+          <div class="nav-links">
+            {% for link in primary_nav %}
+            <a
+              href="{{ link.href }}"
+              class="{% if link.is_active %}is-active{% endif %}"
+              {% if link.is_active %}aria-current="page"{% endif %}
+            >
+              {{ link.label }}
+            </a>
+            {% endfor %}
+          </div>
+          <a class="nav-cta" href="#booking">Plan a walk</a>
+        </nav>
+        {% if service_notice.enabled %}
+        <div class="service-banner" role="status" aria-live="assertive">
+          <span>Service notice</span>
+          <p>{{ service_notice.message }}</p>
+        </div>
+        {% endif %}
+        <div class="hero">
+          <div>
+            <p style="text-transform: uppercase; letter-spacing: 0.2em; color: #6366f1; font-weight: 700">
+              Trusted by busy pet parents across town
+            </p>
+            <h1>Modern dog walking with a concierge touch.</h1>
+            <p>
+              Same-day bookings, GPS tracking, and walkers who treat every pup like their own. Schedule a
+              visit in seconds and stay in the loop from pickup to drop-off.
+            </p>
+            <div class="hero-actions">
+              <button class="btn btn-primary" onclick="document.getElementById('booking').scrollIntoView({ behavior: 'smooth' })">
+                Reserve a walk
+              </button>
+              <button class="btn btn-secondary" onclick="document.getElementById('contact').scrollIntoView({ behavior: 'smooth' })">
+                Talk with us
+              </button>
+            </div>
+            <div class="stats">
+              <div class="stat-card">
+                <strong>1,200+</strong>
+                Happy walks completed
+              </div>
+              <div class="stat-card">
+                <strong>98%</strong>
+                Five-star reviews
+              </div>
+              <div class="stat-card">
+                <strong>24/7</strong>
+                Live chat support
+              </div>
+            </div>
+          </div>
+          <figure>
+            <img src="{{ home_hero_image }}" alt="Dog enjoying a walk" loading="lazy" />
+          </figure>
+        </div>
+      </header>
+      <main>
+        <section class="profile-section" aria-labelledby="walkerProfileTitle">
+          <div class="profile-shell">
+            <div class="profile-grid">
+              <div class="profile-spotlight">
+                <article class="profile-card">
+                  <div class="profile-photo">
+                    <img
+                      src="{{ home_profile_image }}"
+                      alt="Portrait of Andy, smiling local dog walker"
+                      loading="lazy"
+                    />
+                    <span class="profile-photo__tag">Concierge walker</span>
+                  </div>
+                  <div class="profile-contact">
+                    <p style="margin: 0; opacity: 0.85">Locally rooted · Available daily</p>
+                    <strong>Happy Trails</strong>
+                    <p style="margin: 0">Call <a href="tel:07595289669">07595 289669</a></p>
+                    <button class="btn btn-primary" onclick="document.getElementById('contact').scrollIntoView({ behavior: 'smooth' })">
+                      Plan a walk
+                    </button>
+                  </div>
+                </article>
+              </div>
+              <div class="profile-info">
+                <small>Meet Andy</small>
+                <h2 id="walkerProfileTitle">Neighbourhood walks, luxury-level care</h2>
+                <p class="profile-story__lede">Every route is scouted at sunrise, every paw checked at drop-off, and every update delivered with concierge polish.</p>
+                <p>
+                  Fifteen years on these routes means I know every shaded lane and calm cut-through. I keep things unrushed, positive, and tailored so pups come home content and you stay worry-free.
+                </p>
+                <div class="profile-signature">Andy — Lead walker &amp; resident dog whisperer</div>
+              </div>
+            </div>
+            <div class="profile-lower">
+              <div class="profile-metrics">
+                <div class="profile-metric">
+                  <strong>15 yrs</strong>
+                  Local experience
+                </div>
+                <div class="profile-metric">
+                  <strong>12 min</strong>
+                  Average reply time
+                </div>
+                <div class="profile-metric">
+                  <strong>4 mi</strong>
+                  Daily service radius
+                </div>
+                <div class="profile-metric">
+                  <strong>100%</strong>
+                  Solo household walks
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section class="coverage-section" aria-labelledby="coverageHeading">
+          <div class="coverage-shell">
+            <div>
+              <p class="coverage-eyebrow">Service area</p>
+              <h3 id="coverageHeading">Neighbourhoods we cover</h3>
+              <p>Choose your block and we’ll meet you right outside your door.</p>
+            </div>
+            <article class="coverage-card">
+              {% if coverage_areas %}
+              <ul class="coverage-list">
+                {% for area in coverage_areas %}
+                <li>
+                  <strong>{{ area.name }}</strong>
+                  {% if area.travel_fee %}
+                  <span class="coverage-fee">+{{ format_price_label(area.travel_fee) }} travel</span>
+                  {% endif %}
+                  <span>{{ area.description }}</span>
+                </li>
+                {% endfor %}
+              </ul>
+              {% else %}
+              <p style="margin: 0">Add coverage areas from the admin dashboard.</p>
+              {% endif %}
+            </article>
+          </div>
+        </section>
+        <section id="pages">
+          <div class="section-heading">
+            <p style="text-transform: uppercase; letter-spacing: 0.2em; color: #a855f7; font-weight: 700">
+              Explore
+            </p>
+            <h2>Need something else?</h2>
+            <p>Hop into our supporting pages for blocklists, submissions, and more.</p>
+          </div>
+          <div class="page-links">
+            {% for link in page_links %}
+            <a href="{{ link.href }}">{{ link.label }} <span aria-hidden="true">→</span></a>
+            {% endfor %}
+          </div>
+        </section>
+        <section>
+          <div class="section-heading">
+            <p style="text-transform: uppercase; letter-spacing: 0.2em; color: #f97316; font-weight: 700">
+              Services
+            </p>
+            <h2>Perfect walks for every pup</h2>
+            <p>Choose from flexible sessions that fit your routine.</p>
+          </div>
+          <div class="services-grid">
+            <article class="service-card">
+              <span>⏱️</span>
+              <strong>Express Visits</strong>
+              <p>20-minute check-ins with water refills, potty breaks, and belly rubs.</p>
+            </article>
+            <article class="service-card">
+              <span>🌳</span>
+              <strong>Neighborhood Tours</strong>
+              <p>45-minute strolls with photo updates, perfect for energetic pups.</p>
+            </article>
+            <article class="service-card">
+              <span>🤝</span>
+              <strong>Buddy Walks</strong>
+              <p>Pair with a pup pal for social walks and extra playtime.</p>
+            </article>
+            <article class="service-card">
+              <span>🏡</span>
+              <strong>In-home Visits</strong>
+              <p>Feeding, medication reminders, and evening tuck-ins available.</p>
+            </article>
+          </div>
+        </section>
+        <section id="faq">
+          <div class="section-heading">
+            <p style="text-transform: uppercase; letter-spacing: 0.2em; color: #06b6d4; font-weight: 700">
+              FAQ
+            </p>
+            <h2>Your top questions, answered</h2>
+            <p>Quick clarity on how we work, from safety checks to scheduling.</p>
+          </div>
+          <div class="faq-grid">
+            <article class="faq-card">
+              <h3>How soon can you fit us in?</h3>
+              <p>Same-day bookings are available until 3pm. Choose an open slot and we'll confirm instantly.</p>
+            </article>
+            <article class="faq-card">
+              <h3>Who will be walking my dog?</h3>
+              <p>You meet your walker before the first visit. We keep the same pro assigned for consistency.</p>
+            </article>
+            <article class="faq-card">
+              <h3>How do updates work?</h3>
+              <p>Every walk includes GPS tracking, time stamps, and candid photos delivered to your phone.</p>
+            </article>
+            <article class="faq-card">
+              <h3>What about keys and security?</h3>
+              <p>Keys are coded and stored in a locked cabinet. Smart lock access codes are rotated monthly.</p>
+            </article>
+          </div>
+        </section>
+        <section class="booking" id="booking" aria-labelledby="bookingTitle">
+          <div class="section-heading">
+            <p style="text-transform: uppercase; letter-spacing: 0.2em; color: rgba(255, 255, 255, 0.65); font-weight: 700">
+              Booking hub
+            </p>
+            <h2 id="bookingTitle" style="color: #fff">Reserve a dog walk</h2>
+            <p>Choose a slot that fits your schedule. We'll confirm instantly.</p>
+          </div>
+          {% if booking_slots %}
+          <div class="slots-grid" role="list">
+            {% for slot in booking_slots %}
+            <button
+              type="button"
+              class="slot-card {% if slot.is_booked %}is-booked{% endif %}"
+              data-slot-button
+              data-slot-id="{{ slot.id }}"
+              data-state="{% if slot.is_booked %}booked{% else %}available{% endif %}"
+              data-friendly-label="{{ slot.friendly_label }}"
+              aria-disabled="{% if slot.is_booked %}true{% else %}false{% endif %}"
+              {% if slot.is_booked %}disabled{% endif %}
+            >
+              <strong>{{ slot.date_label }}</strong>
+              <span class="slot-card__time">{{ slot.time_label }}</span>
+              <span class="slot-card__service">{{ slot.service_label }}</span>
+              {% if slot.price_label %}
+              <span class="slot-card__price">{{ slot.price_label }}</span>
+              {% endif %}
+              <span class="slot-card__status">{% if slot.is_booked %}Booked{% else %}Available{% endif %}</span>
+            </button>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="empty-state">No appointment slots are available yet. Please check back soon.</p>
+          {% endif %}
+          <p class="booking-hint">Once a slot is selected we'll ask for your name and email.</p>
+          <div class="booking-success hidden" id="bookingSuccess"></div>
+        </section>
+        <section id="contact">
+          <div class="section-heading">
+            <p style="text-transform: uppercase; letter-spacing: 0.2em; color: #0ea5e9; font-weight: 700">
+              Contact
+            </p>
+            <h2>Let's plan your pup's next adventure</h2>
+            <p>Leave us a note and we'll respond within the hour.</p>
+          </div>
+          <form method="post" action="{{ form_action }}">
+            <label>
+              Name
+              <input type="text" name="name" required />
+            </label>
+            <label>
+              Email
+              <input type="email" name="email" required />
+            </label>
+            <label>
+              Phone
+              <input type="tel" name="phone" required />
+            </label>
+            <label style="grid-column: 1 / -1">
+              Message
+              <textarea name="message" required></textarea>
+            </label>
+            <button type="submit" class="btn btn-primary">Submit enquiry</button>
+            {% if submission_success %}
+            <p class="success">Thanks! Your enquiry has been recorded.</p>
+            {% endif %}
+          </form>
+        </section>
+        {% if meet_greet_enabled %}
+        <section aria-labelledby="meetGreetTitle">
+          <div class="section-heading">
+            <p style="text-transform: uppercase; letter-spacing: 0.2em; color: #06b6d4; font-weight: 700">
+              Meet & Greet
+            </p>
+            <h2 id="meetGreetTitle">Schedule a complimentary meet and greet</h2>
+            <p>
+              Before the first walk, we pair you with your walker for a relaxed meet-up. It's free, friendly, and built to make
+              sure every pup feels at home.
+            </p>
+          </div>
+          <div class="meet-greet">
+            <article class="meet-greet__card">
+              <span class="meet-greet__badge">No cost</span>
+              <h3>30-minute welcome visit</h3>
+              <p class="meet-greet__note">
+                We come to you (or your favourite park) to learn routines, swap keys, and answer every question. Bring treats,
+                questions, and any special instructions—we love the details.
+              </p>
+              <ul class="meet-greet__list">
+                <li>Introductions for you, your pup, and your walker</li>
+                <li>Safety check of harnesses, leashes, and entry instructions</li>
+                <li>Custom walk plan built on your dog's energy level</li>
+              </ul>
+              <a class="btn btn-primary" href="{{ url_for('bookings_page') }}#meetSlots">
+                Book a free meet &amp; greet
+              </a>
+            </article>
+            <article class="meet-greet__card">
+              <h3>What to expect</h3>
+              <div class="meet-greet__perks">
+                <div class="meet-greet__perk">
+                  <strong>Warm introductions</strong>
+                  <span>Let your pup sniff things out while we build trust at their pace.</span>
+                </div>
+                <div class="meet-greet__perk">
+                  <strong>Care blueprint</strong>
+                  <span>We'll map hydration breaks, preferred routes, and post-walk rituals.</span>
+                </div>
+                <div class="meet-greet__perk">
+                  <strong>Instant booking</strong>
+                  <span>Ready to go? Approve your schedule on the spot from the Happy Trails app.</span>
+                </div>
+              </div>
+              <p class="meet-greet__note">
+                Meet and greets are always complimentary—think of them as your on-boarding to concierge-level dog walking.
+              </p>
+              <a class="btn btn-secondary" href="{{ url_for('bookings_page') }}#meetSlots">
+                Reserve your spot
+              </a>
+            </article>
+          </div>
+        </section>
+        {% endif %}
+      </main>
+      <footer>
+        <div class="admin-cta">
+          <a class="btn btn-admin" href="{{ url_for('admin_page') }}">Go to admin</a>
+        </div>
+        <p>© {{ current_year }} Happy Trails Dog Walking · Fully bonded & insured · Serving downtown & beyond</p>
+      </footer>
+    </div>
+    <div class="booking-modal hidden" id="bookingModal" role="dialog" aria-modal="true">
+      <div class="booking-modal__content">
+        <button class="booking-modal__close" id="bookingModalClose" aria-label="Close booking form">
+          &times;
+        </button>
+        <div>
+          <h2 style="margin-bottom: 0.35rem">Reserve this slot</h2>
+          <p id="bookingSlotSummary" style="margin: 0; color: #475569"></p>
+        </div>
+        {% set breeds_available = dog_breeds|length > 0 %}
+        {% set areas_available = coverage_areas|length > 0 %}
+        {% set booking_ready = breeds_available and areas_available %}
+        <form id="bookingForm">
+          <input type="hidden" id="bookingSlotId" />
+          <label>
+            Your name
+            <input type="text" id="bookingName" required />
+          </label>
+          <label>
+            Email address
+            <input type="email" id="bookingEmail" required />
+          </label>
+          {% if breeds_available %}
+          <label>
+            Dog breed
+            <select id="bookingBreed" required>
+              <option value="" disabled selected>Select a breed</option>
+              {% for breed in dog_breeds %}
+              <option value="{{ breed.id }}">{{ breed.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          {% else %}
+          <p class="booking-modal__note">
+            Add dog breeds from the admin page to enable bookings.
+          </p>
+          {% endif %}
+          {% if areas_available %}
+          <label>
+            Service area
+            <select id="bookingCoverageArea" required>
+              <option value="" disabled selected>Select your area</option>
+              {% for area in coverage_areas %}
+              <option value="{{ area.id }}">
+                {{ area.name }}{% if area.travel_fee %} · +{{ format_price_label(area.travel_fee) }} travel{% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </label>
+          {% else %}
+          <p class="booking-modal__note">
+            Add service areas from the admin page to enable bookings.
+          </p>
+          {% endif %}
+          <div class="booking-modal__error hidden" id="bookingModalError"></div>
+          <button type="submit" {% if not booking_ready %}disabled{% endif %}>Book this slot</button>
+        </form>
+      </div>
+    </div>
+    {% include "chat_widget.html" %}
+    <script src="{{ url_for('static', filename='js/booking.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/chat-widget.js') }}" defer></script>
+  </body>
+</html>

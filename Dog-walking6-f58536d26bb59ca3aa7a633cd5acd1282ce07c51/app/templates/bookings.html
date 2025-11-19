@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bookings · Happy Trails</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chat-widget.css') }}" />
+    <style>
+      :root {
+        font-family: "Poppins", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont,
+          "Helvetica Neue", sans-serif;
+        color: #0f172a;
+        background: radial-gradient(circle at top, #fdf4ff 0%, #f5f7ff 35%, #eef2ff 70%, #f6f8fb 100%);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: inherit;
+        color: inherit;
+      }
+      img {
+        max-width: 100%;
+        display: block;
+      }
+      .site-shell {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      .primary-nav {
+        position: sticky;
+        top: 0;
+        left: 0;
+        width: 100%;
+        z-index: 15;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1.1rem clamp(1rem, 3vw, 2.5rem);
+        margin-bottom: clamp(1.5rem, 4vw, 3rem);
+        border-radius: 0;
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(49, 46, 129, 0.92));
+        border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+        box-shadow: 0 30px 60px rgba(15, 23, 42, 0.35);
+        backdrop-filter: blur(10px);
+        overflow: hidden;
+      }
+      .primary-nav::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at 10% 50%, rgba(94, 234, 212, 0.35), transparent 55%),
+          radial-gradient(circle at 80% 20%, rgba(236, 72, 153, 0.3), transparent 50%);
+        opacity: 0.9;
+        mix-blend-mode: screen;
+        z-index: -1;
+      }
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        font-weight: 700;
+        font-size: 1.2rem;
+        color: #f8fafc;
+        letter-spacing: 0.02em;
+        text-decoration: none;
+      }
+      .logo span {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, rgba(94, 234, 212, 0.8), rgba(236, 72, 153, 0.9));
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-size: 1.35rem;
+      }
+      .nav-links {
+        display: flex;
+        gap: 1.25rem;
+        font-size: 0.95rem;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .nav-links a {
+        text-decoration: none;
+        color: rgba(248, 250, 252, 0.85);
+        font-weight: 600;
+        position: relative;
+        padding-bottom: 0.3rem;
+      }
+      .nav-links a:hover,
+      .nav-links a:focus-visible {
+        color: #fff;
+      }
+      .nav-links a::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        height: 3px;
+        width: 0;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #5eead4, #a5b4fc, #f472b6);
+        transition: width 0.3s ease;
+      }
+      .nav-links a:hover::after,
+      .nav-links a.is-active::after {
+        width: 100%;
+      }
+      .nav-cta {
+        text-decoration: none;
+        font-size: 0.9rem;
+        font-weight: 600;
+        padding: 0.65rem 1.25rem;
+        border-radius: 999px;
+        color: #0f172a;
+        background: #fef3c7;
+        box-shadow: 0 12px 30px rgba(252, 211, 77, 0.35);
+        border: 1px solid rgba(253, 230, 138, 0.8);
+      }
+      .nav-cta:hover,
+      .nav-cta:focus-visible {
+        background: #fde68a;
+        box-shadow: 0 20px 35px rgba(252, 211, 77, 0.45);
+      }
+      .service-banner {
+        width: 100%;
+        margin: 0 auto clamp(1.2rem, 2vw, 2rem);
+        padding: 0.85rem 1.2rem;
+        border-radius: 18px;
+        background: rgba(254, 215, 170, 0.95);
+        border: 1px solid rgba(251, 146, 60, 0.4);
+        color: #7c2d12;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        box-shadow: 0 15px 35px rgba(249, 115, 22, 0.25);
+      }
+      .service-banner span {
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.75rem;
+        color: rgba(124, 45, 18, 0.9);
+      }
+      .service-banner p {
+        margin: 0;
+        font-weight: 600;
+      }
+      .inline-note {
+        display: block;
+        margin-top: 0.75rem;
+        font-size: 0.95rem;
+        color: #0369a1;
+        font-weight: 600;
+      }
+      .info-banner {
+        margin-bottom: 1.25rem;
+        padding: 0.9rem 1.2rem;
+        border-radius: 18px;
+        background: rgba(191, 219, 254, 0.4);
+        border: 1px solid rgba(14, 165, 233, 0.45);
+        color: #0c4a6e;
+        font-weight: 600;
+      }
+      @media (max-width: 640px) {
+        .primary-nav {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 0.75rem;
+        }
+        .nav-links {
+          flex-wrap: wrap;
+        }
+        .nav-cta {
+          align-self: stretch;
+          text-align: center;
+        }
+      }
+      main {
+        flex: 1;
+        padding: clamp(1.5rem, 4vw, 4rem);
+        display: flex;
+        flex-direction: column;
+        gap: 2.5rem;
+      }
+      section {
+        background: #fff;
+        border-radius: 32px;
+        padding: clamp(1.5rem, 3vw, 3rem);
+        box-shadow: 0 25px 70px rgba(15, 23, 42, 0.12);
+      }
+      .hero {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: clamp(1.5rem, 3vw, 3.5rem);
+        align-items: center;
+      }
+      .hero h1 {
+        margin: 0 0 1rem;
+        font-size: clamp(2.3rem, 5vw, 3.8rem);
+        line-height: 1.1;
+      }
+      .hero p {
+        margin: 0 0 1.1rem;
+        color: #475569;
+        font-size: 1.1rem;
+      }
+      .hero figure {
+        margin: 0;
+        border-radius: 32px;
+        overflow: hidden;
+        box-shadow: 0 30px 80px rgba(15, 23, 42, 0.2);
+      }
+      .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.25em;
+        font-weight: 700;
+        color: #6366f1;
+        margin-bottom: 0.75rem;
+      }
+      .options-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1.25rem;
+      }
+      .option-card {
+        border-radius: 26px;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        background: linear-gradient(135deg, rgba(226, 232, 240, 0.45), rgba(255, 255, 255, 0.9));
+      }
+      .option-card.is-muted {
+        border-style: dashed;
+        background: linear-gradient(135deg, rgba(191, 219, 254, 0.35), rgba(255, 255, 255, 0.95));
+      }
+      .option-card h3 {
+        margin: 0;
+        font-size: 1.4rem;
+      }
+      .option-card p {
+        margin: 0;
+        color: #475569;
+      }
+      .option-card__note {
+        margin: 0;
+        font-size: 0.9rem;
+        color: #0e7490;
+        font-weight: 500;
+      }
+      .option-card a {
+        align-self: flex-start;
+        text-decoration: none;
+        padding: 0.85rem 1.5rem;
+        border-radius: 999px;
+        font-weight: 600;
+        background: linear-gradient(135deg, #2563eb, #5eead4);
+        color: #fff;
+        box-shadow: 0 18px 40px rgba(37, 99, 235, 0.35);
+      }
+      .option-card a.secondary {
+        background: linear-gradient(135deg, #ec4899, #8b5cf6);
+        box-shadow: 0 18px 40px rgba(236, 72, 153, 0.35);
+      }
+      .reason-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+      }
+      .reason-card {
+        border-radius: 24px;
+        padding: 1.25rem 1.5rem;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        background: #fff;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      }
+      .reason-card h4 {
+        margin: 0 0 0.35rem;
+      }
+      .reason-card p {
+        margin: 0;
+        color: #475569;
+      }
+      .timeline {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+        position: relative;
+      }
+      .timeline-step {
+        padding: 1.25rem 1.5rem;
+        border-radius: 24px;
+        background: linear-gradient(135deg, rgba(14, 165, 233, 0.15), rgba(244, 114, 182, 0.18));
+        border: 1px solid rgba(14, 165, 233, 0.25);
+      }
+      .timeline-step span {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        margin-bottom: 0.5rem;
+        background: rgba(15, 23, 42, 0.08);
+        font-weight: 700;
+        color: #0f172a;
+      }
+      .slots-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-top: 1.25rem;
+      }
+      .slot-card {
+        border-radius: 20px;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        padding: 1.2rem;
+        background: linear-gradient(135deg, rgba(226, 232, 240, 0.5), rgba(255, 255, 255, 0.95));
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+        text-align: left;
+        cursor: pointer;
+        transition: transform 0.2s ease, border 0.2s ease;
+      }
+      .slot-card:hover {
+        transform: translateY(-3px);
+        border-color: #2563eb;
+      }
+      .slot-card strong,
+      .slot-card__time {
+        color: #0f172a;
+      }
+      .slot-card__time {
+        font-size: 1.05rem;
+        font-weight: 600;
+      }
+      .slot-card__service {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #6366f1;
+      }
+      .slot-card__price {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #047857;
+      }
+      .slot-card__status {
+        margin-top: 0.3rem;
+        align-self: flex-start;
+        padding: 0.2rem 0.65rem;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        background: rgba(16, 185, 129, 0.15);
+        color: #047857;
+      }
+      .slot-card.is-booked {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+      .slot-card.is-booked .slot-card__status {
+        background: rgba(248, 113, 113, 0.2);
+        color: #dc2626;
+      }
+      .booking-success {
+        margin-top: 1rem;
+        padding: 0.9rem 1rem;
+        border-radius: 16px;
+        border: 1px solid rgba(16, 185, 129, 0.35);
+        background: rgba(187, 247, 208, 0.4);
+        color: #14532d;
+        font-weight: 600;
+      }
+      .slot-price-pill {
+        display: inline-flex;
+        align-items: center;
+        margin-top: 0.65rem;
+        padding: 0.35rem 0.85rem;
+        border-radius: 999px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        background: rgba(224, 231, 255, 0.8);
+        color: #1e1b4b;
+      }
+      .slot-price-pill.is-free {
+        color: #f0fdf4;
+        background: #16a34a;
+        box-shadow: 0 0 18px rgba(34, 197, 94, 0.65);
+        animation: freeFlash 1.2s ease-in-out infinite alternate;
+      }
+      @keyframes freeFlash {
+        0% {
+          background: #16a34a;
+          color: #f0fdf4;
+        }
+        50% {
+          background: #22c55e;
+          color: #ffffff;
+        }
+        100% {
+          background: #15803d;
+          color: #ecfdf5;
+        }
+      }
+      .empty-state {
+        background: rgba(15, 23, 42, 0.02);
+        border: 1px dashed rgba(15, 23, 42, 0.2);
+        border-radius: 16px;
+        padding: 1rem 1.25rem;
+        color: #475569;
+      }
+      .hidden {
+        display: none !important;
+      }
+      body.modal-open {
+        overflow: hidden;
+      }
+      .booking-modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(6, 11, 40, 0.45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        z-index: 25;
+      }
+      .booking-modal.hidden {
+        display: none;
+      }
+      .booking-modal__content {
+        width: min(420px, 90vw);
+        border-radius: 28px;
+        padding: 1.75rem;
+        background: #fff;
+        box-shadow: 0 40px 90px rgba(15, 23, 42, 0.25);
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        position: relative;
+      }
+      .booking-modal__close {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        border: none;
+        background: rgba(15, 23, 42, 0.05);
+        border-radius: 999px;
+        width: 36px;
+        height: 36px;
+        font-size: 1.2rem;
+        cursor: pointer;
+      }
+      .booking-modal__error {
+        border-radius: 12px;
+        background: rgba(248, 113, 113, 0.15);
+        border: 1px solid rgba(239, 68, 68, 0.4);
+        padding: 0.6rem 0.75rem;
+        color: #991b1b;
+        font-weight: 600;
+      }
+      .booking-modal__price {
+        margin: -0.25rem 0 0.5rem;
+        font-size: 1rem;
+      }
+      .booking-modal__note {
+        font-size: 0.9rem;
+        color: #475569;
+        background: rgba(14, 165, 233, 0.08);
+        border-radius: 12px;
+        padding: 0.65rem 0.85rem;
+      }
+      form {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+        margin-top: 1.5rem;
+      }
+      label {
+        font-weight: 600;
+        display: block;
+        margin-bottom: 0.35rem;
+      }
+      input,
+      textarea,
+      select {
+        width: 100%;
+        border-radius: 18px;
+        border: 1px solid rgba(15, 23, 42, 0.15);
+        padding: 0.75rem 1rem;
+        font-family: inherit;
+        font-size: 1rem;
+      }
+      textarea {
+        min-height: 120px;
+        resize: vertical;
+      }
+      .form-actions {
+        grid-column: 1 / -1;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: center;
+      }
+      button {
+        border: none;
+        border-radius: 999px;
+        padding: 0.9rem 1.5rem;
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: pointer;
+        background: linear-gradient(135deg, #2563eb, #5eead4);
+        color: #fff;
+        box-shadow: 0 18px 40px rgba(37, 99, 235, 0.35);
+      }
+      .success-banner {
+        grid-column: 1 / -1;
+        padding: 0.85rem 1.2rem;
+        border-radius: 18px;
+        background: rgba(134, 239, 172, 0.25);
+        border: 1px solid rgba(34, 197, 94, 0.5);
+        font-weight: 600;
+        color: #15803d;
+      }
+      footer {
+        padding: 2rem 1.5rem 3rem;
+        text-align: center;
+        color: rgba(15, 23, 42, 0.6);
+        font-size: 0.95rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="site-shell">
+        <header>
+          <nav class="primary-nav" aria-label="Primary">
+            <a class="logo" href="{{ url_for('index') }}"><span>🐾</span>Happy Paws</a>
+            <div class="nav-links">
+              {% for link in primary_nav %}
+              <a
+                href="{{ link.href }}"
+                class="{% if link.is_active %}is-active{% endif %}"
+                {% if link.is_active %}aria-current="page"{% endif %}
+              >
+                {{ link.label }}
+              </a>
+              {% endfor %}
+            </div>
+            <a class="nav-cta" href="{{ home_booking_url }}">Plan a walk</a>
+          </nav>
+          {% if service_notice.enabled %}
+          <div class="service-banner" role="status" aria-live="assertive">
+            <span>Service notice</span>
+            <p>{{ service_notice.message }}</p>
+          </div>
+          {% endif %}
+        </header>
+      <main>
+        <section class="hero">
+          <div>
+            <p class="eyebrow">Bookings</p>
+            <h1>Choose the perfect first step for your pup.</h1>
+            <p>
+              Book a walk instantly or schedule a concierge-style meet &amp; greet so we can learn every quirk,
+              routine, and cuddle cue before services begin.
+              {% if not meet_greet_enabled %}
+              <span class="inline-note">Meet &amp; greet bookings stay available here even when the homepage CTA is turned off.</span>
+              {% endif %}
+            </p>
+            <div class="options-grid">
+              <div class="option-card">
+                <h3>Book a Walk</h3>
+                <p>Grab an available time from our live calendar and get instant confirmation.</p>
+                <a href="{{ home_booking_url }}">Browse walk times</a>
+              </div>
+              <div class="option-card {% if not meet_greet_enabled %}is-muted{% endif %}">
+                <h3>Book a Meet &amp; Greet</h3>
+                <p>Invite us over for a relaxed 30-minute visit where we connect with your dog and walk your setup.</p>
+                {% if not meet_greet_enabled %}
+                <p class="option-card__note">This option is hidden from the homepage, but you can still reserve a time on this page.</p>
+                {% endif %}
+                <a class="secondary" href="#meetSlots">Browse available slots</a>
+              </div>
+            </div>
+          </div>
+          <figure>
+            <img
+              src="{{ bookings_hero_image }}"
+              alt="Dog snuggled on a sofa"
+            />
+          </figure>
+        </section>
+        <section id="meetSlots">
+          {% if not meet_greet_enabled %}
+          <div class="info-banner" role="status">Meet &amp; greet scheduling remains available here even when the public CTA is switched off.</div>
+          {% endif %}
+          <div class="eyebrow" style="color: #0ea5e9">Live openings</div>
+          <h2 style="margin-top: 0">Reserve a meet &amp; greet time</h2>
+          <p style="color: #475569">Pick the concierge visit that fits your schedule. We'll confirm instantly.</p>
+          {% if meet_slots %}
+          <div class="slots-grid" role="list">
+            {% for slot in meet_slots %}
+            <button
+              type="button"
+              class="slot-card {% if slot.is_booked %}is-booked{% endif %}"
+              data-slot-button
+              data-slot-id="{{ slot.id }}"
+              data-price-label="{{ slot.price_label or '' }}"
+              data-price-amount="{{ '%.2f'|format(slot.price) if slot.price is not none else '' }}"
+              data-state="{% if slot.is_booked %}booked{% else %}available{% endif %}"
+              data-friendly-label="{{ slot.friendly_label }}"
+              aria-disabled="{% if slot.is_booked %}true{% else %}false{% endif %}"
+              {% if slot.is_booked %}disabled{% endif %}
+            >
+              <strong>{{ slot.date_label }}</strong>
+              <span class="slot-card__time">{{ slot.time_label }}</span>
+              <span class="slot-card__service">{{ slot.service_label }}</span>
+              {% if slot.price_label %}
+              <span class="slot-card__price">{{ slot.price_label }}</span>
+              {% endif %}
+              <span class="slot-card__status">{% if slot.is_booked %}Booked{% else %}Available{% endif %}</span>
+            </button>
+            {% endfor %}
+          </div>
+          {% else %}
+            <p class="empty-state">No meet &amp; greet slots are available at the moment. Check back soon or text us at (555) 014-7788 to be added to the priority list.</p>
+            {% endif %}
+            <div class="booking-success hidden" id="bookingSuccess"></div>
+        </section>
+        <section>
+          <div class="eyebrow" style="color: #f97316">Why it matters</div>
+          <h2 style="margin-top: 0">Meet &amp; greets keep pups confident and routines seamless.</h2>
+          <p style="color: #475569; font-size: 1.05rem">
+            Think of it as a stress-free dress rehearsal. We learn your cues, your dog's energy, and the quirks that
+            make home feel safe so day-one walks feel like reunions instead of new introductions.
+          </p>
+          <div class="reason-grid">
+            <article class="reason-card">
+              <h4>Trust building</h4>
+              <p>Dogs relax faster when they've already exchanged sniffs and treats with their walker.</p>
+            </article>
+            <article class="reason-card">
+              <h4>Home walkthrough</h4>
+              <p>Show us leashes, harnesses, treat drawers, and alarm panels so we can replicate your routine.</p>
+            </article>
+            <article class="reason-card">
+              <h4>Care planning</h4>
+              <p>We note meds, feeding cues, reactivity triggers, and preferred walking routes.</p>
+            </article>
+            <article class="reason-card">
+              <h4>Concierge touches</h4>
+              <p>Customize updates, post-walk rituals, and access preferences before the first booking.</p>
+            </article>
+          </div>
+        </section>
+        <section>
+          <div class="eyebrow" style="color: #06b6d4">What to expect</div>
+          <h2 style="margin-top: 0">Your meet &amp; greet timeline</h2>
+          <div class="timeline">
+              <div class="timeline-step">
+                <span>1</span>
+                <h3>Share the basics</h3>
+                <p>Grab a slot above and include care notes plus access details right inside the booking modal.</p>
+              </div>
+            <div class="timeline-step">
+              <span>2</span>
+              <h3>Concierge confirmation</h3>
+              <p>We reply within the hour with a confirmed time plus the name and bio of your walker.</p>
+            </div>
+            <div class="timeline-step">
+              <span>3</span>
+              <h3>In-home visit</h3>
+              <p>We spend ~30 minutes meeting your pup, reviewing routines, and answering every question.</p>
+            </div>
+            <div class="timeline-step">
+              <span>4</span>
+              <h3>Ready for adventures</h3>
+              <p>Once we're aligned, we activate your profile so you can book walks with zero friction.</p>
+            </div>
+          </div>
+        </section>
+      </main>
+      <footer>&copy; {{ datetime.utcnow().year }} Happy Trails Dog Walking. All rights reserved.</footer>
+    </div>
+    {% set breeds_available = dog_breeds|length > 0 %}
+    {% set areas_available = coverage_areas|length > 0 %}
+    {% set booking_ready = breeds_available and areas_available %}
+    <div class="booking-modal hidden" id="bookingModal" role="dialog" aria-modal="true">
+      <div class="booking-modal__content">
+        <button class="booking-modal__close" id="bookingModalClose" aria-label="Close booking form">
+          &times;
+        </button>
+        <div>
+          <h2 style="margin-bottom: 0.35rem">Reserve this slot</h2>
+          <p id="bookingSlotSummary" style="margin: 0; color: #475569"></p>
+          <div id="bookingSlotPrice" class="slot-price-pill hidden"></div>
+        </div>
+        <form id="bookingForm">
+          <input type="hidden" id="bookingSlotId" />
+          <label>
+            Your name
+            <input type="text" id="bookingName" required />
+          </label>
+          <label>
+            Email address
+            <input type="email" id="bookingEmail" required />
+          </label>
+          {% if breeds_available %}
+          <label>
+            Dog breed
+            <select id="bookingBreed" required>
+              <option value="" disabled selected>Select a breed</option>
+              {% for breed in dog_breeds %}
+              <option value="{{ breed.id }}">{{ breed.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          {% else %}
+          <p class="booking-modal__note">
+            Add dog breeds from the admin page to enable bookings.
+          </p>
+          {% endif %}
+          {% if areas_available %}
+          <label>
+            Service area
+            <select id="bookingCoverageArea" required>
+              <option value="" disabled selected>Select your area</option>
+              {% for area in coverage_areas %}
+              <option value="{{ area.id }}">
+                {{ area.name }}{% if area.travel_fee %} · +{{ format_price_label(area.travel_fee) }} travel{% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </label>
+          {% else %}
+          <p class="booking-modal__note">
+            Add service areas from the admin page to enable bookings.
+          </p>
+          {% endif %}
+          <div class="booking-modal__error hidden" id="bookingModalError"></div>
+          <button type="submit" {% if not booking_ready %}disabled{% endif %}>Book this slot</button>
+        </form>
+      </div>
+    </div>
+    {% include "chat_widget.html" %}
+    <script src="{{ url_for('static', filename='js/booking.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/chat-widget.js') }}" defer></script>
+  </body>
+</html>

@@ -1,0 +1,3210 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chat-widget.css') }}" />
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      body {
+        font-family: "Inter", "Segoe UI", Arial, sans-serif;
+        margin: 0;
+        min-height: 100vh;
+        background: linear-gradient(180deg, #eff4ff 0%, #f8fafc 60%, #fff 100%);
+        color: #0f172a;
+      }
+      .admin-shell {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2.5rem 1.5rem 3rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+      .admin-header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 1rem;
+        align-items: center;
+      }
+      .admin-header h1 {
+        margin: 0 0 0.35rem;
+        font-size: clamp(1.5rem, 3vw, 2.4rem);
+      }
+      .admin-header p {
+        margin: 0;
+        color: #475569;
+      }
+      a,
+      button {
+        width: fit-content;
+        padding: 0.5rem 1rem;
+        border-radius: 999px;
+        border: none;
+        background: #1f4ad1;
+        color: #fff;
+        cursor: pointer;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+      }
+      a:hover,
+      button:hover {
+        background: #1739a2;
+      }
+      .link-button {
+        background: transparent;
+        color: #1f4ad1;
+        padding: 0;
+        border: none;
+        border-radius: 0;
+        text-decoration: underline;
+        font-weight: 600;
+      }
+      .link-button:hover {
+        background: transparent;
+        color: #0f2f8d;
+      }
+      button:disabled,
+      button[disabled] {
+        background: #cbd2d9;
+        color: #475569;
+        cursor: not-allowed;
+      }
+      .home-link {
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.85rem;
+      }
+      .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-size: 0.75rem;
+        color: #94a3b8;
+        margin: 0 0 0.3rem;
+      }
+      .global-chat-banner {
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.9rem 1.25rem;
+        border-radius: 20px;
+        background: rgba(254, 243, 199, 0.95);
+        border: 1px solid rgba(251, 191, 36, 0.5);
+        box-shadow: 0 15px 35px rgba(251, 146, 60, 0.25);
+        margin: 0 0 1.5rem;
+        position: sticky;
+        top: 0.5rem;
+        z-index: 30;
+      }
+      .global-chat-banner.is-active {
+        display: flex;
+        animation: flashBg 1.1s ease-in-out infinite;
+      }
+      .global-chat-banner p {
+        margin: 0;
+        color: #92400e;
+      }
+      .view-nav {
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 999px;
+        padding: 0.4rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        box-shadow: 0 10px 40px rgba(15, 23, 42, 0.08);
+      }
+      .view-nav button {
+        border-radius: 999px;
+        padding: 0.4rem 0.9rem;
+        background: transparent;
+        color: #475569;
+        border: 1px solid transparent;
+        font-size: 0.9rem;
+      }
+      .view-nav button.is-active {
+        background: #1f4ad1;
+        color: #fff;
+        border-color: #1f4ad1;
+      }
+      .admin-main {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+      .view {
+        display: none;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+      .view--active {
+        display: flex;
+      }
+      .coverage-admin {
+        margin-top: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      .coverage-admin__grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1rem;
+      }
+      .coverage-admin__card {
+        background: #fff;
+        border-radius: 18px;
+        padding: 1.25rem;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+        border: 1px solid rgba(15, 23, 42, 0.04);
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .coverage-admin__card h3 {
+        margin: 0;
+        font-size: 1.2rem;
+      }
+      .coverage-admin__card p {
+        margin: 0;
+        color: #475569;
+      }
+      .coverage-admin__card form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .coverage-admin__card label {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #0f172a;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+      .coverage-admin__card input,
+      .coverage-admin__card textarea {
+        border-radius: 12px;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        padding: 0.65rem 0.75rem;
+        font-size: 0.95rem;
+        font-family: inherit;
+      }
+      .coverage-admin__card textarea {
+        min-height: 80px;
+        resize: vertical;
+      }
+      .coverage-admin__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+      }
+      .coverage-admin__empty {
+        margin: 0;
+        color: #94a3b8;
+        font-style: italic;
+      }
+      .photo-admin {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+      .photo-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+      }
+      .photo-group__header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 0.5rem;
+        align-items: baseline;
+      }
+      .photo-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1rem;
+      }
+      .photo-card {
+        background: #fff;
+        border-radius: 20px;
+        padding: 1rem;
+        box-shadow: 0 15px 40px rgba(15, 23, 42, 0.08);
+        border: 1px solid rgba(15, 23, 42, 0.05);
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .photo-card__preview {
+        border-radius: 14px;
+        overflow: hidden;
+        aspect-ratio: 4 / 3;
+        background: #f1f5f9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .photo-card__preview img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+      .photo-card__details {
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+      }
+      .photo-card__details h3 {
+        margin: 0;
+        font-size: 1.05rem;
+      }
+      .photo-card__details p {
+        margin: 0;
+        color: #475569;
+        font-size: 0.9rem;
+      }
+      .photo-card form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .photo-card label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+      .photo-card input[type="url"] {
+        border-radius: 12px;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        padding: 0.55rem 0.65rem;
+        font-size: 0.95rem;
+        font-family: inherit;
+      }
+      .photo-card__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+      }
+      .photo-card__meta {
+        font-size: 0.8rem;
+        color: #94a3b8;
+      }
+      .credential-admin {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+      .credential-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 1rem;
+      }
+      .credential-card {
+        background: #fff;
+        border-radius: 18px;
+        padding: 1.25rem;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+        border: 1px solid rgba(15, 23, 42, 0.05);
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .credential-card form,
+      .credential-edit-form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .credential-card label,
+      .credential-edit-form label {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #0f172a;
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+      }
+      .credential-card input,
+      .credential-card textarea,
+      .credential-edit-form input,
+      .credential-edit-form textarea {
+        border-radius: 12px;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        padding: 0.65rem 0.75rem;
+        font-size: 0.95rem;
+        font-family: inherit;
+      }
+      .credential-card textarea,
+      .credential-edit-form textarea {
+        min-height: 80px;
+        resize: vertical;
+      }
+      .credential-list {
+        display: grid;
+        gap: 1rem;
+      }
+      .credential-list__item {
+        background: #fff;
+        border-radius: 18px;
+        padding: 1.25rem;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+        border: 1px solid rgba(15, 23, 42, 0.05);
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .credential-list__title {
+        margin: 0;
+        font-size: 1.2rem;
+      }
+      .credential-list__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+      }
+      .credential-delete-form {
+        margin-top: -0.25rem;
+      }
+      .credential-empty {
+        margin: 0;
+        color: #94a3b8;
+        font-style: italic;
+      }
+      .view-heading {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        padding: 1.25rem;
+        border-radius: 18px;
+        background: #fff;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+      }
+      .view-heading h2 {
+        margin: 0.1rem 0 0.3rem;
+        font-size: clamp(1.3rem, 2.5vw, 1.9rem);
+      }
+      .view-heading p {
+        margin: 0;
+        color: #475569;
+        max-width: 46ch;
+      }
+      .ghost-button {
+        background: transparent;
+        border: 1px solid #cbd2d9;
+        color: #0f172a;
+      }
+      .ghost-button:hover {
+        background: #e2e8f0;
+        color: #0f172a;
+      }
+      .ghost-button--small {
+        padding: 0.35rem 0.8rem;
+        font-size: 0.85rem;
+      }
+      .menu-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+      }
+      .menu-card {
+        width: 100%;
+        height: 100%;
+        text-align: left;
+        background: #fff;
+        border-radius: 20px;
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+        box-shadow: 0 15px 40px rgba(15, 23, 42, 0.08);
+        border: 1px solid rgba(15, 23, 42, 0.04);
+        color: #0f172a;
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
+      }
+      .menu-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 18px 45px rgba(15, 23, 42, 0.12);
+      }
+      .menu-card__eyebrow {
+        font-size: 0.8rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #94a3b8;
+        margin: 0;
+      }
+      .menu-card h3 {
+        margin: 0;
+        font-size: 1.4rem;
+      }
+      .menu-card p {
+        margin: 0;
+        color: #475569;
+      }
+      .menu-card__meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+      }
+      .menu-card__icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 16px;
+        background: #eef2ff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: #1f4ad1;
+      }
+      .menu-card__top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.85rem;
+      }
+      .menu-pill {
+        padding: 0.15rem 0.65rem;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        border: 1px solid #e2e8f0;
+        color: #475569;
+        background: #f8fafc;
+      }
+      .menu-pill--alert {
+        border-color: #f97316;
+        color: #c2410c;
+        background: #fff7ed;
+      }
+      .menu-pill--success {
+        border-color: #22c55e;
+        color: #15803d;
+        background: #f0fdf4;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        background: #fff;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 10px 40px rgba(15, 23, 42, 0.08);
+      }
+      th,
+      td {
+        border: 1px solid #cbd2d9;
+        padding: 0.75rem;
+        text-align: left;
+      }
+      th {
+        background: #f4f6fb;
+      }
+      select {
+        padding: 0.35rem 0.5rem;
+      }
+      .actions {
+        display: flex;
+        gap: 0.5rem;
+      }
+      form.inline {
+        display: inline;
+      }
+      section {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      section + section {
+        margin-top: 1rem;
+      }
+      .chat-alert {
+        background: #fff;
+        border-radius: 16px;
+        padding: 1.25rem 1.5rem;
+        box-shadow: 0 15px 35px rgba(15, 23, 42, 0.06);
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+      .chat-alert button:disabled {
+        background: #cbd2d9;
+        cursor: not-allowed;
+      }
+      .chat-alert.flash {
+        animation: flashSuccessBg 1s steps(2, jump-start) infinite;
+      }
+      .chat-panel {
+        background: #fff;
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      .chat-panel__header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+      }
+      .chat-panel__actions {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+      .chat-panel__selection-group {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        align-items: flex-end;
+      }
+      .chat-panel__selection {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        min-width: 220px;
+      }
+      .chat-panel__selection label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #475569;
+      }
+      .chat-panel__selection select {
+        padding: 0.4rem 0.5rem;
+        border-radius: 8px;
+        border: 1px solid #cbd2d9;
+        font-size: 0.95rem;
+        min-height: 2.25rem;
+      }
+      .chat-indicator {
+        padding: 0.35rem 0.75rem;
+        border-radius: 999px;
+        background: #e2e8f0;
+        color: #1f2937;
+        font-size: 0.85rem;
+        font-weight: 600;
+        transition: transform 0.2s ease, background 0.2s ease;
+      }
+      .chat-indicator.active {
+        background: #f97316;
+        color: #fff;
+        animation: pulse 1s infinite;
+      }
+      .chat-panel__close {
+        background: #e2e8f0;
+        color: #0f172a;
+      }
+      .chat-panel__close:hover {
+        background: #cbd2d9;
+        color: #0f172a;
+      }
+      .chat-panel__body {
+        max-height: 380px;
+        height: 380px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1rem;
+        background: #f8fafc;
+      }
+      .chat-row {
+        display: flex;
+      }
+      .chat-row.admin {
+        justify-content: flex-end;
+      }
+      .chat-row .bubble {
+        padding: 0.6rem 0.85rem;
+        border-radius: 12px;
+        max-width: 70%;
+        font-size: 0.95rem;
+      }
+      .chat-row.admin .bubble {
+        background: #1f4ad1;
+        color: #fff;
+        border-bottom-right-radius: 4px;
+      }
+      .chat-row.visitor .bubble {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        color: #0f172a;
+        border-bottom-left-radius: 4px;
+      }
+      .chat-panel__form {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+      }
+      .chat-panel__form input {
+        flex: 1;
+        padding: 0.55rem 0.9rem;
+        border-radius: 999px;
+        border: 1px solid #cbd2d9;
+        font-size: 1rem;
+      }
+      .chat-panel__form button {
+        margin: 0;
+        border-radius: 999px;
+      }
+      .chat-empty-state {
+        width: 100%;
+        text-align: center;
+        color: #6b7280;
+        padding: 1.5rem 0.5rem;
+      }
+      .breed-admin,
+      .booking-admin,
+      .autopilot-card {
+        background: #fff;
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 15px 40px rgba(15, 23, 42, 0.08);
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      .autopilot-card__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+      .autopilot-card__toggle-form {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .toggle-switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        cursor: pointer;
+        font-weight: 600;
+        color: #475569;
+      }
+      .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+        position: absolute;
+      }
+      .toggle-slider {
+        width: 48px;
+        height: 26px;
+        border-radius: 999px;
+        background: #cbd2d9;
+        position: relative;
+        transition: background 0.2s ease;
+      }
+      .toggle-slider::after {
+        content: "";
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #fff;
+        top: 3px;
+        left: 3px;
+        box-shadow: 0 2px 4px rgba(15, 23, 42, 0.2);
+        transition: transform 0.2s ease;
+      }
+      .toggle-switch input:checked + .toggle-slider {
+        background: #0f9d58;
+      }
+      .toggle-switch input:checked + .toggle-slider::after {
+        transform: translateX(22px);
+      }
+      .toggle-state {
+        font-size: 0.85rem;
+      }
+      .autopilot-status-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 1rem;
+      }
+      .autopilot-status-grid span {
+        color: #94a3b8;
+        font-size: 0.85rem;
+      }
+      .autopilot-preview {
+        margin: 0;
+        background: #f8fafc;
+        padding: 0.75rem 1rem;
+        border-radius: 12px;
+      }
+      .autopilot-warning {
+        margin: 0;
+        color: #b91c1c;
+        background: #fee2e2;
+        border: 1px solid #fecaca;
+        padding: 0.65rem 0.85rem;
+        border-radius: 10px;
+        font-weight: 600;
+      }
+      .service-status-card {
+        background: #fff;
+        border-radius: 24px;
+        padding: clamp(1.25rem, 3vw, 2rem);
+        box-shadow: 0 20px 50px rgba(15, 23, 42, 0.1);
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+      .service-status-card__preview {
+        border-radius: 18px;
+        border: 1px dashed rgba(15, 23, 42, 0.2);
+        padding: 1.2rem 1.4rem;
+        background: rgba(254, 243, 199, 0.4);
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+      .service-status-card__preview.is-active {
+        border-color: rgba(194, 65, 12, 0.5);
+        background: rgba(254, 243, 199, 0.9);
+      }
+      .service-status-card__preview span {
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.75rem;
+        color: #92400e;
+      }
+      .service-status-card__preview p {
+        margin: 0;
+        font-weight: 600;
+        color: #7c2d12;
+      }
+      .service-status-card__form p {
+        margin: 0 0 0.75rem;
+        color: #475569;
+      }
+      .service-status-card__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: center;
+      }
+      .service-status-card__note {
+        margin: 0;
+        font-size: 0.85rem;
+        color: #94a3b8;
+      }
+      .business-brief-form textarea {
+        width: 100%;
+        min-height: 130px;
+        border-radius: 12px;
+        border: 1px solid #cbd2d9;
+        padding: 0.75rem;
+        font-size: 1rem;
+      }
+      .business-brief-form button {
+        margin-top: 0.5rem;
+      }
+      .breed-admin__grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 1.25rem;
+      }
+      .breed-admin form label {
+        font-weight: 600;
+        color: #475569;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+      .breed-admin form input[type="text"] {
+        padding: 0.45rem 0.6rem;
+        border-radius: 10px;
+        border: 1px solid #cbd2d9;
+      }
+      .breed-list-wrapper h3 {
+        margin: 0 0 0.35rem;
+      }
+      .breed-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 0.4rem 0.75rem;
+        font-size: 0.85rem;
+      }
+      @media (min-width: 900px) {
+        .breed-list {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+      .breed-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.35rem;
+        background: #f1f5f9;
+        padding: 0.35rem 0.6rem;
+        border-radius: 999px;
+      }
+      .breed-item form {
+        margin: 0;
+      }
+      .breed-remove-btn {
+        background: transparent;
+        color: #ef4444;
+        padding: 0;
+        width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        border: none;
+        font-size: 1rem;
+      }
+      .breed-remove-btn:hover {
+        background: rgba(239, 68, 68, 0.12);
+      }
+      .breed-ai-panel {
+        border-top: 1px solid #e2e8f0;
+        padding-top: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .breed-ai-panel__form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .breed-ai-panel__form input[type="text"] {
+        padding: 0.5rem 0.65rem;
+        border: 1px solid #cbd2d9;
+        border-radius: 10px;
+      }
+      .breed-ai-results {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1rem;
+      }
+      .breed-ai-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 0.85rem 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .breed-ai-card__list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        max-height: 220px;
+        overflow-y: auto;
+      }
+      .breed-ai-card__list label {
+        display: flex;
+        gap: 0.35rem;
+        font-size: 0.9rem;
+        align-items: center;
+      }
+      .breed-ai-panel__error {
+        color: #b91c1c;
+        background: #fee2e2;
+        border: 1px solid #fecaca;
+        padding: 0.65rem 0.85rem;
+        border-radius: 10px;
+        font-weight: 600;
+      }
+      .breed-ai-panel__dismiss {
+        display: flex;
+        justify-content: flex-end;
+      }
+      .booking-admin .slot-form {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+        align-items: end;
+      }
+      .slot-form label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        font-weight: 600;
+        color: #475569;
+      }
+      .slot-form input[type="date"] {
+        padding: 0.45rem 0.6rem;
+        border-radius: 10px;
+        border: 1px solid #cbd2d9;
+      }
+      .slot-edit-panel {
+        margin-top: 0.75rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid #e2e8f0;
+      }
+      .slot-edit-panel summary {
+        cursor: pointer;
+        font-weight: 600;
+        color: #2563eb;
+      }
+      .slot-edit-form {
+        margin-top: 0.5rem;
+        display: grid;
+        gap: 0.75rem;
+      }
+      .slot-edit-form label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        font-size: 0.9rem;
+        color: #475569;
+      }
+      .slot-edit-form input,
+      .slot-edit-form select {
+        font: inherit;
+        padding: 0.35rem 0.5rem;
+        border-radius: 6px;
+        border: 1px solid #cbd5f5;
+      }
+      .slot-edit-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .time-picker__options {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+      }
+      .time-button {
+        background: #e2e8f0;
+        color: #0f172a;
+        border-radius: 999px;
+        padding: 0.35rem 0.85rem;
+        cursor: pointer;
+        border: none;
+        font-weight: 600;
+      }
+      .time-button.selected {
+        background: #1f4ad1;
+        color: #fff;
+      }
+      .slot-columns {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1rem;
+      }
+      .slot-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+      }
+      .slot-list li {
+        padding: 0.9rem 1rem;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+      }
+      .slot-list strong {
+        display: block;
+        font-size: 1rem;
+        margin-bottom: 0.2rem;
+      }
+      .slot-list__meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        margin-top: 0.2rem;
+        font-size: 0.85rem;
+      }
+      .slot-label {
+        font-weight: 600;
+        color: #475569;
+      }
+      .slot-price {
+        font-weight: 600;
+        color: #0f172a;
+      }
+      .muted {
+        color: #64748b;
+        font-size: 0.9rem;
+      }
+      .slots-table {
+        border-collapse: collapse;
+        width: 100%;
+        background: #fff;
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .slots-table th,
+      .slots-table td {
+        border: 1px solid #e2e8f0;
+        padding: 0.75rem;
+        text-align: left;
+      }
+      .slots-table th {
+        background: #f8fafc;
+      }
+      .slot-status-form select {
+        padding: 0.35rem 0.5rem;
+        border-radius: 8px;
+        border: 1px solid #cbd2d9;
+      }
+      .chat-panel__delete {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+      .chat-panel__delete:hover {
+        background: #fecaca;
+        color: #7f1d1d;
+      }
+      .chat-panel__delete:disabled {
+        background: #e2e8f0;
+        color: #475569;
+        cursor: not-allowed;
+      }
+      .backup-card {
+        background: #fff;
+        border-radius: 20px;
+        padding: 1.5rem;
+        box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+      }
+      .backup-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1.25rem;
+      }
+      .backup-grid + .backup-grid {
+        margin-top: 0.5rem;
+      }
+      .backup-panel {
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 1rem 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+        background: #f8fafc;
+      }
+      .backup-panel h3 {
+        margin: 0;
+      }
+      .backup-panel p {
+        margin: 0;
+        color: #475569;
+      }
+      .backup-upload-form {
+        display: grid;
+        gap: 0.5rem;
+      }
+      .backup-upload-form label {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #0f172a;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+      .backup-upload-form input[type="file"] {
+        font-size: 0.9rem;
+      }
+      .backup-alert {
+        border-radius: 16px;
+        padding: 0.75rem 1rem;
+        background: #ecfdf5;
+        color: #065f46;
+        font-weight: 600;
+      }
+      .backup-alert--error {
+        background: #fee2e2;
+        color: #b91c1c;
+      }
+      .backup-meta {
+        border-top: 1px solid #e2e8f0;
+        padding-top: 1rem;
+        display: grid;
+        gap: 0.35rem;
+      }
+      .backup-meta strong {
+        display: block;
+        font-size: 1.1rem;
+        margin-bottom: 0.25rem;
+      }
+      .backup-meta ul {
+        margin: 0;
+        padding-left: 1.2rem;
+        color: #475569;
+      }
+      .backup-note {
+        margin: 0;
+        color: #b45309;
+        font-size: 0.9rem;
+      }
+      .backup-note code {
+        font-size: 0.85rem;
+        word-break: break-all;
+      }
+      .ghost-button--danger {
+        color: #b91c1c;
+        border-color: #fecaca;
+      }
+      .empty-state {
+        color: #6b7280;
+      }
+      .hidden {
+        display: none;
+      }
+      @keyframes flashBg {
+        0% {
+          box-shadow: 0 0 0 rgba(249, 115, 22, 0.3);
+          background: #fff7ed;
+        }
+        50% {
+          box-shadow: 0 0 25px rgba(249, 115, 22, 0.45);
+          background: #ffedd5;
+        }
+        100% {
+          box-shadow: 0 0 0 rgba(249, 115, 22, 0.3);
+          background: #fff7ed;
+        }
+      }
+      @keyframes flashSuccessBg {
+        0% {
+          box-shadow: 0 0 0 rgba(34, 197, 94, 0.25);
+          background: #f0fdf4;
+        }
+        50% {
+          box-shadow: 0 0 25px rgba(34, 197, 94, 0.45);
+          background: #dcfce7;
+        }
+        100% {
+          box-shadow: 0 0 0 rgba(34, 197, 94, 0.25);
+          background: #f0fdf4;
+        }
+      }
+      .menu-card--alert {
+        animation: flashBg 1.5s ease-in-out infinite;
+      }
+      .menu-card--success {
+        animation: flashSuccessBg 1.5s ease-in-out infinite;
+        border-color: #22c55e;
+      }
+      @keyframes pulse {
+        0% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.08);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="admin-shell">
+      <header class="admin-header">
+        <div>
+          <p class="eyebrow">Control center</p>
+          <h1>Admin dashboard</h1>
+          <p>Jump between concierge tools, review leads, and meet visitors in one place.</p>
+        </div>
+        <a class="home-link" href="{{ home_url }}">Return to site</a>
+      </header>
+      <div class="global-chat-banner" id="globalChatBanner" aria-live="polite">
+        <div>
+          <p class="eyebrow" style="margin-bottom: 0.15rem">Live chat</p>
+          <p id="globalChatBannerText">A visitor is waiting in live chat.</p>
+        </div>
+        <button type="button" class="ghost-button" data-open-view="chat" id="globalChatBannerButton">
+          Jump to chat
+        </button>
+      </div>
+      <nav class="view-nav" aria-label="Admin menu">
+        <button type="button" class="is-active" data-open-view="menu">Main menu</button>
+        <button type="button" data-open-view="autopilot">Autopilot</button>
+        <button type="button" data-open-view="status">Service notice</button>
+        <button type="button" data-open-view="backups">Save &amp; load</button>
+        <button type="button" data-open-view="photos">Site photos</button>
+        <button type="button" data-open-view="breeds">Dog breeds</button>
+        <button type="button" data-open-view="enquiries">Enquiries</button>
+        <button type="button" data-open-view="appointments">Appointments</button>
+        <button type="button" data-open-view="coverage">Service area</button>
+        <button type="button" data-open-view="credentials">Credentials</button>
+        <button type="button" data-open-view="visitors">Visitor insights</button>
+        <button type="button" data-open-view="chat">Live chat</button>
+      </nav>
+      <main class="admin-main">
+        <section class="view view--active" data-view="menu" aria-label="Main admin menu">
+          <div class="view-heading">
+            <div>
+              <p class="eyebrow">Start here</p>
+              <h2>Choose a workspace</h2>
+              <p>Each tile opens a focused screen. Use the buttons above to jump between tools anytime.</p>
+            </div>
+          </div>
+          <div class="menu-grid">
+            <button type="button" class="menu-card" data-open-view="autopilot">
+              <div class="menu-card__top">
+                <div>
+                  <p class="menu-card__eyebrow">Autopilot concierge</p>
+                  <h3>{{ 'Enabled' if autopilot_enabled else 'Off' }}</h3>
+                  <p>
+                    {{
+                      'DeepSeek is ready to reply in your tone.'
+                      if autopilot_enabled
+                      else 'Turn it on to let DeepSeek assist visitors.'
+                    }}
+                  </p>
+                </div>
+                <div class="menu-card__icon">🤖</div>
+              </div>
+              <div class="menu-card__meta">
+                <span class="menu-pill">Last run: {{ autopilot_status.last_run or 'Never' }}</span>
+              </div>
+            </button>
+            <button
+              type="button"
+              class="menu-card {% if service_notice.enabled %}menu-card--alert{% endif %}"
+              data-open-view="status"
+            >
+              <div class="menu-card__top">
+                <div>
+                  <p class="menu-card__eyebrow">Service notice</p>
+                  <h3>{{ 'Live' if service_notice.enabled else 'Hidden' }}</h3>
+                  <p>
+                    {{
+                      'Visitors currently see the construction warning.'
+                      if service_notice.enabled
+                      else 'Activate when the site is under development.'
+                    }}
+                  </p>
+                </div>
+                <div class="menu-card__icon">🚧</div>
+              </div>
+              <div class="menu-card__meta">
+                <span class="menu-pill">{{ service_notice.message }}</span>
+              </div>
+            </button>
+            <button type="button" class="menu-card" data-open-view="status">
+              <div class="menu-card__top">
+                <div>
+                  <p class="menu-card__eyebrow">Meet &amp; greet CTA</p>
+                  <h3>{{ 'Visible' if meet_greet_enabled else 'Hidden' }}</h3>
+                  <p>
+                    {{
+                      'Homepage section is currently promoted to visitors.'
+                      if meet_greet_enabled
+                      else 'Keep it off while meet & greets are unavailable.'
+                    }}
+                  </p>
+                </div>
+                <div class="menu-card__icon">🐶</div>
+              </div>
+              <div class="menu-card__meta">
+                <span class="menu-pill">
+                  {{ 'Homepage CTA live' if meet_greet_enabled else 'CTA hidden sitewide' }}
+                </span>
+              </div>
+            </button>
+            <button type="button" class="menu-card" data-open-view="backups">
+              <div class="menu-card__top">
+                <div>
+                  <p class="menu-card__eyebrow">Save &amp; load</p>
+                  <h3>
+                    {% if state_backup_metadata.exists %}
+                    Backup ready
+                    {% else %}
+                    No backup yet
+                    {% endif %}
+                  </h3>
+                  <p>Save your current leads, chats, and slots to reload after updates.</p>
+                </div>
+                <div class="menu-card__icon">💾</div>
+              </div>
+              <div class="menu-card__meta">
+                <span class="menu-pill">
+                  {% if state_backup_metadata.saved_at %}
+                  Saved {{ state_backup_metadata.saved_at }}
+                  {% elif state_backup_metadata.exists %}
+                  Backup file detected
+                  {% else %}
+                  Awaiting first save
+                  {% endif %}
+                </span>
+              </div>
+            </button>
+            <button type="button" class="menu-card" data-open-view="photos">
+              <div class="menu-card__top">
+                <div>
+                  <p class="menu-card__eyebrow">Site photos</p>
+                  <h3>{{ site_photo_total }} image{{ 's' if site_photo_total != 1 else '' }}</h3>
+                  <p>Review every hero image and portrait across the live pages.</p>
+                </div>
+                <div class="menu-card__icon">🖼️</div>
+              </div>
+              <div class="menu-card__meta">
+                <span class="menu-pill {% if site_photo_custom_count %}menu-pill--alert{% endif %}">
+                  {% if site_photo_custom_count %}
+                  {{ site_photo_custom_count }} custom update{{ 's' if site_photo_custom_count != 1 else '' }}
+                  {% else %}
+                  All default images
+                  {% endif %}
+                </span>
+              </div>
+            </button>
+            <button type="button" class="menu-card" data-open-view="breeds">
+              <div class="menu-card__top">
+                <div>
+                  <p class="menu-card__eyebrow">Dog breeds</p>
+                  <h3>{{ dog_breeds | length }} live</h3>
+                  <p>Curate the list visitors see while booking.</p>
+                </div>
+                <div class="menu-card__icon">🐾</div>
+              </div>
+              <div class="menu-card__meta">
+                <span class="menu-pill">
+                  {% if breed_ai_suggestions %}AI suggestions ready{% else %}AI suggestions idle{% endif %}
+                </span>
+              </div>
+            </button>
+            <button type="button" class="menu-card" data-open-view="enquiries">
+              <div class="menu-card__top">
+                <div>
+                  <p class="menu-card__eyebrow">Enquiries</p>
+                  <h3>{{ submissions | length }} total</h3>
+                  <p>
+                    {{ new_enquiry_count }} new message{{ 's' if new_enquiry_count != 1 else '' }} awaiting a response.
+                  </p>
+                </div>
+                <div class="menu-card__icon">✉️</div>
+              </div>
+              <div class="menu-card__meta">
+                <span class="menu-pill">Status: {{ 'Busy' if submissions else 'Quiet' }}</span>
+              </div>
+            </button>
+            <button
+              type="button"
+              class="menu-card {% if has_new_bookings %}menu-card--success{% endif %}"
+              data-open-view="appointments"
+            >
+              <div class="menu-card__top">
+                <div>
+                  <p class="menu-card__eyebrow">Appointment slots</p>
+                  <h3>{{ booked_slots | length }} booked • {{ available_slots | length }} open</h3>
+                  <p>Publish new times and track who has booked.</p>
+                </div>
+                <div class="menu-card__icon">📅</div>
+              </div>
+              <div class="menu-card__meta">
+                {% if has_new_bookings %}
+                <span class="menu-pill menu-pill--success">New booking needs review</span>
+                {% else %}
+                <span class="menu-pill">All bookings handled</span>
+                {% endif %}
+              </div>
+            </button>
+            <button type="button" class="menu-card" data-open-view="coverage">
+              <div class="menu-card__top">
+                <div>
+                  <p class="menu-card__eyebrow">Service area</p>
+                  <h3>{{ coverage_areas | length }} live</h3>
+                  <p>Manage the neighbourhood cards shown on the homepage.</p>
+                </div>
+                <div class="menu-card__icon">🗺️</div>
+              </div>
+              <div class="menu-card__meta">
+                <span class="menu-pill">Update copy &amp; order anytime</span>
+              </div>
+            </button>
+            <button type="button" class="menu-card" data-open-view="credentials">
+              <div class="menu-card__top">
+                <div>
+                  <p class="menu-card__eyebrow">Credentials</p>
+                  <h3>{{ certificates | length }} published</h3>
+                  <p>Showcase qualifications on the About page.</p>
+                </div>
+                <div class="menu-card__icon">📜</div>
+              </div>
+              <div class="menu-card__meta">
+                <span class="menu-pill">Uploads appear instantly</span>
+              </div>
+            </button>
+            <button type="button" class="menu-card" data-open-view="visitors">
+              <div class="menu-card__top">
+                <div>
+                  <p class="menu-card__eyebrow">Visitor insights</p>
+                  <h3>{{ visitor_count }} tracked</h3>
+                  <p>See locations, devices, and block unwanted traffic.</p>
+                </div>
+                <div class="menu-card__icon">📊</div>
+              </div>
+              <div class="menu-card__meta">
+                <span class="menu-pill">{{ blocked_ips | length }} blocked IP{{ '' if blocked_ips | length == 1 else 's' }}</span>
+              </div>
+            </button>
+            <button type="button" class="menu-card" data-open-view="chat">
+              <div class="menu-card__top">
+                <div>
+                  <p class="menu-card__eyebrow">Live visitor chat</p>
+                  <h3>{{ chat_waiting_count }} waiting</h3>
+                  <p>
+                    {% if chat_waiting_count %}
+                    Visitors are ready to talk now.
+                    {% else %}
+                    You're all caught up on conversations.
+                    {% endif %}
+                  </p>
+                </div>
+                <div class="menu-card__icon">💬</div>
+              </div>
+              <div class="menu-card__meta">
+                <span class="menu-pill">{{ chat_conversations | length }} total chats</span>
+              </div>
+            </button>
+          </div>
+        </section>
+
+        <section class="view" data-view="autopilot" aria-labelledby="autopilotHeading">
+          <div class="view-heading">
+            <div>
+              <p class="eyebrow">Concierge</p>
+              <h2 id="autopilotHeading">Autopilot concierge</h2>
+              <p>Toggle DeepSeek on or off and refine the business-in-a-box playbook it reads.</p>
+            </div>
+            <button type="button" class="ghost-button" data-open-view="menu">Back to main menu</button>
+          </div>
+          <section class="autopilot-card">
+            <div class="autopilot-card__header">
+              <div>
+                <h3 style="margin: 0 0 0.35rem">Autopilot concierge</h3>
+                <p style="margin: 0; color: #475569">
+                  DeepSeek can jump into any chat using your saved business-in-a-box script.
+                </p>
+              </div>
+              <form method="post" action="{{ url_for('toggle_autopilot') }}" class="autopilot-card__toggle-form">
+                <label class="toggle-switch">
+                  <input
+                    type="checkbox"
+                    name="enabled"
+                    value="1"
+                    {% if autopilot_enabled %}checked{% endif %}
+                    onchange="this.form.submit()"
+                    aria-label="Toggle Autopilot"
+                  />
+                  <span class="toggle-slider" aria-hidden="true"></span>
+                  <span class="toggle-state">{{ 'On' if autopilot_enabled else 'Off' }}</span>
+                </label>
+                <noscript>
+                  <button type="submit" name="enabled" value="{{ 0 if autopilot_enabled else 1 }}">
+                    {{ 'Disable' if autopilot_enabled else 'Enable' }} Autopilot
+                  </button>
+                </noscript>
+              </form>
+            </div>
+            <div class="autopilot-status-grid">
+              <div>
+                <span>Status</span>
+                <strong>{{ 'Enabled' if autopilot_enabled else 'Off' }}</strong>
+              </div>
+              <div>
+                <span>Model</span>
+                <strong>{{ autopilot_model }}</strong>
+              </div>
+              <div>
+                <span>Last run</span>
+                <strong>{{ autopilot_status.last_run or 'Not yet' }}</strong>
+              </div>
+              <div>
+                <span>Visitor</span>
+                <strong>{{ autopilot_status.last_visitor_id or '—' }}</strong>
+              </div>
+            </div>
+            {% if autopilot_status.last_reply_preview %}
+            <p class="autopilot-preview">
+              <strong>Latest answer:</strong> {{ autopilot_status.last_reply_preview }}
+            </p>
+            {% endif %}
+            {% if autopilot_api_key_missing %}
+            <p class="autopilot-warning">Add the DEEPSEEK_API_KEY variable in Vercel to activate autopilot.</p>
+            {% endif %}
+            {% if autopilot_status.last_error %}
+            <p class="autopilot-warning">Last error: {{ autopilot_status.last_error }}</p>
+            {% endif %}
+            <form class="business-brief-form" method="post" action="{{ url_for('update_business_profile') }}">
+              <label>
+                Business in a box brief
+                <textarea name="business_box" required>{{ business_in_a_box }}</textarea>
+              </label>
+              <p class="muted" style="margin: 0">
+                Share your differentiators, tone, and booking steps. Autopilot reads this before answering.
+              </p>
+              <button type="submit">Save playbook</button>
+            </form>
+          </section>
+        </section>
+
+        <section class="view" data-view="status" aria-labelledby="noticeHeading">
+          <div class="view-heading">
+            <div>
+              <p class="eyebrow">Service banner</p>
+              <h2 id="noticeHeading">Website status notice</h2>
+              <p>Flip the construction warning or meet &amp; greet CTA on or off whenever you're updating the public site.</p>
+            </div>
+            <button type="button" class="ghost-button" data-open-view="menu">Back to main menu</button>
+          </div>
+          <section class="service-status-card">
+            <div class="service-status-card__preview {% if service_notice.enabled %}is-active{% endif %}">
+              <span>Live banner preview</span>
+              <p>{{ service_notice.message }}</p>
+            </div>
+            <form method="post" action="{{ url_for('update_service_notice') }}" class="service-status-card__form">
+              <input type="hidden" name="message" value="{{ service_notice.message }}" />
+              <p>
+                The message is fixed so visitors always see:
+                <strong>{{ service_notice.message }}</strong>
+              </p>
+              <div class="service-status-card__actions">
+                <button type="submit" name="enabled" value="1" {% if service_notice.enabled %}disabled{% endif %}>
+                  Show notice
+                </button>
+                <button
+                  type="submit"
+                  name="enabled"
+                  value="0"
+                  class="ghost-button"
+                  {% if not service_notice.enabled %}disabled{% endif %}
+                >
+                  Hide notice
+                </button>
+              </div>
+              <p class="service-status-card__note">
+                This setting is included when you save or load admin backups.
+              </p>
+            </form>
+          </section>
+          <section class="service-status-card">
+            <div class="service-status-card__preview {% if meet_greet_enabled %}is-active{% endif %}">
+              <span>Homepage meet &amp; greet section</span>
+              <p>
+                {{
+                  'Visitors can see the complimentary meet & greet section and CTA across the site.'
+                  if meet_greet_enabled
+                  else 'The meet & greet promo is currently hidden from public pages.'
+                }}
+              </p>
+            </div>
+            <form method="post" action="{{ url_for('update_meet_greet_setting') }}" class="service-status-card__form">
+              <p>Control whether the "Schedule a complimentary meet and greet" block appears on the homepage and bookings page.</p>
+              <div class="service-status-card__actions">
+                <button type="submit" name="enabled" value="1" {% if meet_greet_enabled %}disabled{% endif %}>Show section</button>
+                <button
+                  type="submit"
+                  name="enabled"
+                  value="0"
+                  class="ghost-button"
+                  {% if not meet_greet_enabled %}disabled{% endif %}
+                >
+                  Hide section
+                </button>
+              </div>
+              <p class="service-status-card__note">
+                This toggle is also saved inside admin backups.
+              </p>
+            </form>
+          </section>
+        </section>
+
+        <section class="view" data-view="backups" aria-labelledby="backupHeading">
+          <div class="view-heading">
+            <div>
+              <p class="eyebrow">Save &amp; load</p>
+              <h2 id="backupHeading">Back up your admin data</h2>
+              <p>Download a single JSON file named <code>{{ state_backup_metadata.export_filename }}</code> and reload it whenever you need to recover this dashboard.</p>
+            </div>
+            <button type="button" class="ghost-button" data-open-view="menu">Back to main menu</button>
+          </div>
+          <section class="backup-card">
+            {% if state_backup_message %}
+            <div class="backup-alert {% if state_backup_is_error %}backup-alert--error{% endif %}">
+              {{ state_backup_message }}
+            </div>
+            {% endif %}
+            <div class="backup-hero">
+              <div>
+                <p class="eyebrow">Mission critical</p>
+                <h3>Keep “andy” close.</h3>
+                <p>
+                  Clicking “Download backup” writes the current in-memory state to <code>{{ state_backup_metadata.export_path }}</code>
+                  and sends the JSON file to your browser. Each download overwrites the same file so there's only one source of truth.
+                </p>
+                <ol class="backup-hero__list">
+                  <li>Download before experimenting.</li>
+                  <li>Keep the downloaded <code>{{ state_backup_metadata.export_filename }}</code> somewhere safe.</li>
+                  <li>Restore with the Upload &amp; restore button.</li>
+                </ol>
+              </div>
+              <div class="backup-hero__meta">
+                <p class="backup-hero__status">
+                  <span>Last backup written</span>
+                  <strong>{{ state_backup_metadata.saved_at or 'Not yet saved' }}</strong>
+                </p>
+                <p class="backup-hero__status">
+                  <span>File name</span>
+                  <strong>{{ state_backup_metadata.export_filename }}</strong>
+                </p>
+                <p class="backup-hero__status">
+                  <span>Stored at</span>
+                  <code>{{ state_backup_metadata.export_path }}</code>
+                </p>
+              </div>
+            </div>
+            <div class="backup-grid">
+              <div class="backup-panel">
+                <h3>Download the backup</h3>
+                <p>Grab a JSON export of everything you see in the admin (submissions, chats, visitors, slots, settings).</p>
+                <form method="get" action="{{ url_for('download_admin_state') }}">
+                  <button type="submit">Download backup</button>
+                </form>
+                <p class="backup-note">
+                  Each download overwrites <code>{{ state_backup_metadata.export_filename }}</code> at the server path below before sending it to you.
+                </p>
+                {% if state_backup_metadata.export_path %}
+                <p class="backup-note">
+                  The current server copy lives at <code>{{ state_backup_metadata.export_path }}</code>.
+                </p>
+                {% endif %}
+              </div>
+              <div class="backup-panel">
+                <h3>Upload &amp; restore</h3>
+                <p>Reload everything from the same <code>{{ state_backup_metadata.export_filename }}</code> file you just downloaded.</p>
+                <form
+                  method="post"
+                  action="{{ url_for('import_admin_state') }}"
+                  enctype="multipart/form-data"
+                  class="backup-upload-form"
+                >
+                  <label for="stateFileInput">
+                    Choose a backup file (optional)
+                    <input
+                      type="file"
+                      id="stateFileInput"
+                      name="state_file"
+                      accept=".json,application/json"
+                    />
+                  </label>
+                  <button type="submit">Upload &amp; restore</button>
+                </form>
+                <p class="backup-note">
+                  Upload the JSON you downloaded&mdash;even if your computer renamed it to <code>andy(1).json</code>. Leave the
+                  file picker empty
+                  {% if state_backup_metadata.exists %}
+                  to load the server copy stored at <code>{{ state_backup_metadata.export_path }}</code>
+                  {% else %}
+                  if you want to pick a file later, but we recommend uploading one now so it's ready to go
+                  {% endif %}.
+                </p>
+              </div>
+            </div>
+            <div class="backup-meta">
+              <strong>Backup file details</strong>
+              <ul>
+                <li>Filename: {{ state_backup_metadata.export_filename }}</li>
+                <li>Status: {% if state_backup_metadata.exists %}Ready to restore{% else %}Awaiting first download{% endif %}</li>
+                <li>
+                  Location:
+                  <code>{{ state_backup_metadata.export_path }}</code>
+                  <button
+                    type="button"
+                    class="ghost-button ghost-button--small"
+                    data-copy-backup-path
+                    data-copy-backup-value="{{ state_backup_metadata.export_path }}"
+                  >
+                    Copy path
+                  </button>
+                </li>
+              </ul>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" data-view="photos" aria-labelledby="photoHeading">
+          <div class="view-heading">
+            <div>
+              <p class="eyebrow">Visual library</p>
+              <h2 id="photoHeading">Manage site photos</h2>
+              <p>Preview every hero image and portrait, swap URLs, and reset anything back to its default.</p>
+            </div>
+            <button type="button" class="ghost-button" data-open-view="menu">Back to main menu</button>
+          </div>
+          <section class="photo-admin">
+            {% if site_photo_groups %}
+            {% for group in site_photo_groups %}
+            <div class="photo-group">
+              <div class="photo-group__header">
+                <h3>{{ group.label }}</h3>
+                <p class="photo-card__meta">
+                  {{ group.photos | length }} photo{{ 's' if group.photos | length != 1 else '' }} in this section
+                </p>
+              </div>
+              <div class="photo-grid">
+                {% for photo in group.photos %}
+                <article class="photo-card">
+                  <div class="photo-card__preview">
+                    <img src="{{ photo.url }}" alt="{{ photo.label }} preview" loading="lazy" />
+                  </div>
+                  <div class="photo-card__details">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem">
+                      <h3>{{ photo.label }}</h3>
+                      <span class="menu-pill {% if not photo.is_default %}menu-pill--alert{% endif %}">
+                        {% if photo.is_default %}
+                        Default
+                        {% else %}
+                        Custom
+                        {% endif %}
+                      </span>
+                    </div>
+                    <p>{{ photo.description }}</p>
+                    {% if photo.page_title %}
+                    <p class="photo-card__meta">Page: {{ photo.page_title }}</p>
+                    {% endif %}
+                  </div>
+                  <form method="post" action="{{ url_for('update_site_photo') }}">
+                    <input type="hidden" name="photo_key" value="{{ photo.key }}" />
+                    <label>
+                      Image URL
+                      <input type="url" name="photo_url" value="{{ photo.url }}" placeholder="https://..." />
+                    </label>
+                    <div class="photo-card__actions">
+                      <button type="submit">Save photo</button>
+                      <button type="submit" name="reset" value="1" class="ghost-button" {% if photo.is_default %}disabled{% endif %}>
+                        Use default
+                      </button>
+                    </div>
+                    <p class="photo-card__meta">Default: {{ photo.default_url }}</p>
+                  </form>
+                </article>
+                {% endfor %}
+              </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p class="coverage-admin__empty">No photos registered yet.</p>
+            {% endif %}
+          </section>
+        </section>
+
+        <section class="view" data-view="breeds" aria-labelledby="breedHeading">
+          <div class="view-heading">
+            <div>
+              <p class="eyebrow">Booking flow</p>
+              <h2 id="breedHeading">Dog breed directory</h2>
+              <p>Curate and edit the breeds visitors can choose from, or let AI draft suggestions.</p>
+            </div>
+            <button type="button" class="ghost-button" data-open-view="menu">Back to main menu</button>
+          </div>
+          <section class="breed-admin">
+            <div>
+              <h2>Dog breeds</h2>
+              <p style="margin: 0; color: #475569">Curate the breed list shown to visitors during booking.</p>
+            </div>
+            <div class="breed-admin__grid">
+              <form method="post" action="{{ url_for('add_dog_breed') }}">
+                <label>
+                  Add a breed
+                  <input type="text" name="breed_name" placeholder="e.g. Cavalier King Charles Spaniel" required />
+                </label>
+                <button type="submit">Add breed</button>
+              </form>
+              <div class="breed-list-wrapper">
+                <h3>Active breeds</h3>
+                {% if dog_breeds %}
+                <ul class="breed-list">
+                  {% for breed in dog_breeds %}
+                  <li class="breed-item">
+                    <span>{{ breed.name }}</span>
+                    <form method="post" action="{{ url_for('delete_dog_breed', breed_id=breed.id) }}">
+                      <button class="breed-remove-btn" type="submit" aria-label="Remove {{ breed.name }}">&times;</button>
+                    </form>
+                  </li>
+                  {% endfor %}
+                </ul>
+                {% else %}
+                <p class="empty-state" style="font-size: 0.9rem">No breeds have been added yet.</p>
+                {% endif %}
+              </div>
+            </div>
+            <div class="breed-ai-panel">
+              <h3>Ask AI for help</h3>
+              <p class="muted" style="margin: 0">
+                DeepSeek will suggest breeds to add or remove. Describe what you need and review the results before
+                applying them.
+              </p>
+              <form class="breed-ai-panel__form" method="post" action="{{ url_for('request_breed_ai') }}">
+                <label>
+                  Prompt
+                  <input type="text" name="breed_prompt" placeholder="e.g. Add 10 small friendly breeds" required />
+                </label>
+                <button type="submit">Ask AI</button>
+              </form>
+              {% if breed_ai_suggestions %}
+              {% if breed_ai_suggestions.error %}
+              <p class="breed-ai-panel__error">{{ breed_ai_suggestions.error }}</p>
+              {% else %}
+              <div class="breed-ai-results">
+                {% if breed_ai_suggestions.add %}
+                <form class="breed-ai-card" method="post" action="{{ url_for('apply_breed_ai_suggestions') }}">
+                  <input type="hidden" name="action" value="add" />
+                  <strong>Add these breeds?</strong>
+                  <div class="breed-ai-card__list">
+                    {% for name in breed_ai_suggestions.add %}
+                    <label>
+                      <input type="checkbox" name="breed" value="{{ name }}" checked />
+                      {{ name }}
+                    </label>
+                    {% endfor %}
+                  </div>
+                  <button type="submit">Add selected</button>
+                </form>
+                {% endif %}
+                {% if breed_ai_suggestions.remove %}
+                <form class="breed-ai-card" method="post" action="{{ url_for('apply_breed_ai_suggestions') }}">
+                  <input type="hidden" name="action" value="remove" />
+                  <strong>Remove these breeds?</strong>
+                  <div class="breed-ai-card__list">
+                    {% for name in breed_ai_suggestions.remove %}
+                    <label>
+                      <input type="checkbox" name="breed" value="{{ name }}" checked />
+                      {{ name }}
+                    </label>
+                    {% endfor %}
+                  </div>
+                  <button type="submit">Remove selected</button>
+                </form>
+                {% endif %}
+              </div>
+              {% endif %}
+              <form class="breed-ai-panel__dismiss" method="post" action="{{ url_for('clear_breed_ai_suggestions') }}">
+                <button type="submit">Dismiss suggestions</button>
+              </form>
+              {% endif %}
+            </div>
+          </section>
+        </section>
+
+        <section class="view" data-view="enquiries" aria-labelledby="enquiryHeading">
+          <div class="view-heading">
+            <div>
+              <p class="eyebrow">Inbox</p>
+              <h2 id="enquiryHeading">Visitor enquiries</h2>
+              <p>Track every submission, update statuses, and follow up with leads in a tidy table.</p>
+            </div>
+            <button type="button" class="ghost-button" data-open-view="menu">Back to main menu</button>
+          </div>
+          <section>
+            <h2>Enquiries</h2>
+            {% if submissions %}
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th>Message</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for submission in submissions %}
+                <tr>
+                  <td>{{ submission.name }}</td>
+                  <td>{{ submission.email }}</td>
+                  <td>{{ submission.phone }}</td>
+                  <td>{{ submission.message }}</td>
+                  <td>
+                    <form class="inline" method="post" action="{{ url_for('update_submission_status', submission_id=submission.id) }}">
+                      <select name="status" onchange="this.form.submit()">
+                        {% for option in status_options %}
+                        <option value="{{ option }}" {% if option == (submission.status or 'New') %}selected{% endif %}>
+                          {{ option }}
+                        </option>
+                        {% endfor %}
+                      </select>
+                      <noscript>
+                        <button type="submit">Update</button>
+                      </noscript>
+                    </form>
+                  </td>
+                  <td>
+                    <div class="actions">
+                      <a href="{{ url_for('edit_submission', submission_id=submission.id) }}">Edit</a>
+                      <form class="inline" method="post" action="{{ url_for('delete_submission', submission_id=submission.id) }}">
+                        <button type="submit">Delete</button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% else %}
+            <p class="empty-state">No submissions yet. Head back to the <a href="{{ home_url }}">home page</a> to create one.</p>
+            {% endif %}
+          </section>
+        </section>
+
+        <section class="view" data-view="appointments" aria-labelledby="appointmentHeading">
+          <div class="view-heading">
+            <div>
+              <p class="eyebrow">Scheduling</p>
+              <h2 id="appointmentHeading">Appointment slots</h2>
+              <p>Publish times visitors can book and mark booked visits as you work each lead.</p>
+            </div>
+            <button type="button" class="ghost-button" data-open-view="menu">Back to main menu</button>
+          </div>
+          <section class="booking-admin">
+            <div>
+              <h2>Appointment slots</h2>
+              <p style="margin: 0; color: #475569">Publish dates and times visitors can book instantly.</p>
+            </div>
+            <form class="slot-form" method="post" action="{{ url_for('create_appointment_slot') }}">
+              <label>
+                Pick a date
+                <input type="date" name="date" min="{{ today }}" required />
+              </label>
+              <div>
+                <span style="font-weight: 600; color: #475569">Choose a time</span>
+                <input
+                  type="hidden"
+                  name="time"
+                  id="slotTimeInput"
+                  value="{{ time_choices[0] if time_choices else '' }}"
+                  required
+                />
+                <div class="time-picker__options">
+                  {% for option in time_choices %}
+                  <button type="button" class="time-button {% if loop.first %}selected{% endif %}" data-time-option="{{ option }}">
+                    {{ option }}
+                  </button>
+                  {% endfor %}
+                </div>
+              </div>
+              <label>
+                Price
+                <input type="number" name="price" min="0" step="0.01" placeholder="45" required />
+              </label>
+              <label>
+                Booking type
+                <select name="service_type" required>
+                  {% for value, label in booking_service_type_options %}
+                  <option value="{{ value }}">{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <button type="submit">Add slot</button>
+            </form>
+            <div class="slot-columns">
+              <div>
+                <h3>Available slots</h3>
+                {% if available_slots %}
+                <ul class="slot-list">
+                  {% for slot in available_slots %}
+                  {% set slot_date = slot.start_iso[:10] %}
+                  {% set slot_time = slot.start_iso[11:16] %}
+                  <li>
+                    <strong>{{ slot.long_date_label }}</strong>
+                    <span class="muted">{{ slot.time_label }}</span>
+                    <div class="slot-list__meta">
+                      <span class="slot-label">{{ slot.service_label }}</span>
+                      {% if slot.price_label %}
+                      <span class="slot-price">{{ slot.price_label }}</span>
+                      {% endif %}
+                    </div>
+                    <details class="slot-edit-panel">
+                      <summary>Edit or delete this slot</summary>
+                      <form
+                        class="slot-edit-form"
+                        method="post"
+                        action="{{ url_for('update_appointment_slot', slot_id=slot.id) }}"
+                      >
+                        <label>
+                          Pick a date
+                          <input type="date" name="date" value="{{ slot_date }}" required />
+                        </label>
+                        <label>
+                          Choose a time
+                          <input type="time" name="time" value="{{ slot_time }}" required />
+                        </label>
+                        <label>
+                          Price
+                          <input
+                            type="number"
+                            name="price"
+                            min="0"
+                            step="0.01"
+                            value="{{ '%.2f'|format(slot.price) if slot.price is not none else '' }}"
+                          />
+                        </label>
+                        <label>
+                          Booking type
+                          <select name="service_type" required>
+                            {% for value, label in booking_service_type_options %}
+                            <option value="{{ value }}" {% if value == slot.service_type %}selected{% endif %}>
+                              {{ label }}
+                            </option>
+                            {% endfor %}
+                          </select>
+                        </label>
+                        <div class="slot-edit-actions">
+                          <button type="submit">Save changes</button>
+                          <button
+                            type="submit"
+                            form="delete-slot-{{ slot.id }}"
+                            class="ghost-button"
+                            onclick="return confirm('Remove this slot?');"
+                          >
+                            Delete slot
+                          </button>
+                        </div>
+                      </form>
+                      <form
+                        id="delete-slot-{{ slot.id }}"
+                        method="post"
+                        action="{{ url_for('delete_appointment_slot', slot_id=slot.id) }}"
+                      ></form>
+                    </details>
+                  </li>
+                  {% endfor %}
+                </ul>
+                {% else %}
+                <p class="empty-state">No open slots at the moment.</p>
+                {% endif %}
+              </div>
+              <div>
+                <h3>Booked slots</h3>
+                {% if booked_slots %}
+                <table class="slots-table">
+                  <thead>
+                    <tr>
+                      <th>When</th>
+                      <th>Visitor</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for slot in booked_slots %}
+                    {% set slot_date = slot.start_iso[:10] %}
+                    {% set slot_time = slot.start_iso[11:16] %}
+                    <tr>
+                      <td>
+                        <strong>{{ slot.long_date_label }}</strong>
+                        <div class="muted">{{ slot.time_label }}</div>
+                        <div class="slot-label">{{ slot.service_label }}</div>
+                        {% if slot.price_label %}
+                        <div class="slot-price">{{ slot.price_label }}</div>
+                        {% endif %}
+                      </td>
+                      <td>
+                        <div>{{ slot.visitor_name or '—' }}</div>
+                        <div class="muted">{{ slot.visitor_email or '—' }}</div>
+                        {% if slot.visitor_dog_breed %}
+                        <div class="muted">Breed: {{ slot.visitor_dog_breed }}</div>
+                        {% endif %}
+                        {% if slot.visitor_service_area %}
+                        <div class="muted">
+                          Area: {{ slot.visitor_service_area }}
+                          {% if slot.visitor_travel_fee_label %}
+                          · Travel fee {{ slot.visitor_travel_fee_label }}
+                          {% endif %}
+                        </div>
+                        {% endif %}
+                      </td>
+                      <td>
+                        <form class="slot-status-form" method="post" action="{{ url_for('update_slot_status', slot_id=slot.id) }}">
+                          <select name="status" onchange="this.form.submit()">
+                            {% for option in booking_status_options %}
+                            <option value="{{ option }}" {% if option == (slot.workflow_status or 'New') %}selected{% endif %}>
+                              {{ option }}
+                            </option>
+                            {% endfor %}
+                          </select>
+                          <noscript><button type="submit">Update</button></noscript>
+                        </form>
+                      </td>
+                      <td>
+                        <details class="slot-edit-panel">
+                          <summary>Edit or delete</summary>
+                          <form
+                            class="slot-edit-form"
+                            method="post"
+                            action="{{ url_for('update_appointment_slot', slot_id=slot.id) }}"
+                          >
+                            <label>
+                              Pick a date
+                              <input type="date" name="date" value="{{ slot_date }}" required />
+                            </label>
+                            <label>
+                              Choose a time
+                              <input type="time" name="time" value="{{ slot_time }}" required />
+                            </label>
+                            <label>
+                              Price
+                              <input
+                                type="number"
+                                name="price"
+                                min="0"
+                                step="0.01"
+                                value="{{ '%.2f'|format(slot.price) if slot.price is not none else '' }}"
+                              />
+                            </label>
+                            <label>
+                              Booking type
+                              <select name="service_type" required>
+                                {% for value, label in booking_service_type_options %}
+                                <option value="{{ value }}" {% if value == slot.service_type %}selected{% endif %}>
+                                  {{ label }}
+                                </option>
+                                {% endfor %}
+                              </select>
+                            </label>
+                            <div class="slot-edit-actions">
+                              <button type="submit">Save changes</button>
+                              <button
+                                type="submit"
+                                form="delete-booked-slot-{{ slot.id }}"
+                                class="ghost-button"
+                                onclick="return confirm('Delete this booked slot?');"
+                              >
+                                Delete slot
+                              </button>
+                            </div>
+                          </form>
+                          <form
+                            id="delete-booked-slot-{{ slot.id }}"
+                            method="post"
+                            action="{{ url_for('delete_appointment_slot', slot_id=slot.id) }}"
+                          ></form>
+                        </details>
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+                {% else %}
+                <p class="empty-state">Booked slots will appear here as visitors reserve them.</p>
+                {% endif %}
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" data-view="coverage" aria-labelledby="coverageAdminHeading">
+          <div class="view-heading">
+            <div>
+              <p class="eyebrow">Service area</p>
+              <h2 id="coverageAdminHeading">Homepage coverage list</h2>
+              <p>Update the neighbourhoods visitors see on the main site.</p>
+            </div>
+            <button type="button" class="ghost-button" data-open-view="menu">Back to main menu</button>
+          </div>
+          <section class="coverage-admin" aria-labelledby="coverageAdminHeading">
+            <div class="coverage-admin__grid">
+              <article class="coverage-admin__card">
+                <h3>Add a new area</h3>
+                <p>Give it a friendly name, description, and optional travel fee.</p>
+                <form method="post" action="{{ url_for('save_coverage_area') }}">
+                  <label>
+                    Area name
+                    <input type="text" name="area_name" required />
+                  </label>
+                  <label>
+                    Description
+                    <textarea name="area_description" placeholder="Quiet lanes, riverside paths, etc." required></textarea>
+                  </label>
+                  <label>
+                    Travel fee (optional)
+                    <input type="number" name="area_travel_fee" min="0" step="0.01" placeholder="0" />
+                  </label>
+                  <button type="submit">Add area</button>
+                </form>
+              </article>
+              {% if coverage_areas %}
+              {% for area in coverage_areas %}
+              <article class="coverage-admin__card">
+                <h3>{{ area.name }}</h3>
+                <p>Shown exactly as written on the homepage.</p>
+                <p class="muted" style="margin: 0 0 0.75rem">
+                  {% if area.travel_fee %}
+                  Travel fee shown to visitors: +{{ format_price_label(area.travel_fee) }}
+                  {% else %}
+                  No travel fee added for this area.
+                  {% endif %}
+                </p>
+                <form method="post" action="{{ url_for('save_coverage_area') }}">
+                  <input type="hidden" name="area_id" value="{{ area.id }}" />
+                  <label>
+                    Area name
+                    <input type="text" name="area_name" value="{{ area.name }}" required />
+                  </label>
+                  <label>
+                    Description
+                    <textarea name="area_description" required>{{ area.description }}</textarea>
+                  </label>
+                  <label>
+                    Travel fee (optional)
+                    <input
+                      type="number"
+                      name="area_travel_fee"
+                      min="0"
+                      step="0.01"
+                      value="{{ '%.2f'|format(area.travel_fee) if area.travel_fee is not none else '' }}"
+                    />
+                  </label>
+                  <div class="coverage-admin__actions">
+                    <button type="submit">Save changes</button>
+                    <button type="submit" form="delete-area-{{ area.id }}" class="ghost-button">Remove</button>
+                  </div>
+                </form>
+                <form
+                  id="delete-area-{{ area.id }}"
+                  method="post"
+                  action="{{ url_for('delete_coverage_area', area_id=area.id) }}"
+                  onsubmit="return confirm('Remove {{ area.name }} from the homepage?');"
+                ></form>
+              </article>
+              {% endfor %}
+              {% else %}
+              <p class="coverage-admin__empty">No coverage areas published yet.</p>
+              {% endif %}
+            </div>
+          </section>
+        </section>
+
+        <section class="view" data-view="credentials" aria-labelledby="credentialHeading">
+          <div class="view-heading">
+            <div>
+              <p class="eyebrow">About page</p>
+              <h2 id="credentialHeading">Certificates &amp; qualifications</h2>
+              <p>Upload new credentials and edit existing ones. Changes appear immediately on the About page.</p>
+            </div>
+            <button type="button" class="ghost-button" data-open-view="menu">Back to main menu</button>
+          </div>
+          <section class="credential-admin">
+            <div class="credential-grid">
+              <article class="credential-card">
+                <h3>Add a certificate</h3>
+                <p style="margin: 0; color: #475569">Drop in the headline, issuer, and any links for visitors.</p>
+                <form method="post" action="{{ url_for('save_certificate') }}">
+                  <label>
+                    Title
+                    <input type="text" name="certificate_title" placeholder="e.g. Canine First Aid" required />
+                  </label>
+                  <label>
+                    Issuer
+                    <input type="text" name="certificate_issuer" placeholder="Training provider" />
+                  </label>
+                  <label>
+                    Year
+                    <input type="text" name="certificate_year" placeholder="2024" />
+                  </label>
+                  <label>
+                    Description
+                    <textarea name="certificate_description" placeholder="What this credential covers"></textarea>
+                  </label>
+                  <label>
+                    Image URL
+                    <input type="url" name="certificate_image_url" placeholder="https://..." />
+                  </label>
+                  <label>
+                    Link to certificate
+                    <input type="url" name="certificate_link_url" placeholder="https://..." />
+                  </label>
+                  <button type="submit">Publish certificate</button>
+                </form>
+              </article>
+              <article class="credential-card">
+                <h3>Tips</h3>
+                <ul style="margin: 0; padding-left: 1.1rem; color: #475569; line-height: 1.6">
+                  <li>Use square or landscape images so cards stay tidy.</li>
+                  <li>Leave the link blank if you do not have a public PDF yet.</li>
+                  <li>Update descriptions anytime—no need to re-upload.</li>
+                </ul>
+              </article>
+            </div>
+            <div class="credential-list">
+              {% if certificates %}
+              {% for certificate in certificates %}
+              <article class="credential-list__item">
+                <h3 class="credential-list__title">{{ certificate.title }}</h3>
+                <form class="credential-edit-form" method="post" action="{{ url_for('save_certificate') }}">
+                  <input type="hidden" name="certificate_id" value="{{ certificate.id }}" />
+                  <label>
+                    Title
+                    <input type="text" name="certificate_title" value="{{ certificate.title }}" required />
+                  </label>
+                  <label>
+                    Issuer
+                    <input type="text" name="certificate_issuer" value="{{ certificate.issuer }}" />
+                  </label>
+                  <label>
+                    Year
+                    <input type="text" name="certificate_year" value="{{ certificate.year }}" />
+                  </label>
+                  <label>
+                    Description
+                    <textarea name="certificate_description">{{ certificate.description }}</textarea>
+                  </label>
+                  <label>
+                    Image URL
+                    <input type="url" name="certificate_image_url" value="{{ certificate.image_url }}" />
+                  </label>
+                  <label>
+                    Link to certificate
+                    <input type="url" name="certificate_link_url" value="{{ certificate.link_url }}" />
+                  </label>
+                  <div class="credential-list__actions">
+                    <button type="submit">Save changes</button>
+                  </div>
+                </form>
+                <form
+                  class="credential-delete-form"
+                  method="post"
+                  action="{{ url_for('delete_certificate', certificate_id=certificate.id) }}"
+                  onsubmit="return confirm('Remove {{ certificate.title }}?');"
+                >
+                  <button type="submit" class="ghost-button">Delete</button>
+                </form>
+              </article>
+              {% endfor %}
+              {% else %}
+              <p class="credential-empty">No certificates published yet.</p>
+              {% endif %}
+            </div>
+          </section>
+        </section>
+
+        <section class="view" data-view="visitors" aria-labelledby="visitorHeading">
+          <div class="view-heading">
+            <div>
+              <p class="eyebrow">Insights</p>
+              <h2 id="visitorHeading">Visitor analytics</h2>
+              <p>Review activity, geolocation, and quickly block or unblock IPs.</p>
+            </div>
+            <button type="button" class="ghost-button" data-open-view="menu">Back to main menu</button>
+          </div>
+          <section>
+            <h2>Visitor Insights</h2>
+            {% if visitors %}
+            <table>
+              <thead>
+                <tr>
+                  <th>IP Address</th>
+                  <th>Visits</th>
+                  <th>First Visit (UTC)</th>
+                  <th>Last Visit (UTC)</th>
+                  <th>Location</th>
+                  <th>User Agent</th>
+                  <th>Accept-Language</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for ip, details in visitors %}
+                <tr>
+                  <td>{{ ip }}</td>
+                  <td>{{ details.visits }}</td>
+                  <td>{{ details.first_visit.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                  <td>{{ details.last_visit.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                  <td>{{ details.location }}</td>
+                  <td>{{ details.user_agent }}</td>
+                  <td>{{ details.accept_language }}</td>
+                  <td>
+                    {% if ip in blocked_ips %}
+                    <form class="inline" method="post" action="{{ url_for('unblock_visitor', ip_address=ip) }}">
+                      <button type="submit">Unblock</button>
+                    </form>
+                    {% else %}
+                    <form class="inline" method="post" action="{{ url_for('block_visitor', ip_address=ip) }}">
+                      <button type="submit">Block</button>
+                    </form>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% else %}
+            <p class="empty-state">No visitor data collected yet.</p>
+            {% endif %}
+          </section>
+        </section>
+
+        <section class="view" data-view="chat" aria-labelledby="chatHeading">
+          <div class="view-heading">
+            <div>
+              <p class="eyebrow">Conversations</p>
+              <h2 id="chatHeading">Live visitor chat</h2>
+              <p>Reply in real time, delete threads, and keep an eye on any waiting guests.</p>
+            </div>
+            <button type="button" class="ghost-button" data-open-view="menu">Back to main menu</button>
+          </div>
+          <section class="chat-alert">
+            <div>
+              <h2>Live Visitor Chat</h2>
+              <p id="chatStatusMessage" style="margin: 0; color: #475569">
+                {% if chat_waiting_count > 1 %}
+                There are {{ chat_waiting_count }} visitors waiting to chat.
+                {% elif chat_waiting_count == 1 %}
+                A visitor is waiting to chat.
+                {% elif chat_has_conversations %}
+                No visitors are currently waiting.
+                {% else %}
+                No live conversations yet.
+                {% endif %}
+              </p>
+            </div>
+            <button id="openChatButton" {% if not chat_has_conversations %}disabled{% endif %}>Open chat window</button>
+          </section>
+          <section class="chat-panel hidden" id="chatPanel">
+            <div class="chat-panel__header">
+              <div>
+                <h2>Live Visitor Chat</h2>
+                <p style="margin: 0; color: #475569">Reply in real time to site visitors.</p>
+              </div>
+              <div class="chat-panel__actions">
+                <div class="chat-panel__selection-group">
+                  <div class="chat-panel__selection">
+                    <label for="chatVisitorSelect">Visitor conversation</label>
+                    <select id="chatVisitorSelect" {% if not chat_has_conversations %}disabled{% endif %}>
+                      <option value="">
+                        {% if chat_has_conversations %}Select a visitor{% else %}No conversations yet{% endif %}
+                      </option>
+                    </select>
+                  </div>
+                  <button type="button" class="chat-panel__delete" id="deleteConversationButton" {% if not chat_has_conversations %}disabled{% endif %}>
+                    Delete conversation
+                  </button>
+                </div>
+                <span id="chatIndicator" class="chat-indicator {% if chat_unread %}active{% endif %}">
+                  {% if chat_unread %}New message{% else %}All caught up{% endif %}
+                </span>
+                <button type="button" class="chat-panel__close" id="closeChatButton">Close</button>
+              </div>
+            </div>
+            <div class="chat-panel__body" id="adminChatMessages" aria-live="polite"></div>
+            <form class="chat-panel__form" id="adminChatForm">
+              <input
+                type="text"
+                id="adminChatInput"
+                name="message"
+                placeholder="Type your reply"
+                autocomplete="off"
+                required
+              />
+              <button type="submit">Send reply</button>
+            </form>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      (function () {
+        const views = Array.from(document.querySelectorAll("[data-view]"));
+        const navButtons = Array.from(document.querySelectorAll(".view-nav [data-open-view]"));
+        const triggers = Array.from(document.querySelectorAll("[data-open-view]"));
+        const initialView = {{ active_view | tojson }};
+        let activeView = initialView || "menu";
+        function setActiveView(viewName) {
+          if (!viewName) {
+            viewName = "menu";
+          }
+          activeView = viewName;
+          views.forEach((view) => {
+            view.classList.toggle("view--active", view.dataset.view === viewName);
+          });
+          navButtons.forEach((button) => {
+            button.classList.toggle("is-active", button.dataset.openView === viewName);
+          });
+        }
+
+        triggers.forEach((trigger) => {
+          trigger.addEventListener("click", (event) => {
+            const target = trigger.dataset.openView;
+            if (!target) {
+              return;
+            }
+            event.preventDefault();
+            setActiveView(target);
+          });
+        });
+
+        setActiveView(activeView);
+
+        const timeButtons = document.querySelectorAll("[data-time-option]");
+        const timeInput = document.getElementById("slotTimeInput");
+        if (timeInput && timeButtons.length) {
+          function select(button) {
+            timeButtons.forEach((btn) => btn.classList.toggle("selected", btn === button));
+            timeInput.value = button.dataset.timeOption || "";
+          }
+          const defaultButton = Array.from(timeButtons).find((btn) => btn.dataset.timeOption);
+          if (defaultButton) {
+            select(defaultButton);
+          }
+          timeButtons.forEach((button) => {
+            button.addEventListener("click", () => select(button));
+          });
+        }
+
+        const copyButton = document.querySelector("[data-copy-backup-path]");
+        if (copyButton && copyButton.dataset.copyBackupValue) {
+          copyButton.addEventListener("click", async () => {
+            const originalText = copyButton.textContent;
+            try {
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(copyButton.dataset.copyBackupValue);
+              } else {
+                throw new Error("Clipboard API unavailable");
+              }
+              copyButton.textContent = "Copied!";
+            } catch (error) {
+              console.warn("Unable to copy backup path", error);
+            }
+            setTimeout(() => {
+              copyButton.textContent = originalText;
+            }, 2000);
+          });
+        }
+
+      })();
+    </script>
+
+<script>
+      const initialConversations = {{ chat_conversations | tojson }};
+      (function () {
+        const messagesEl = document.getElementById("adminChatMessages");
+        const form = document.getElementById("adminChatForm");
+        const input = document.getElementById("adminChatInput");
+        const submitButton = form ? form.querySelector("button[type='submit']") : null;
+        const indicator = document.getElementById("chatIndicator");
+        const panel = document.getElementById("chatPanel");
+        const statusMessage = document.getElementById("chatStatusMessage");
+        const openButton = document.getElementById("openChatButton");
+        const closeButton = document.getElementById("closeChatButton");
+        const chatAlert = document.querySelector(".chat-alert");
+        const globalChatBanner = document.getElementById("globalChatBanner");
+        const globalChatBannerText = document.getElementById("globalChatBannerText");
+        const conversationSelect = document.getElementById("chatVisitorSelect");
+        const deleteButton = document.getElementById("deleteConversationButton");
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+        let audioUnlocked = false;
+        if (!messagesEl || !form) {
+          return;
+        }
+        const conversationMap = new Map();
+        const cachedMessages = new Map();
+        const messageIds = new Set();
+        const unreadVisitors = new Set();
+        let activeVisitorId = null;
+        let chatWindowOpen = false;
+        let shouldStickToBottom = true;
+        let eventSource = null;
+        let reconnectTimer = null;
+        let legacyLastMessageId = 0;
+
+        function ensureAudioContext() {
+          if (audioCtx || !AudioContext) {
+            return !!audioCtx;
+          }
+          try {
+            audioCtx = new AudioContext();
+          } catch (error) {
+            console.warn("Unable to initialize audio context", error);
+          }
+          return !!audioCtx;
+        }
+
+        function unlockAudioContext() {
+          if (audioUnlocked || !ensureAudioContext()) {
+            return;
+          }
+          if (audioCtx.state === "suspended") {
+            audioCtx.resume();
+          }
+          audioUnlocked = true;
+        }
+
+        function playNotificationSound() {
+          if (!ensureAudioContext()) return;
+          if (audioCtx.state === "suspended" && audioUnlocked) {
+            audioCtx.resume();
+          }
+          try {
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.type = "sine";
+            oscillator.frequency.value = 880;
+            gainNode.gain.value = 0.0001;
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+            gainNode.gain.exponentialRampToValueAtTime(0.15, now + 0.02);
+            gainNode.gain.exponentialRampToValueAtTime(0.00001, now + 0.35);
+            oscillator.start(now);
+            oscillator.stop(now + 0.4);
+          } catch (error) {
+            console.warn("Unable to play notification sound", error);
+          }
+        }
+
+        function formatConversationLabel(meta) {
+          if (!meta || !meta.visitor_id) {
+            return "Unknown visitor";
+          }
+          const shortId = meta.visitor_id.slice(0, 6).toUpperCase();
+          const ip = meta.ip_address && meta.ip_address !== "Unknown" ? meta.ip_address : null;
+          return ip ? `${ip} (${shortId})` : `Visitor ${shortId}`;
+        }
+
+        function updateConversationSelect() {
+          if (!conversationSelect) return;
+          const previousValue = conversationSelect.value;
+          conversationSelect.innerHTML = "";
+          if (!conversationMap.size) {
+            const option = document.createElement("option");
+            option.value = "";
+            option.textContent = "No conversations yet";
+            conversationSelect.appendChild(option);
+            conversationSelect.disabled = true;
+          } else {
+            conversationSelect.disabled = false;
+            Array.from(conversationMap.values())
+              .sort((a, b) => {
+                const aDate = new Date(a.created_at || 0).getTime();
+                const bDate = new Date(b.created_at || 0).getTime();
+                return bDate - aDate;
+              })
+              .forEach((meta) => {
+                if (!meta || !meta.visitor_id) return;
+                const option = document.createElement("option");
+                option.value = meta.visitor_id;
+                option.textContent = formatConversationLabel(meta);
+                if (unreadVisitors.has(meta.visitor_id)) {
+                  option.textContent += " • New";
+                }
+                conversationSelect.appendChild(option);
+              });
+          }
+          if (previousValue && conversationMap.has(previousValue)) {
+            conversationSelect.value = previousValue;
+          } else if (activeVisitorId) {
+            conversationSelect.value = activeVisitorId;
+          } else {
+            conversationSelect.value = "";
+          }
+        }
+
+        function ensureConversationMeta(visitorId, ipAddress) {
+          if (!visitorId) return;
+          const existing = conversationMap.get(visitorId) || {};
+          const merged = Object.assign({}, existing, {
+            visitor_id: visitorId,
+            ip_address: ipAddress || existing.ip_address || "Unknown",
+          });
+          merged.created_at = merged.created_at || new Date().toISOString();
+          merged.message_count = (cachedMessages.get(visitorId) || []).length;
+          conversationMap.set(visitorId, merged);
+        }
+
+        function markCachedMessagesAsRead(visitorId) {
+          const messages = cachedMessages.get(visitorId);
+          if (!messages) return;
+          messages.forEach((msg) => {
+            if (msg.sender === "visitor") {
+              msg.seen_by_admin = true;
+            }
+          });
+        }
+
+        function renderPlaceholder(text) {
+          const placeholder = document.createElement("div");
+          placeholder.className = "chat-empty-state";
+          placeholder.textContent = text;
+          messagesEl.appendChild(placeholder);
+        }
+
+        function renderMessage(message) {
+          const row = document.createElement("div");
+          row.className = `chat-row ${message.sender}`;
+          const bubble = document.createElement("div");
+          bubble.className = "bubble";
+          bubble.textContent = message.body;
+          row.appendChild(bubble);
+          messagesEl.appendChild(row);
+          if (shouldStickToBottom) {
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+          }
+        }
+
+        function renderAllMessages() {
+          messagesEl.innerHTML = "";
+          if (!activeVisitorId || !cachedMessages.has(activeVisitorId)) {
+            renderPlaceholder("Select a visitor conversation to get started.");
+            return;
+          }
+          const messages = cachedMessages.get(activeVisitorId).slice().sort((a, b) => a.id - b.id);
+          if (!messages.length) {
+            renderPlaceholder("No messages yet. Say hello to the visitor!");
+            return;
+          }
+          messages.forEach((msg) => renderMessage(msg));
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        function updateStickToBottom() {
+          const { scrollTop, scrollHeight, clientHeight } = messagesEl;
+          const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
+          shouldStickToBottom = distanceFromBottom <= 40;
+        }
+
+        messagesEl.addEventListener("scroll", updateStickToBottom);
+
+        function setIndicator(state, waitingCount = unreadVisitors.size) {
+          if (!indicator) return;
+          indicator.classList.toggle("active", state);
+          if (!state) {
+            indicator.textContent = "All caught up";
+          } else if (waitingCount === 1) {
+            indicator.textContent = "1 visitor waiting";
+          } else {
+            indicator.textContent = `${waitingCount} visitors waiting`;
+          }
+        }
+
+        function setFlash(state) {
+          if (!chatAlert) return;
+          if (state && !chatWindowOpen) {
+            chatAlert.classList.add("flash");
+          } else {
+            chatAlert.classList.remove("flash");
+          }
+        }
+
+        function updateGlobalBanner(waitingCount) {
+          if (!globalChatBanner) return;
+          const hasWaiting = waitingCount > 0;
+          globalChatBanner.classList.toggle("is-active", hasWaiting);
+          if (hasWaiting && globalChatBannerText) {
+            globalChatBannerText.textContent =
+              waitingCount === 1
+                ? "A visitor is waiting in live chat."
+                : `${waitingCount} visitors are waiting in live chat.`;
+          }
+        }
+
+        function updateChatStatus(waitingCount) {
+          if (statusMessage) {
+            if (!conversationMap.size) {
+              statusMessage.textContent = "No live conversations yet.";
+            } else if (waitingCount > 1) {
+              statusMessage.textContent = `There are ${waitingCount} visitors waiting to chat.`;
+            } else if (waitingCount === 1) {
+              statusMessage.textContent = "A visitor is waiting to chat.";
+            } else if (chatWindowOpen) {
+              statusMessage.textContent = "Chat window is open.";
+            } else {
+              statusMessage.textContent = "No visitors are currently waiting.";
+            }
+          }
+          if (openButton) {
+            if (!conversationMap.size) {
+              openButton.disabled = true;
+              openButton.textContent = "Open chat window";
+            } else if (chatWindowOpen) {
+              openButton.disabled = true;
+              openButton.textContent = "Chat window open";
+            } else {
+              openButton.disabled = false;
+              openButton.textContent = waitingCount ? "Respond to visitor" : "Open chat window";
+            }
+          }
+          setFlash(waitingCount > 0);
+          updateGlobalBanner(waitingCount);
+        }
+
+        function updateWaitingState() {
+          const waitingCount = unreadVisitors.size;
+          setIndicator(waitingCount > 0, waitingCount);
+          updateChatStatus(waitingCount);
+          updateConversationSelect();
+        }
+
+        function updateFormState() {
+          const hasActive = !!activeVisitorId && conversationMap.has(activeVisitorId);
+          if (input) {
+            input.disabled = !hasActive;
+          }
+          if (submitButton) {
+            submitButton.disabled = !hasActive;
+          }
+          if (deleteButton) {
+            deleteButton.disabled = !hasActive;
+          }
+        }
+
+        function addMessageToCache(message, fromHistory = false) {
+          if (!message || messageIds.has(message.id)) {
+            return;
+          }
+          const visitorId = message.visitor_id;
+          if (!cachedMessages.has(visitorId)) {
+            cachedMessages.set(visitorId, []);
+          }
+          cachedMessages.get(visitorId).push(message);
+          messageIds.add(message.id);
+          legacyLastMessageId = Math.max(legacyLastMessageId, message.id);
+          ensureConversationMeta(visitorId, message.visitor_ip);
+          if (!fromHistory && message.sender === "visitor" && !message.seen_by_admin) {
+            unreadVisitors.add(visitorId);
+            if (!chatWindowOpen || visitorId !== activeVisitorId) {
+              playNotificationSound();
+            }
+          }
+          if (chatWindowOpen && visitorId === activeVisitorId && !fromHistory) {
+            renderMessage(message);
+          }
+        }
+
+        function handleNewMessage(message) {
+          addMessageToCache(message);
+          if (!activeVisitorId) {
+            activeVisitorId = message.visitor_id;
+            updateFormState();
+            renderAllMessages();
+          } else if (chatWindowOpen && message.visitor_id === activeVisitorId) {
+            shouldStickToBottom = true;
+          }
+          if (chatWindowOpen && message.visitor_id === activeVisitorId) {
+            markAsRead();
+          }
+          updateWaitingState();
+        }
+
+        function handleHistory(payload) {
+          const messages = Array.isArray(payload.messages) ? payload.messages : [];
+          cachedMessages.clear();
+          messageIds.clear();
+          messages
+            .slice()
+            .sort((a, b) => a.id - b.id)
+            .forEach((msg) => addMessageToCache(msg, true));
+          if (Array.isArray(payload.conversations)) {
+            conversationMap.clear();
+            unreadVisitors.clear();
+            payload.conversations.forEach((conversation) => {
+              if (!conversation || !conversation.visitor_id) return;
+              conversationMap.set(conversation.visitor_id, conversation);
+              if (conversation.unread) {
+                unreadVisitors.add(conversation.visitor_id);
+              }
+            });
+          }
+          if (!activeVisitorId) {
+            const firstUnread = unreadVisitors.values().next().value;
+            if (firstUnread) {
+              activeVisitorId = firstUnread;
+            } else {
+              const firstConversation = conversationMap.keys().next().value;
+              activeVisitorId = firstConversation || null;
+            }
+          }
+          renderAllMessages();
+          updateFormState();
+          updateWaitingState();
+        }
+
+        function removeConversationFromState(visitorId) {
+          if (!visitorId) return;
+          cachedMessages.delete(visitorId);
+          conversationMap.delete(visitorId);
+          unreadVisitors.delete(visitorId);
+          if (activeVisitorId === visitorId) {
+            activeVisitorId = conversationMap.keys().next().value || null;
+          }
+          if (!conversationMap.size) {
+            closeChatWindow();
+          }
+          updateFormState();
+          renderAllMessages();
+          updateWaitingState();
+        }
+
+        function handleConversationDeleted(visitorId) {
+          removeConversationFromState(visitorId);
+        }
+
+        async function markAsRead(force = false) {
+          if (!activeVisitorId) return;
+          if (!unreadVisitors.has(activeVisitorId) && !force) {
+            return;
+          }
+          unreadVisitors.delete(activeVisitorId);
+          markCachedMessagesAsRead(activeVisitorId);
+          updateWaitingState();
+          try {
+            await fetch("/admin/chat/read", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ visitor_id: activeVisitorId }),
+            });
+          } catch (error) {
+            console.error("Unable to mark chat as read", error);
+          }
+        }
+
+        function handleStreamPayload(payload) {
+          if (!payload) return;
+          if (payload.type === "ping") {
+            return;
+          }
+          if (payload.type === "history") {
+            handleHistory(payload);
+            return;
+          }
+          if (payload.type === "message" && payload.message) {
+            handleNewMessage(payload.message);
+            return;
+          }
+          if (payload.type === "conversation_deleted") {
+            handleConversationDeleted(payload.visitor_id);
+          }
+        }
+
+        function disconnectStream() {
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+          }
+        }
+
+        function connectStream() {
+          if (!window.EventSource || eventSource) {
+            return;
+          }
+          eventSource = new EventSource("/chat/stream?role=admin");
+          eventSource.onmessage = (event) => {
+            try {
+              const payload = JSON.parse(event.data);
+              handleStreamPayload(payload);
+            } catch (error) {
+              console.error("Unable to parse chat update", error);
+            }
+          };
+          eventSource.onerror = () => {
+            disconnectStream();
+            reconnectTimer = setTimeout(connectStream, 2000);
+          };
+        }
+
+        function getDefaultVisitor() {
+          const firstUnread = unreadVisitors.values().next().value;
+          if (firstUnread) return firstUnread;
+          return conversationMap.keys().next().value || null;
+        }
+
+        function openChatWindow() {
+          if (!panel || !conversationMap.size) return;
+          chatWindowOpen = true;
+          panel.classList.remove("hidden");
+          if (!activeVisitorId) {
+            activeVisitorId = getDefaultVisitor();
+          }
+          shouldStickToBottom = true;
+          renderAllMessages();
+          updateFormState();
+          updateWaitingState();
+          setFlash(false);
+          markAsRead(true);
+        }
+
+        function closeChatWindow() {
+          if (!panel) return;
+          chatWindowOpen = false;
+          panel.classList.add("hidden");
+          updateWaitingState();
+        }
+
+        const unlockEvents = [openButton, closeButton, form];
+        unlockEvents.forEach((element) => {
+          if (!element) return;
+          const eventName = element === form ? "submit" : "click";
+          element.addEventListener(eventName, unlockAudioContext, { once: true });
+        });
+
+        window.addEventListener(
+          "pointerdown",
+          () => {
+            unlockAudioContext();
+          },
+          { once: true }
+        );
+
+        if (openButton) {
+          openButton.addEventListener("click", openChatWindow);
+        }
+
+        if (closeButton) {
+          closeButton.addEventListener("click", closeChatWindow);
+        }
+
+        if (conversationSelect) {
+          conversationSelect.addEventListener("change", (event) => {
+            const value = event.target.value;
+            activeVisitorId = value || null;
+            shouldStickToBottom = true;
+            renderAllMessages();
+            updateFormState();
+            if (chatWindowOpen) {
+              markAsRead();
+            }
+          });
+        }
+
+        if (deleteButton) {
+          deleteButton.addEventListener("click", async () => {
+            if (!activeVisitorId) return;
+            const confirmed = window.confirm("Delete this conversation? This cannot be undone.");
+            if (!confirmed) return;
+            try {
+              await fetch(`/admin/chat/${encodeURIComponent(activeVisitorId)}/delete`, {
+                method: "POST",
+              });
+            } catch (error) {
+              console.error("Unable to delete conversation", error);
+            }
+            removeConversationFromState(activeVisitorId);
+          });
+        }
+
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          if (!activeVisitorId) return;
+          const value = input.value.trim();
+          if (!value) return;
+          try {
+            const response = await fetch("/chat/messages", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ sender: "admin", body: value, visitor_id: activeVisitorId }),
+            });
+            if (response.ok) {
+              const message = await response.json();
+              input.value = "";
+              shouldStickToBottom = true;
+              handleNewMessage(message);
+              markAsRead();
+            }
+          } catch (error) {
+            console.error("Unable to send chat response", error);
+          }
+        });
+
+        if (panel) {
+          panel.addEventListener("click", () => markAsRead());
+          panel.addEventListener("mouseenter", () => markAsRead());
+        }
+
+        async function loadInitialHistory() {
+          try {
+            const response = await fetch(`/chat/messages?role=admin`, { cache: "no-store" });
+            if (!response.ok) return;
+            const data = await response.json();
+            handleHistory(data);
+          } catch (error) {
+            console.error("Unable to load chat messages", error);
+          }
+        }
+
+        async function legacyPoll() {
+          try {
+            const response = await fetch(`/chat/messages?role=admin&after=${legacyLastMessageId}`, {
+              cache: "no-store",
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            if (Array.isArray(data.messages)) {
+              data.messages.forEach((msg) => handleNewMessage(msg));
+            }
+          } catch (error) {
+            console.error("Unable to load chat messages", error);
+          }
+        }
+
+        function bootstrapConversations() {
+          if (Array.isArray(initialConversations)) {
+            initialConversations.forEach((conversation) => {
+              if (!conversation || !conversation.visitor_id) return;
+              conversationMap.set(conversation.visitor_id, conversation);
+              if (conversation.unread) {
+                unreadVisitors.add(conversation.visitor_id);
+              }
+            });
+          }
+          activeVisitorId = getDefaultVisitor();
+          updateFormState();
+          updateWaitingState();
+        }
+
+        bootstrapConversations();
+
+        if (window.EventSource) {
+          connectStream();
+          window.addEventListener("beforeunload", disconnectStream);
+        } else {
+          console.warn("EventSource not available; using fallback polling");
+          loadInitialHistory().finally(() => {
+            legacyPoll();
+            setInterval(legacyPoll, 4000);
+          });
+        }
+      })();
+    </script>
+    {% include "chat_widget.html" %}
+    <script src="{{ url_for('static', filename='js/chat-widget.js') }}" defer></script>
+  </body>
+</html>
