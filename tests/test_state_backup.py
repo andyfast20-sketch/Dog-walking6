@@ -4,6 +4,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+import io
 import json
 import sqlite3
 
@@ -168,3 +169,22 @@ def test_import_route_reports_missing_auto_export(tmp_path, monkeypatch, app_mod
 
     assert response.status_code == 302
     assert "state_action=auto_import_missing" in response.headers.get("Location", "")
+
+
+def test_import_route_accepts_uploaded_file(app_module):
+    client = app_module.app.test_client()
+    app_module.meet_greet_enabled = True
+    uploaded_state = app_module._serialize_state()
+    uploaded_state["meet_greet_enabled"] = False
+
+    response = client.post(
+        "/admin/state/import",
+        data={
+            "state_file": (io.BytesIO(json.dumps(uploaded_state).encode("utf-8")), "andy(3).json"),
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 302
+    assert "state_action=imported" in response.headers.get("Location", "")
+    assert app_module.meet_greet_enabled is False
