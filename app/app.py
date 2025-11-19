@@ -1037,7 +1037,12 @@ def _service_label(value: Optional[str]) -> str:
 def _serialize_state() -> dict:
     visitor_rows = {}
     for ip_address, visitor in visitor_stats.items():
-        data = dict(visitor)
+        if not isinstance(visitor, dict):
+            continue
+        try:
+            data = dict(visitor)
+        except Exception:  # pragma: no cover - defensive
+            continue
         data["first_visit"] = _serialize_datetime(data.get("first_visit"))
         data["last_visit"] = _serialize_datetime(data.get("last_visit"))
         visitor_rows[ip_address] = data
@@ -1868,7 +1873,14 @@ def admin_page():
     active_view = requested_view if requested_view in ADMIN_VIEWS else "menu"
     visitor_rows = []
     for ip_address, visitor in visitor_stats.items():
-        normalized = _normalize_visitor(visitor)
+        if not isinstance(visitor, dict):
+            app.logger.warning("Skipping visitor %s because data is not a dict", ip_address)
+            continue
+        try:
+            normalized = _normalize_visitor(visitor)
+        except Exception as exc:  # pragma: no cover - defensive
+            app.logger.warning("Skipping visitor %s due to invalid data: %s", ip_address, exc)
+            continue
         visitor_rows.append((ip_address, normalized))
     visitor_rows.sort(key=lambda item: _safe_last_visit(item[1]), reverse=True)
     conversation_rows = [
