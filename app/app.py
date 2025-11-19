@@ -1,13 +1,15 @@
 import json
 import os
 import queue
-import sqlite3
-import tempfile
 import threading
 import urllib.error
 import urllib.request
 from datetime import datetime
 from typing import Optional
+
+import boto3
+from botocore.config import Config
+from botocore.exceptions import BotoCoreError, ClientError
 
 from flask import (
     Flask,
@@ -383,8 +385,6 @@ SERVICE_NOTICE_DEFAULT_TEXT = "Website under construction - Do not place any boo
 site_service_notice = {"enabled": False, "message": SERVICE_NOTICE_DEFAULT_TEXT}
 STATE_BACKUP_DB_FILENAME = "state_backups.sqlite3"
 STATE_EXPORT_FILENAME = "andy.json"
-_cached_backup_db_path: Optional[str] = None
-_cached_export_file_path: Optional[str] = None
 STATE_STORAGE_NAMESPACE = os.environ.get("STATE_STORAGE_NAMESPACE", "dog_walking_state")
 STATE_LATEST_STORAGE_KEY = "latest_state"
 STATE_SNAPSHOT_COUNTER_KEY = "snapshot_counter"
@@ -403,6 +403,13 @@ _KV_REST_API_TOKEN = (
 _KV_REST_HEADERS = {"Accept": "application/json"}
 if _KV_REST_API_TOKEN:
     _KV_REST_HEADERS["Authorization"] = f"Bearer {_KV_REST_API_TOKEN}"
+_R2_CLIENT: Optional[object] = None
+R2_BUCKET_NAME = os.environ.get("R2_BUCKET")
+R2_EXPORT_OBJECT_KEY = os.environ.get("R2_EXPORT_KEY") or f"{STATE_STORAGE_NAMESPACE}/{STATE_EXPORT_FILENAME}"
+R2_BACKUP_OBJECT_KEY = (
+    os.environ.get("DOG_WALKING_BACKUP_DB_PATH")
+    or f"{STATE_STORAGE_NAMESPACE}/{STATE_BACKUP_DB_FILENAME}"
+)
 
 
 def _storage_key(*parts) -> str:
@@ -477,154 +484,115 @@ def _kv_incr(key: str) -> int:
     return current_value
 
 
-def _backup_directory_candidates():
-    """Return a list of writeable directories we can attempt for backups."""
-
-    directories = []
-    project_root = os.path.abspath(os.path.join(app.root_path, os.pardir))
-    preferred = [
-        app.instance_path,
-        os.path.join(project_root, "backups"),
-        project_root,
-        app.root_path,
-        os.getcwd(),
-        os.environ.get("STATE_BACKUP_DIR"),
-        os.path.join(tempfile.gettempdir(), "dog_walking_admin"),
-    ]
-    for directory in preferred:
-        if directory and directory not in directories:
-            directories.append(directory)
-    return directories
+def _r2_client():
+    global _R2_CLIENT
+    if _R2_CLIENT is not None:
+        return _R2_CLIENT
+    endpoint_url = os.environ.get("R2_ENDPOINT")
+    access_key = os.environ.get("R2_ACCESS_KEY_ID")
+    secret_key = os.environ.get("R2_SECRET_ACCESS_KEY")
+    if not (endpoint_url and access_key and secret_key and R2_BUCKET_NAME):
+        return None
+    session = boto3.session.Session()
+    _R2_CLIENT = session.client(
+        "s3",
+        endpoint_url=endpoint_url,
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+        region_name="auto",
+        config=Config(signature_version="s3v4"),
+    )
+    return _R2_CLIENT
 
 
 def _state_export_file_path() -> str:
-    """Return a writeable path for the JSON export file."""
+    """Return the object key for the JSON export file in R2."""
 
-    global _cached_export_file_path
-    raw_candidates = [directory for directory in _backup_directory_candidates() if directory]
-    abs_candidates = {os.path.abspath(directory) for directory in raw_candidates}
+    return R2_EXPORT_OBJECT_KEY
 
-    if _cached_export_file_path:
-        directory = os.path.dirname(_cached_export_file_path)
-        if directory and os.path.isdir(directory):
-            if not abs_candidates or os.path.abspath(directory) in abs_candidates:
-                return _cached_export_file_path
-        _cached_export_file_path = None
 
-    for directory in raw_candidates:
-        if not directory:
-            continue
-        try:
-            os.makedirs(directory, exist_ok=True)
-        except OSError:
-            continue
-        if os.access(directory, os.W_OK):
-            _cached_export_file_path = os.path.join(directory, STATE_EXPORT_FILENAME)
-            return _cached_export_file_path
+def _r2_head_object(key: str):
+    client = _r2_client()
+    if not client or not R2_BUCKET_NAME:
+        return None
+    try:
+        return client.head_object(Bucket=R2_BUCKET_NAME, Key=key)
+    except (BotoCoreError, ClientError):
+        return None
 
-    fallback_directory = tempfile.gettempdir()
-    _cached_export_file_path = os.path.join(fallback_directory, STATE_EXPORT_FILENAME)
-    return _cached_export_file_path
+
+def _r2_download(key: str) -> Optional[bytes]:
+    client = _r2_client()
+    if not client or not R2_BUCKET_NAME:
+        return None
+    try:
+        response = client.get_object(Bucket=R2_BUCKET_NAME, Key=key)
+        return response.get("Body", b"").read()
+    except (BotoCoreError, ClientError, AttributeError):
+        return None
+
+
+def _r2_upload(key: str, data: bytes, content_type: str = "application/octet-stream") -> Optional[str]:
+    client = _r2_client()
+    if not client or not R2_BUCKET_NAME:
+        return None
+    try:
+        client.put_object(Bucket=R2_BUCKET_NAME, Key=key, Body=data, ContentType=content_type)
+    except (BotoCoreError, ClientError):
+        return None
+    return key
+
+
+def _r2_delete(key: str):
+    client = _r2_client()
+    if not client or not R2_BUCKET_NAME:
+        return
+    try:
+        client.delete_object(Bucket=R2_BUCKET_NAME, Key=key)
+    except (BotoCoreError, ClientError):
+        return
 
 
 def _write_state_export_payload(payload_text: str) -> Optional[str]:
-    """Persist the serialized state to the auto-restore JSON file."""
+    """Persist the serialized state to the auto-restore JSON file in R2."""
 
-    export_path = _state_export_file_path()
-    try:
-        directory = os.path.dirname(export_path)
-        if directory:
-            os.makedirs(directory, exist_ok=True)
-        with open(export_path, "w", encoding="utf-8") as export_file:
-            export_file.write(payload_text)
-    except OSError:
-        app.logger.warning("Unable to write admin export to %s", export_path)
+    client = _r2_client()
+    if not client or not R2_BUCKET_NAME:
+        app.logger.warning("Unable to write admin export because R2 is not configured")
         return None
-    return export_path
+    export_key = _state_export_file_path()
+    try:
+        client.put_object(
+            Bucket=R2_BUCKET_NAME,
+            Key=export_key,
+            Body=payload_text.encode("utf-8"),
+            ContentType="application/json",
+        )
+    except (BotoCoreError, ClientError) as exc:
+        app.logger.warning("Unable to write admin export to R2 key %s: %s", export_key, exc)
+        return None
+    return export_key
 
 
 def _read_state_export_payload() -> Optional[str]:
     """Load the serialized state from the auto-restore JSON file when available."""
 
-    export_path = _state_export_file_path()
-    if not os.path.exists(export_path):
+    client = _r2_client()
+    if not client or not R2_BUCKET_NAME:
         return None
+    export_key = _state_export_file_path()
     try:
-        with open(export_path, "r", encoding="utf-8") as export_file:
-            return export_file.read()
-    except OSError:
-        app.logger.warning("Unable to read admin export from %s", export_path)
+        response = client.get_object(Bucket=R2_BUCKET_NAME, Key=export_key)
+        return response.get("Body", b"").read().decode("utf-8")
+    except (BotoCoreError, ClientError, AttributeError, UnicodeDecodeError):
+        app.logger.warning("Unable to read admin export from R2 key %s", export_key)
         return None
 
 
 def _state_backup_db_path() -> str:
-    """Return a writeable path for the sqlite backup database."""
+    """Return the object key for the R2 backup mirror."""
 
-    override = os.environ.get("DOG_WALKING_BACKUP_DB_PATH")
-    if override:
-        return os.path.abspath(override)
-
-    global _cached_backup_db_path
-    if _cached_backup_db_path:
-        directory = os.path.dirname(_cached_backup_db_path)
-        if not directory or os.path.exists(directory):
-            return _cached_backup_db_path
-        _cached_backup_db_path = None
-
-    # Prefer any existing database file, even if it lives in a legacy directory.
-    for directory in _backup_directory_candidates():
-        if not directory:
-            continue
-        candidate_path = os.path.join(directory, STATE_BACKUP_DB_FILENAME)
-        if os.path.isfile(candidate_path):
-            _cached_backup_db_path = candidate_path
-            return candidate_path
-
-    # Fall back to the first directory where we can create and write the file.
-    for directory in _backup_directory_candidates():
-        if not directory:
-            continue
-        try:
-            os.makedirs(directory, exist_ok=True)
-        except OSError:
-            continue
-        candidate_path = os.path.join(directory, STATE_BACKUP_DB_FILENAME)
-        try:
-            with open(candidate_path, "a", encoding="utf-8"):
-                pass
-        except OSError:
-            continue
-        _cached_backup_db_path = candidate_path
-        return candidate_path
-
-    fallback_directory = tempfile.gettempdir()
-    try:
-        os.makedirs(fallback_directory, exist_ok=True)
-    except OSError:
-        pass
-    _cached_backup_db_path = os.path.join(fallback_directory, STATE_BACKUP_DB_FILENAME)
-    return _cached_backup_db_path
-
-
-def _ensure_backup_db_initialized():
-    path = _state_backup_db_path()
-    directory = os.path.dirname(path)
-    if directory:
-        try:
-            os.makedirs(directory, exist_ok=True)
-        except OSError:
-            pass
-    with sqlite3.connect(path) as connection:
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS state_backups (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                saved_at TEXT NOT NULL,
-                source TEXT NOT NULL,
-                payload TEXT NOT NULL
-            )
-            """
-        )
+    return R2_BACKUP_OBJECT_KEY
 
 
 def _fetch_backup_row(storage_id: Optional[int] = None):
@@ -850,20 +818,22 @@ def _write_state_backup(source: str = "manual") -> Optional[dict]:
 
 
 def _write_sqlite_backup(state_payload: dict, source: str):
-    """Mirror the persisted state to a local sqlite file when requested."""
+    """Mirror the persisted state to R2 when requested."""
 
-    try:
-        _ensure_backup_db_initialized()
-        path = _state_backup_db_path()
-        payload_text = json.dumps(state_payload, indent=2)
-        with sqlite3.connect(path) as connection:
-            connection.execute(
-                "INSERT INTO state_backups (saved_at, source, payload) VALUES (?, ?, ?)",
-                (state_payload.get("saved_at"), source or "manual", payload_text),
-            )
-    except sqlite3.Error:
+    backup_key = _state_backup_db_path()
+    payload_text = json.dumps(
+        {
+            "saved_at": state_payload.get("saved_at"),
+            "source": source or "manual",
+            "payload": state_payload,
+        },
+        indent=2,
+    )
+    result = _r2_upload(backup_key, payload_text.encode("utf-8"), content_type="application/json")
+    if not result:
+        app.logger.warning("Unable to mirror backup to R2 key %s", backup_key)
         return None
-    return path
+    return result
 
 
 def _serialize_datetime(value):
@@ -1242,13 +1212,12 @@ def _get_state_backup_metadata() -> dict:
     }
     if not export_path:
         return metadata
-    if os.path.exists(export_path):
+    head_object = _r2_head_object(export_path)
+    if head_object:
         metadata["exists"] = True
-        try:
-            saved_at = datetime.utcfromtimestamp(os.path.getmtime(export_path))
+        saved_at = head_object.get("LastModified")
+        if isinstance(saved_at, datetime):
             metadata["saved_at"] = saved_at.strftime("%b %d, %Y %H:%M UTC")
-        except OSError:
-            pass
     return metadata
 
 
@@ -1942,12 +1911,14 @@ def load_backup_history_entry(entry_id: int):
             return redirect(url_for("admin_page", state_action="history_load_failed", view="backups"))
         return redirect(url_for("admin_page", state_action="history_loaded", view="backups"))
     legacy_path = entry.get("legacy_path")
-    if not legacy_path or not os.path.exists(legacy_path):
+    if not legacy_path:
+        return redirect(url_for("admin_page", state_action="history_missing", view="backups"))
+    raw_bytes = _r2_download(legacy_path)
+    if raw_bytes is None:
         return redirect(url_for("admin_page", state_action="history_missing", view="backups"))
     try:
-        with open(legacy_path, "r", encoding="utf-8") as backup_file:
-            data = json.load(backup_file)
-    except (OSError, json.JSONDecodeError):
+        data = json.loads(raw_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
         return redirect(url_for("admin_page", state_action="history_load_failed", view="backups"))
     _load_state(data)
     _persist_state_change()
@@ -1963,11 +1934,8 @@ def delete_backup_history_entry(entry_id: int):
     if storage_id:
         _delete_backup_row(storage_id)
     legacy_path = entry.get("legacy_path")
-    if legacy_path and os.path.exists(legacy_path):
-        try:
-            os.remove(legacy_path)
-        except OSError:
-            pass
+    if legacy_path:
+        _r2_delete(legacy_path)
     _persist_state_change()
     return redirect(url_for("admin_page", state_action="history_deleted", view="backups"))
 
@@ -2010,14 +1978,10 @@ def import_admin_state():
         except OSError:
             return redirect(url_for("admin_page", state_action="import_failed", view="backups"))
     else:
-        export_path = _state_export_file_path()
-        if not os.path.exists(export_path):
+        payload_text = _read_state_export_payload()
+        if payload_text is None:
             return redirect(url_for("admin_page", state_action="auto_import_missing", view="backups"))
-        try:
-            with open(export_path, "rb") as export_file:
-                raw_bytes = export_file.read()
-        except OSError:
-            return redirect(url_for("admin_page", state_action="auto_import_failed", view="backups"))
+        raw_bytes = payload_text.encode("utf-8")
     if raw_bytes is None:
         return redirect(url_for("admin_page", state_action="import_failed", view="backups"))
     try:
