@@ -1027,6 +1027,67 @@
         border-radius: 12px;
         border: 1px solid #e2e8f0;
         background: #f8fafc;
+        position: relative;
+        overflow: hidden;
+        transition: transform 120ms ease, box-shadow 120ms ease;
+      }
+      .slot-list li:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+      }
+      .slot-list li.slot-weather-rain {
+        border-color: #93c5fd;
+        background: linear-gradient(135deg, rgba(219, 234, 254, 0.95), rgba(191, 219, 254, 0.85));
+      }
+      .slot-list li.slot-weather-rain::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: linear-gradient(
+            120deg,
+            rgba(59, 130, 246, 0.08) 25%,
+            rgba(59, 130, 246, 0.18) 25%,
+            rgba(59, 130, 246, 0.18) 50%,
+            rgba(59, 130, 246, 0.08) 50%,
+            rgba(59, 130, 246, 0.08) 75%,
+            rgba(59, 130, 246, 0.18) 75%,
+            rgba(59, 130, 246, 0.18)
+          ),
+          linear-gradient(
+            60deg,
+            rgba(59, 130, 246, 0.08) 25%,
+            rgba(59, 130, 246, 0.16) 25%,
+            rgba(59, 130, 246, 0.16) 50%,
+            rgba(59, 130, 246, 0.08) 50%,
+            rgba(59, 130, 246, 0.08) 75%,
+            rgba(59, 130, 246, 0.16) 75%,
+            rgba(59, 130, 246, 0.16)
+          );
+        background-size: 18px 18px;
+        opacity: 0.35;
+        pointer-events: none;
+      }
+      .slot-list li.slot-weather-good {
+        border-color: #16a34a;
+        background: #ecfdf3;
+      }
+      .slot-list li.slot-weather-sunny {
+        border-color: #f59e0b;
+        background: #fff7ed;
+      }
+      .slot-weather {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        margin-top: 0.45rem;
+        font-size: 0.9rem;
+        color: #0f172a;
+      }
+      .slot-weather__icon {
+        font-size: 1.1rem;
+      }
+      .slot-weather__summary {
+        color: #475569;
       }
       .slot-list strong {
         display: block;
@@ -2039,7 +2100,7 @@
                   {% for slot in available_slots %}
                   {% set slot_date = slot.start_iso[:10] %}
                   {% set slot_time = slot.start_iso[11:16] %}
-                  <li>
+                  <li class="slot-weather-{{ slot.weather_status or 'unknown' }}">
                     <strong>{{ slot.long_date_label }}</strong>
                     <span class="muted">{{ slot.time_label }}</span>
                     <div class="slot-list__meta">
@@ -2047,6 +2108,20 @@
                       {% if slot.price_label %}
                       <span class="slot-price">{{ slot.price_label }}</span>
                       {% endif %}
+                    </div>
+                    <div class="slot-weather" aria-live="polite">
+                      {% if slot.weather_status == 'sunny' %}
+                      <span class="slot-weather__icon" title="Sunny">☀️</span>
+                      {% elif slot.weather_status == 'rain' %}
+                      <span class="slot-weather__icon" title="Rain forecast">🌧️</span>
+                      {% elif slot.weather_status == 'good' %}
+                      <span class="slot-weather__icon" title="Good weather">✅</span>
+                      {% else %}
+                      <span class="slot-weather__icon" title="Weather unavailable">ℹ️</span>
+                      {% endif %}
+                      <span class="slot-weather__summary">
+                        {{ slot.weather_summary or 'Weather forecast unavailable' }}
+                      </span>
                     </div>
                     <details class="slot-edit-panel">
                       <summary>Edit or delete this slot</summary>
