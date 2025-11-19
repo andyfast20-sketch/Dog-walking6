@@ -1,10 +1,12 @@
 import json
 import os
 import queue
+import sqlite3
 import threading
 import urllib.error
 import urllib.request
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 import boto3
@@ -390,6 +392,7 @@ STATE_LATEST_STORAGE_KEY = "latest_state"
 STATE_SNAPSHOT_COUNTER_KEY = "snapshot_counter"
 _state_storage_lock = threading.Lock()
 _fallback_kv_store: dict = {}
+_cached_export_file_path: Optional[str] = None
 _KV_REST_API_URL = (
     os.environ.get("VERCEL_KV_REST_API_URL")
     or os.environ.get("KV_REST_API_URL")
@@ -506,9 +509,36 @@ def _r2_client():
 
 
 def _state_export_file_path() -> str:
-    """Return the object key for the JSON export file in R2."""
+    """Return the path or object key for the JSON export file."""
 
-    return R2_EXPORT_OBJECT_KEY
+    global _cached_export_file_path
+
+    # Prefer R2 when configured
+    if _r2_client() and R2_BUCKET_NAME:
+        return R2_EXPORT_OBJECT_KEY
+
+    candidates = list(_backup_directory_candidates())
+    if _cached_export_file_path and any(
+        _cached_export_file_path.startswith(candidate) for candidate in candidates
+    ):
+        return _cached_export_file_path
+
+    _cached_export_file_path = None
+    for directory in candidates:
+        try:
+            os.makedirs(directory, exist_ok=True)
+        except OSError:
+            continue
+        _cached_export_file_path = os.path.join(directory, STATE_EXPORT_FILENAME)
+        return _cached_export_file_path
+
+    return STATE_EXPORT_FILENAME
+
+
+def _backup_directory_candidates():
+    project_root = Path(app.root_path).parent
+    backups_dir = project_root / "backups"
+    return [str(project_root), str(backups_dir)]
 
 
 def _r2_head_object(key: str):
@@ -554,22 +584,31 @@ def _r2_delete(key: str):
 
 
 def _write_state_export_payload(payload_text: str) -> Optional[str]:
-    """Persist the serialized state to the auto-restore JSON file in R2."""
+    """Persist the serialized state to the auto-restore JSON file."""
 
     client = _r2_client()
-    if not client or not R2_BUCKET_NAME:
-        app.logger.warning("Unable to write admin export because R2 is not configured")
-        return None
     export_key = _state_export_file_path()
+    if client and R2_BUCKET_NAME and export_key == R2_EXPORT_OBJECT_KEY:
+        try:
+            client.put_object(
+                Bucket=R2_BUCKET_NAME,
+                Key=export_key,
+                Body=payload_text.encode("utf-8"),
+                ContentType="application/json",
+            )
+        except (BotoCoreError, ClientError) as exc:
+            app.logger.warning("Unable to write admin export to R2 key %s: %s", export_key, exc)
+            return None
+        return export_key
+
     try:
-        client.put_object(
-            Bucket=R2_BUCKET_NAME,
-            Key=export_key,
-            Body=payload_text.encode("utf-8"),
-            ContentType="application/json",
-        )
-    except (BotoCoreError, ClientError) as exc:
-        app.logger.warning("Unable to write admin export to R2 key %s: %s", export_key, exc)
+        directory = os.path.dirname(export_key)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        with open(export_key, "w", encoding="utf-8") as handle:
+            handle.write(payload_text)
+    except OSError:
+        app.logger.warning("Unable to write admin export because local storage is not available")
         return None
     return export_key
 
@@ -577,15 +616,20 @@ def _write_state_export_payload(payload_text: str) -> Optional[str]:
 def _read_state_export_payload() -> Optional[str]:
     """Load the serialized state from the auto-restore JSON file when available."""
 
-    client = _r2_client()
-    if not client or not R2_BUCKET_NAME:
-        return None
     export_key = _state_export_file_path()
+    client = _r2_client()
+    if client and R2_BUCKET_NAME and export_key == R2_EXPORT_OBJECT_KEY:
+        try:
+            response = client.get_object(Bucket=R2_BUCKET_NAME, Key=export_key)
+            return response.get("Body", b"").read().decode("utf-8")
+        except (BotoCoreError, ClientError, AttributeError, UnicodeDecodeError):
+            app.logger.warning("Unable to read admin export from R2 key %s", export_key)
+            return None
+
     try:
-        response = client.get_object(Bucket=R2_BUCKET_NAME, Key=export_key)
-        return response.get("Body", b"").read().decode("utf-8")
-    except (BotoCoreError, ClientError, AttributeError, UnicodeDecodeError):
-        app.logger.warning("Unable to read admin export from R2 key %s", export_key)
+        with open(export_key, "r", encoding="utf-8") as handle:
+            return handle.read()
+    except OSError:
         return None
 
 
@@ -818,20 +862,46 @@ def _write_state_backup(source: str = "manual") -> Optional[dict]:
 
 
 def _write_sqlite_backup(state_payload: dict, source: str):
-    """Mirror the persisted state to R2 when requested."""
+    """Mirror the persisted state to a local sqlite file or R2 when requested."""
 
-    backup_key = _state_backup_db_path()
-    payload_text = json.dumps(
-        {
-            "saved_at": state_payload.get("saved_at"),
-            "source": source or "manual",
-            "payload": state_payload,
-        },
-        indent=2,
-    )
-    result = _r2_upload(backup_key, payload_text.encode("utf-8"), content_type="application/json")
+    backup_path = _state_backup_db_path()
+    local_backup_path = os.environ.get("DOG_WALKING_BACKUP_DB_PATH")
+    payload_text = json.dumps(state_payload, indent=2)
+
+    # When a local path is provided, persist the snapshot there for easy restores.
+    if local_backup_path:
+        backup_path = local_backup_path
+        try:
+            directory = os.path.dirname(backup_path)
+            if directory:
+                os.makedirs(directory, exist_ok=True)
+            with sqlite3.connect(backup_path) as connection:
+                connection.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS state_backups (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        saved_at TEXT,
+                        source TEXT,
+                        payload TEXT
+                    )
+                    """
+                )
+                connection.execute(
+                    "INSERT INTO state_backups (saved_at, source, payload) VALUES (?, ?, ?)",
+                    (
+                        state_payload.get("saved_at"),
+                        source or "manual",
+                        payload_text,
+                    ),
+                )
+                connection.commit()
+            return backup_path
+        except (OSError, sqlite3.DatabaseError):
+            app.logger.warning("Unable to write admin export because local storage is not available")
+
+    result = _r2_upload(backup_path, payload_text.encode("utf-8"), content_type="application/json")
     if not result:
-        app.logger.warning("Unable to mirror backup to R2 key %s", backup_key)
+        app.logger.warning("Unable to mirror backup to R2 key %s", backup_path)
         return None
     return result
 
@@ -1212,12 +1282,20 @@ def _get_state_backup_metadata() -> dict:
     }
     if not export_path:
         return metadata
-    head_object = _r2_head_object(export_path)
-    if head_object:
+    if os.path.exists(export_path):
         metadata["exists"] = True
-        saved_at = head_object.get("LastModified")
-        if isinstance(saved_at, datetime):
+        try:
+            saved_at = datetime.utcfromtimestamp(os.path.getmtime(export_path))
             metadata["saved_at"] = saved_at.strftime("%b %d, %Y %H:%M UTC")
+        except OSError:
+            pass
+    else:
+        head_object = _r2_head_object(export_path)
+        if head_object:
+            metadata["exists"] = True
+            saved_at = head_object.get("LastModified")
+            if isinstance(saved_at, datetime):
+                metadata["saved_at"] = saved_at.strftime("%b %d, %Y %H:%M UTC")
     return metadata
 
 
