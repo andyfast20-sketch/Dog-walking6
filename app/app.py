@@ -5,6 +5,7 @@ import sqlite3
 import threading
 import urllib.error
 import urllib.request
+import urllib.parse
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -273,6 +274,7 @@ chat_stream_subscribers = []
 chat_subscribers_lock = threading.Lock()
 appointment_slots = []
 next_slot_id = 1
+WEATHER_LOCATION_QUERY = "Tameside, Manchester"
 dog_breeds = []
 next_dog_breed_id = 1
 breed_ai_suggestions = None
@@ -1029,6 +1031,63 @@ def _format_price_label(value) -> str:
     return formatted
 
 
+def _weather_api_key() -> Optional[str]:
+    return os.environ.get("BBC_WEATHER_API_KEY") or os.environ.get("WEATHER_API_KEY")
+
+
+def _classify_weather(summary: str) -> str:
+    text = summary.lower()
+    if any(keyword in text for keyword in ("rain", "shower", "drizzle", "storm")):
+        return "rain"
+    if any(keyword in text for keyword in ("sun", "clear", "bright")):
+        return "sunny"
+    if any(keyword in text for keyword in ("cloud", "fair", "dry", "pleasant")):
+        return "good"
+    return "unknown"
+
+
+def _fetch_tameside_weather(start: datetime) -> dict:
+    api_key = _weather_api_key()
+    if not api_key:
+        return {"status": "unknown", "summary": "Weather lookup unavailable (missing API key)."}
+
+    date_str = start.strftime("%Y-%m-%d")
+    hour = start.strftime("%H")
+    query = urllib.parse.quote(WEATHER_LOCATION_QUERY)
+    url = (
+        "https://api.weatherapi.com/v1/forecast.json"
+        f"?key={api_key}&q={query}&dt={date_str}&hour={hour}"
+    )
+    request = urllib.request.Request(url, headers={"User-Agent": "HappyTrails/1.0"})
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError, json.JSONDecodeError):
+        return {"status": "unknown", "summary": "Weather lookup unavailable."}
+
+    forecast_days = (payload.get("forecast") or {}).get("forecastday") or []
+    if not forecast_days:
+        return {"status": "unknown", "summary": "Weather data unavailable."}
+
+    # Try to find an hour-specific forecast, otherwise fall back to the day's condition text.
+    target_hour = int(hour)
+    condition_text = ""
+    for day in forecast_days:
+        if day.get("date") != date_str:
+            continue
+        for hour_entry in day.get("hour", []):
+            if hour_entry.get("time") and hour_entry.get("time").endswith(f" {target_hour:02d}:00"):
+                condition_text = (hour_entry.get("condition") or {}).get("text", "")
+                break
+        if not condition_text:
+            condition_text = ((day.get("day") or {}).get("condition") or {}).get("text", "")
+        break
+
+    condition_text = condition_text or "Weather data unavailable"
+    status = _classify_weather(condition_text)
+    return {"status": status, "summary": condition_text}
+
+
 def _service_label(value: Optional[str]) -> str:
     service_key = value if value in BOOKING_SERVICE_TYPES else "walk"
     return BOOKING_SERVICE_TYPES.get(service_key, BOOKING_SERVICE_TYPES["walk"])["label"]
@@ -1073,6 +1132,7 @@ def _serialize_state() -> dict:
                 "booked_at": _serialize_datetime(slot.get("booked_at")),
                 "price": slot.get("price"),
                 "service_type": slot.get("service_type", "walk"),
+                "weather": slot.get("weather") if isinstance(slot.get("weather"), dict) else {},
             }
         )
     state = {
@@ -1172,6 +1232,7 @@ def _load_state(state: dict):
             "booked_at": _parse_datetime(payload.get("booked_at")),
             "price": _parse_price(payload.get("price")),
             "service_type": payload.get("service_type", "walk"),
+            "weather": payload.get("weather") if isinstance(payload.get("weather"), dict) else {},
         }
         slots.append(slot)
     appointment_slots = sorted(slots, key=lambda slot: slot["start"])
@@ -1369,6 +1430,9 @@ def _serialize_slot(slot: dict):
     visitor_area_name = slot.get("visitor_service_area_name") or ""
     visitor_travel_fee = _parse_price(slot.get("visitor_travel_fee"))
     visitor_travel_fee_label = _format_price_label(visitor_travel_fee)
+    weather = slot.get("weather") if isinstance(slot.get("weather"), dict) else {}
+    weather_status = weather.get("status") or "unknown"
+    weather_summary = weather.get("summary") or ""
     return {
         "id": slot["id"],
         "start_iso": slot["start"].isoformat(),
@@ -1389,6 +1453,8 @@ def _serialize_slot(slot: dict):
         "service_label": service_label,
         "price": price_amount,
         "price_label": price_label,
+        "weather_status": weather_status,
+        "weather_summary": weather_summary,
     }
 
 
@@ -2446,6 +2512,7 @@ def create_appointment_slot():
         "visitor_dog_breed": None,
         "price": price_amount,
         "service_type": service_type,
+        "weather": _fetch_tameside_weather(start),
     }
     appointment_slots.append(slot)
     appointment_slots.sort(key=lambda entry: entry["start"])
@@ -2490,7 +2557,10 @@ def update_appointment_slot(slot_id: int):
         price_amount = _parse_price(price_input)
         if price_amount is None:
             return redirect(appointments_url)
+    previous_start = slot.get("start")
     slot.update({"start": start, "service_type": service_type, "price": price_amount})
+    if previous_start != start or not slot.get("weather"):
+        slot["weather"] = _fetch_tameside_weather(start)
     appointment_slots.sort(key=lambda entry: entry["start"])
     _persist_state_change()
     return redirect(appointments_url)
