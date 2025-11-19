@@ -231,6 +231,7 @@
         const message = await response.json();
         input.value = "";
         addMessage(message);
+        pollOnce();
       }
     } catch (error) {
       console.error("Unable to send message", error);
