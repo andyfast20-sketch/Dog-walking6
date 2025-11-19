@@ -385,6 +385,96 @@ STATE_BACKUP_DB_FILENAME = "state_backups.sqlite3"
 STATE_EXPORT_FILENAME = "andy.json"
 _cached_backup_db_path: Optional[str] = None
 _cached_export_file_path: Optional[str] = None
+STATE_STORAGE_NAMESPACE = os.environ.get("STATE_STORAGE_NAMESPACE", "dog_walking_state")
+STATE_LATEST_STORAGE_KEY = "latest_state"
+STATE_SNAPSHOT_COUNTER_KEY = "snapshot_counter"
+_state_storage_lock = threading.Lock()
+_fallback_kv_store: dict = {}
+_KV_REST_API_URL = (
+    os.environ.get("VERCEL_KV_REST_API_URL")
+    or os.environ.get("KV_REST_API_URL")
+    or ""
+).strip() or None
+_KV_REST_API_TOKEN = (
+    os.environ.get("VERCEL_KV_REST_API_TOKEN")
+    or os.environ.get("KV_REST_API_TOKEN")
+    or ""
+).strip() or None
+_KV_REST_HEADERS = {"Accept": "application/json"}
+if _KV_REST_API_TOKEN:
+    _KV_REST_HEADERS["Authorization"] = f"Bearer {_KV_REST_API_TOKEN}"
+
+
+def _storage_key(*parts) -> str:
+    safe_parts = [STATE_STORAGE_NAMESPACE]
+    safe_parts.extend(str(part) for part in parts if part is not None)
+    return ":".join(safe_parts)
+
+
+def _latest_state_key() -> str:
+    return _storage_key(STATE_LATEST_STORAGE_KEY)
+
+
+def _snapshot_key(storage_id: int) -> str:
+    return _storage_key("snapshot", storage_id)
+
+
+def _snapshot_counter_key() -> str:
+    return _storage_key(STATE_SNAPSHOT_COUNTER_KEY)
+
+
+
+def _kv_rest_execute(command: str, *args):
+    if not _KV_REST_API_URL:
+        return None
+    payload = json.dumps({"command": command, "args": [str(arg) for arg in args]}).encode("utf-8")
+    headers = dict(_KV_REST_HEADERS)
+    headers["Content-Type"] = "application/json"
+    request = urllib.request.Request(
+        _KV_REST_API_URL,
+        data=payload,
+        headers=headers,
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            raw = response.read().decode("utf-8")
+        data = json.loads(raw)
+        return data.get("result")
+    except (urllib.error.URLError, json.JSONDecodeError):
+        return None
+
+
+def _kv_set(key: str, value: str):
+    if _kv_rest_execute("SET", key, value) is not None:
+        return
+    _fallback_kv_store[key] = value
+
+
+def _kv_get(key: str):
+    result = _kv_rest_execute("GET", key)
+    if result is not None:
+        return str(result)
+    return _fallback_kv_store.get(key)
+
+
+def _kv_delete(key: str):
+    _kv_rest_execute("DEL", key)
+    _fallback_kv_store.pop(key, None)
+
+
+def _kv_incr(key: str) -> int:
+    result = _kv_rest_execute("INCR", key)
+    if isinstance(result, int):
+        return result
+    if isinstance(result, str):
+        try:
+            return int(result)
+        except ValueError:
+            pass
+    current_value = int(_fallback_kv_store.get(key, 0) or 0) + 1
+    _fallback_kv_store[key] = str(current_value)
+    return current_value
 
 
 def _backup_directory_candidates():
@@ -411,13 +501,17 @@ def _state_export_file_path() -> str:
     """Return a writeable path for the JSON export file."""
 
     global _cached_export_file_path
+    raw_candidates = [directory for directory in _backup_directory_candidates() if directory]
+    abs_candidates = {os.path.abspath(directory) for directory in raw_candidates}
+
     if _cached_export_file_path:
         directory = os.path.dirname(_cached_export_file_path)
         if directory and os.path.isdir(directory):
-            return _cached_export_file_path
+            if not abs_candidates or os.path.abspath(directory) in abs_candidates:
+                return _cached_export_file_path
         _cached_export_file_path = None
 
-    for directory in _backup_directory_candidates():
+    for directory in raw_candidates:
         if not directory:
             continue
         try:
@@ -520,34 +614,28 @@ def _ensure_backup_db_initialized():
 
 
 def _fetch_backup_row(storage_id: Optional[int] = None):
-    _ensure_backup_db_initialized()
-    path = _state_backup_db_path()
-    with sqlite3.connect(path) as connection:
-        connection.row_factory = sqlite3.Row
-        if storage_id is None:
-            return connection.execute(
-                "SELECT id, saved_at, source, payload FROM state_backups ORDER BY id DESC LIMIT 1"
-            ).fetchone()
-        return connection.execute(
-            "SELECT id, saved_at, source, payload FROM state_backups WHERE id = ?",
-            (storage_id,),
-        ).fetchone()
+    target_id = storage_id if storage_id is not None else _latest_snapshot_storage_id()
+    if target_id is None:
+        return None
+    row = _get_snapshot_row(target_id)
+    if not row:
+        return None
+    return {
+        "id": target_id,
+        "saved_at": row.get("saved_at"),
+        "source": row.get("source"),
+        "payload": row.get("payload"),
+    }
 
 
 def _count_backup_rows() -> int:
-    _ensure_backup_db_initialized()
-    path = _state_backup_db_path()
-    with sqlite3.connect(path) as connection:
-        return connection.execute("SELECT COUNT(*) FROM state_backups").fetchone()[0]
+    return sum(1 for entry in backup_history if entry.get("storage_id"))
 
 
 def _delete_backup_row(storage_id: Optional[int]):
     if storage_id is None:
         return
-    _ensure_backup_db_initialized()
-    path = _state_backup_db_path()
-    with sqlite3.connect(path) as connection:
-        connection.execute("DELETE FROM state_backups WHERE id = ?", (storage_id,))
+    _kv_delete(_snapshot_key(storage_id))
 
 
 def _describe_backup_source(source: Optional[str]) -> str:
@@ -636,42 +724,130 @@ def _remove_backup_history_entry(entry_id: int):
     return entry
 
 
+def _latest_snapshot_storage_id() -> Optional[int]:
+    for entry in backup_history:
+        storage_id = entry.get("storage_id")
+        if storage_id:
+            return storage_id
+    return None
+
+
+def _get_snapshot_row(storage_id: Optional[int]):
+    if storage_id is None:
+        return None
+    raw_value = _kv_get(_snapshot_key(storage_id))
+    if not raw_value:
+        return None
+    try:
+        row = json.loads(raw_value)
+    except (TypeError, json.JSONDecodeError):
+        return None
+    row.setdefault("id", storage_id)
+    return row
+
+
+def save_data(
+    *,
+    source: str = "manual",
+    record_history: bool = True,
+    state_payload: Optional[dict] = None,
+) -> Optional[dict]:
+    payload = state_payload or _serialize_state()
+    saved_at_value = payload.get("saved_at") or datetime.utcnow().isoformat()
+    history_entry = None
+    storage_id = None
+    payload_to_persist = payload
+    try:
+        with _state_storage_lock:
+            if record_history:
+                storage_id = _kv_incr(_snapshot_counter_key())
+                storage_label = f"Snapshot #{storage_id} (persistent store)"
+                history_entry = _record_backup_history(
+                    storage_label,
+                    source,
+                    saved_at_value,
+                    storage_id=storage_id,
+                    storage_type="persistent",
+                )
+                payload_to_persist = dict(payload)
+                payload_to_persist["backup_history"] = [
+                    _serialize_backup_history_entry(entry) for entry in backup_history
+                ]
+                payload_to_persist["next_backup_history_id"] = next_backup_history_id
+                row_payload = {
+                    "id": storage_id,
+                    "saved_at": saved_at_value,
+                    "source": source or "manual",
+                    "payload": json.dumps(payload_to_persist, indent=2),
+                }
+            payload_text = json.dumps(payload_to_persist, indent=2)
+            _kv_set(_latest_state_key(), payload_text)
+            if record_history and storage_id is not None:
+                _kv_set(_snapshot_key(storage_id), row_payload["payload"])
+            _write_state_export_payload(payload_text)
+    except Exception as exc:  # pylint: disable=broad-except
+        app.logger.exception("Failed to save application state: %s", exc)
+        return None
+    return {"history_entry": history_entry, "storage_id": storage_id, "payload": payload_to_persist}
+
+
+def load_data(
+    storage_id: Optional[int] = None,
+    *,
+    persist_after: bool = False,
+) -> bool:
+    if storage_id is None:
+        payload_text = _kv_get(_latest_state_key())
+        if not payload_text:
+            return False
+    else:
+        row = _get_snapshot_row(storage_id)
+        if not row:
+            return False
+        payload_text = row.get("payload")
+        if not payload_text:
+            return False
+    try:
+        payload = json.loads(payload_text)
+    except (TypeError, json.JSONDecodeError):
+        return False
+    _load_state(payload)
+    if persist_after:
+        save_data(source="auto", record_history=False)
+    return True
+
+
+def _persist_state_change():
+    save_data(source="auto", record_history=False)
+
+
 def _write_state_backup(source: str = "manual") -> Optional[dict]:
-    """Persist the serialized state to the managed database."""
+    """Persist the serialized state to the managed store."""
 
     state_payload = _serialize_state()
+    result = save_data(source=source, record_history=True, state_payload=state_payload)
+    if not result:
+        return None
+    if os.environ.get("DOG_WALKING_BACKUP_DB_PATH"):
+        _write_sqlite_backup(result.get("payload") or state_payload, source)
+    return result
+
+
+def _write_sqlite_backup(state_payload: dict, source: str):
+    """Mirror the persisted state to a local sqlite file when requested."""
+
     try:
         _ensure_backup_db_initialized()
         path = _state_backup_db_path()
+        payload_text = json.dumps(state_payload, indent=2)
         with sqlite3.connect(path) as connection:
-            cursor = connection.execute(
-                "INSERT INTO state_backups (saved_at, source, payload) VALUES (?, ?, ?)",
-                (state_payload.get("saved_at"), source or "manual", "{}"),
-            )
-            storage_id = cursor.lastrowid
-            storage_label = f"Snapshot #{storage_id} (database)"
-            history_entry = _record_backup_history(
-                storage_label,
-                source,
-                state_payload.get("saved_at"),
-                storage_id=storage_id,
-                storage_type="database",
-            )
-            state_payload_with_history = dict(state_payload)
-            state_payload_with_history["backup_history"] = [
-                _serialize_backup_history_entry(entry) for entry in backup_history
-            ]
-            state_payload_with_history["next_backup_history_id"] = next_backup_history_id
-            payload_text = json.dumps(state_payload_with_history, indent=2)
             connection.execute(
-                "UPDATE state_backups SET payload = ? WHERE id = ?",
-                (payload_text, storage_id),
+                "INSERT INTO state_backups (saved_at, source, payload) VALUES (?, ?, ?)",
+                (state_payload.get("saved_at"), source or "manual", payload_text),
             )
-            _write_state_export_payload(payload_text)
     except sqlite3.Error:
         return None
-
-    return {"history_entry": history_entry, "storage_id": storage_id}
+    return path
 
 
 def _serialize_datetime(value):
@@ -1061,15 +1237,7 @@ def _get_state_backup_metadata() -> dict:
 
 
 def _load_state_from_database(storage_id: Optional[int] = None) -> bool:
-    row = _fetch_backup_row(storage_id)
-    if not row:
-        return False
-    try:
-        payload = json.loads(row["payload"])
-    except (TypeError, json.JSONDecodeError):
-        return False
-    _load_state(payload)
-    return True
+    return load_data(storage_id=storage_id, persist_after=storage_id is not None)
 
 
 def _get_submission(submission_id: int):
@@ -1267,16 +1435,20 @@ def _run_autopilot_if_needed(visitor_id: str):
             "last_visitor_id": visitor_id,
         }
     )
+    _persist_state_change()
     try:
         messages = _build_autopilot_messages(conversation)
         reply = _call_deepseek_chat_completion(messages)
     except Exception as exc:  # pylint: disable=broad-except
         autopilot_status.update({"state": "error", "last_error": str(exc)})
+        _persist_state_change()
         return
     if not reply:
         autopilot_status.update({"state": "no_reply", "last_reply_preview": None})
+        _persist_state_change()
         return
     autopilot_status.update({"state": "answered", "last_reply_preview": reply[:200].strip()})
+    _persist_state_change()
     _add_chat_message("admin", reply, visitor_id, trigger_autopilot=False)
 
 
@@ -1404,6 +1576,7 @@ def _add_chat_message(
     _broadcast_chat_update({"type": "message", "message": message})
     if trigger_autopilot and sender == "visitor":
         _run_autopilot_if_needed(visitor_id)
+    _persist_state_change()
     return message
 
 
@@ -1412,6 +1585,7 @@ def _delete_conversation(visitor_id: str) -> bool:
     if not conversation:
         return False
     _broadcast_chat_update({"type": "conversation_deleted", "visitor_id": visitor_id})
+    _persist_state_change()
     return True
 
 
@@ -1518,6 +1692,7 @@ def index():
         }
         submissions.append(submission)
         next_submission_id += 1
+        _persist_state_change()
         return redirect(url_for("index", submitted=1))
 
     page_links = [
@@ -1698,6 +1873,7 @@ def update_site_photo():
     else:
         url_value = (request.form.get("photo_url") or "").strip()
         site_photos[key] = url_value or SITE_PHOTO_DEFAULTS[key]["default_url"]
+    _persist_state_change()
     return redirect(url_for("admin_page", view="photos"))
 
 
@@ -1714,6 +1890,7 @@ def toggle_auto_save_setting():
     global auto_save_enabled
 
     auto_save_enabled = request.form.get("enabled") == "1"
+    _persist_state_change()
     return redirect(url_for("admin_page", view="backups"))
 
 
@@ -1731,6 +1908,7 @@ def run_auto_save():
         auto_save_last_run = history_entry["saved_at"]
     else:
         auto_save_last_run = datetime.utcnow()
+    _persist_state_change()
     payload = {"saved": True, "saved_at": auto_save_last_run.isoformat()}
     if history_entry:
         payload["history_entry"] = _present_backup_history_entry(history_entry, include_urls=True)
@@ -1756,6 +1934,7 @@ def load_backup_history_entry(entry_id: int):
     except (OSError, json.JSONDecodeError):
         return redirect(url_for("admin_page", state_action="history_load_failed", view="backups"))
     _load_state(data)
+    _persist_state_change()
     return redirect(url_for("admin_page", state_action="history_loaded", view="backups"))
 
 
@@ -1773,17 +1952,20 @@ def delete_backup_history_entry(entry_id: int):
             os.remove(legacy_path)
         except OSError:
             pass
+    _persist_state_change()
     return redirect(url_for("admin_page", state_action="history_deleted", view="backups"))
 
 
 @app.route("/admin/state/load", methods=["POST"])
 def load_admin_state():
     row = _fetch_backup_row()
-    if not row:
-        return redirect(url_for("admin_page", state_action="missing", view="backups"))
-    if not _load_state_from_database(row["id"]):
-        return redirect(url_for("admin_page", state_action="load_failed", view="backups"))
-    return redirect(url_for("admin_page", state_action="loaded", view="backups"))
+    if row:
+        if not _load_state_from_database(row["id"]):
+            return redirect(url_for("admin_page", state_action="load_failed", view="backups"))
+        return redirect(url_for("admin_page", state_action="loaded", view="backups"))
+    if load_data():
+        return redirect(url_for("admin_page", state_action="loaded", view="backups"))
+    return redirect(url_for("admin_page", state_action="missing", view="backups"))
 
 
 @app.route("/admin/state/download", methods=["GET"])
@@ -1833,6 +2015,7 @@ def import_admin_state():
         _load_state(data)
     except Exception:  # pragma: no cover - defensive; _load_state validates content
         return redirect(url_for("admin_page", state_action="import_failed", view="backups"))
+    _persist_state_change()
     return redirect(url_for("admin_page", state_action="imported", view="backups"))
 
 
@@ -1847,6 +2030,7 @@ def toggle_autopilot():
             "last_error": None if autopilot_enabled else autopilot_status.get("last_error"),
         }
     )
+    _persist_state_change()
     return redirect(url_for("admin_page"))
 
 
@@ -1859,6 +2043,7 @@ def update_service_notice():
     if not message_value:
         message_value = SERVICE_NOTICE_DEFAULT_TEXT
     site_service_notice = {"enabled": enabled_value == "1", "message": message_value}
+    _persist_state_change()
     return redirect(url_for("admin_page", view="status"))
 
 
@@ -1868,6 +2053,7 @@ def update_meet_greet_setting():
 
     enabled_value = request.form.get("enabled", "0")
     meet_greet_enabled = enabled_value == "1"
+    _persist_state_change()
     return redirect(url_for("admin_page", view="status"))
 
 
@@ -1876,6 +2062,7 @@ def update_business_profile():
     global business_in_a_box
     description = (request.form.get("business_box") or "").strip()
     business_in_a_box = description or BUSINESS_BOX_DEFAULT
+    _persist_state_change()
     return redirect(url_for("admin_page"))
 
 
@@ -1884,9 +2071,13 @@ def add_dog_breed():
     global next_dog_breed_id
     name = (request.form.get("breed_name") or "").strip()
     normalized = _normalize_breed_name(name)
+    added = False
     if normalized and not _breed_name_exists(normalized):
         dog_breeds.append({"id": next_dog_breed_id, "name": normalized})
         next_dog_breed_id += 1
+        added = True
+    if added:
+        _persist_state_change()
     return redirect(url_for("admin_page", view="breeds"))
 
 
@@ -1899,12 +2090,14 @@ def save_coverage_area():
     travel_fee = _parse_price(request.form.get("area_travel_fee"))
     if not name:
         return redirect(url_for("admin_page", view="coverage"))
+    updated = False
     if area_id_value:
         area = _get_coverage_area(_coerce_int(area_id_value, 0))
         if area:
             area["name"] = name
             area["description"] = description
             area["travel_fee"] = travel_fee
+            updated = True
     else:
         coverage_areas.append(
             {
@@ -1915,6 +2108,9 @@ def save_coverage_area():
             }
         )
         next_coverage_area_id += 1
+        updated = True
+    if updated:
+        _persist_state_change()
     return redirect(url_for("admin_page", view="coverage"))
 
 
@@ -1922,6 +2118,7 @@ def save_coverage_area():
 def delete_coverage_area(area_id: int):
     global coverage_areas
     coverage_areas = [area for area in coverage_areas if area.get("id") != area_id]
+    _persist_state_change()
     return redirect(url_for("admin_page", view="coverage"))
 
 
@@ -1929,6 +2126,7 @@ def delete_coverage_area(area_id: int):
 def delete_dog_breed(breed_id: int):
     global dog_breeds
     dog_breeds = [breed for breed in dog_breeds if breed["id"] != breed_id]
+    _persist_state_change()
     return redirect(url_for("admin_page", view="breeds"))
 
 
@@ -1944,6 +2142,7 @@ def save_certificate():
     link_url = (request.form.get("certificate_link_url") or "").strip()
     if not title:
         return redirect(url_for("admin_page", view="credentials"))
+    updated = False
     if certificate_id_value:
         certificate = _get_certificate(_coerce_int(certificate_id_value, 0))
         if certificate:
@@ -1957,6 +2156,7 @@ def save_certificate():
                     "link_url": link_url,
                 }
             )
+            updated = True
     else:
         team_certificates.append(
             {
@@ -1970,6 +2170,9 @@ def save_certificate():
             }
         )
         next_certificate_id += 1
+        updated = True
+    if updated:
+        _persist_state_change()
     return redirect(url_for("admin_page", view="credentials"))
 
 
@@ -1977,6 +2180,7 @@ def save_certificate():
 def delete_certificate(certificate_id: int):
     global team_certificates
     team_certificates = [row for row in team_certificates if row.get("id") != certificate_id]
+    _persist_state_change()
     return redirect(url_for("admin_page", view="credentials"))
 
 
@@ -2000,6 +2204,7 @@ def request_breed_ai():
     prompt = (request.form.get("breed_prompt") or "").strip()
     if not prompt:
         breed_ai_suggestions = None
+        _persist_state_change()
         return redirect(url_for("admin_page", view="breeds"))
     breed_ai_suggestions = {
         "prompt": prompt,
@@ -2029,6 +2234,7 @@ def request_breed_ai():
         data = _extract_json_object(reply)
     except Exception as exc:  # pylint: disable=broad-except
         breed_ai_suggestions["error"] = str(exc)
+        _persist_state_change()
         return redirect(url_for("admin_page", view="breeds"))
     add_items = []
     remove_items = []
@@ -2038,6 +2244,7 @@ def request_breed_ai():
             if value_str and value_str not in target:
                 target.append(value_str)
     breed_ai_suggestions.update({"add": add_items, "remove": remove_items})
+    _persist_state_change()
     return redirect(url_for("admin_page", view="breeds"))
 
 
@@ -2052,25 +2259,37 @@ def apply_breed_ai_suggestions():
             selected.append(normalized)
     if not selected or action not in {"add", "remove"}:
         return redirect(url_for("admin_page", view="breeds"))
+    changed = False
     if action == "add":
         for name in selected:
             if not _breed_name_exists(name):
                 dog_breeds.append({"id": next_dog_breed_id, "name": name})
                 next_dog_breed_id += 1
+                changed = True
     elif action == "remove":
         target_names = {name.lower() for name in selected}
+        original_count = len(dog_breeds)
         dog_breeds = [breed for breed in dog_breeds if breed["name"].lower() not in target_names]
+        if len(dog_breeds) != original_count:
+            changed = True
     if breed_ai_suggestions:
         if action == "add":
             breed_ai_suggestions["add"] = [
                 name for name in breed_ai_suggestions.get("add", []) if name not in selected
             ]
+            if selected:
+                changed = True
         else:
             breed_ai_suggestions["remove"] = [
                 name for name in breed_ai_suggestions.get("remove", []) if name not in selected
             ]
+            if selected:
+                changed = True
         if not breed_ai_suggestions["add"] and not breed_ai_suggestions["remove"]:
             breed_ai_suggestions = None
+            changed = True
+    if changed:
+        _persist_state_change()
     return redirect(url_for("admin_page", view="breeds"))
 
 
@@ -2078,6 +2297,7 @@ def apply_breed_ai_suggestions():
 def clear_breed_ai_suggestions():
     global breed_ai_suggestions
     breed_ai_suggestions = None
+    _persist_state_change()
     return redirect(url_for("admin_page", view="breeds"))
 
 
@@ -2114,6 +2334,7 @@ def create_appointment_slot():
     appointment_slots.append(slot)
     appointment_slots.sort(key=lambda entry: entry["start"])
     next_slot_id += 1
+    _persist_state_change()
     return redirect(appointments_url)
 
 
@@ -2126,6 +2347,7 @@ def update_slot_status(slot_id: int):
     if status not in BOOKING_WORKFLOW_STATUSES:
         status = BOOKING_WORKFLOW_STATUSES[0]
     slot["workflow_status"] = status
+    _persist_state_change()
     return redirect(url_for("admin_page", view="appointments"))
 
 
@@ -2154,6 +2376,7 @@ def update_appointment_slot(slot_id: int):
             return redirect(appointments_url)
     slot.update({"start": start, "service_type": service_type, "price": price_amount})
     appointment_slots.sort(key=lambda entry: entry["start"])
+    _persist_state_change()
     return redirect(appointments_url)
 
 
@@ -2164,6 +2387,7 @@ def delete_appointment_slot(slot_id: int):
     if slot is None:
         abort(404)
     appointment_slots = [entry for entry in appointment_slots if entry["id"] != slot_id]
+    _persist_state_change()
     return redirect(url_for("admin_page", view="appointments"))
 
 
@@ -2217,6 +2441,7 @@ def book_appointment_slot(slot_id: int):
             "booked_at": datetime.utcnow(),
         }
     )
+    _persist_state_change()
     serialized_slot = _serialize_slot(slot)
     return jsonify({"slot": serialized_slot})
 
@@ -2239,6 +2464,7 @@ def edit_submission(submission_id: int):
                 else STATUS_OPTIONS[0],
             }
         )
+        _persist_state_change()
         return redirect(url_for("admin_page"))
 
     submission.setdefault("status", STATUS_OPTIONS[0])
@@ -2262,6 +2488,7 @@ def update_submission_status(submission_id: int):
         status = STATUS_OPTIONS[0]
 
     submission["status"] = status
+    _persist_state_change()
     return redirect(url_for("admin_page"))
 
 
@@ -2272,18 +2499,21 @@ def delete_submission(submission_id: int):
         abort(404)
 
     submissions.remove(submission)
+    _persist_state_change()
     return redirect(url_for("admin_page"))
 
 
 @app.route("/admin/visitors/<path:ip_address>/block", methods=["POST"])
 def block_visitor(ip_address: str):
     blocked_ips.add(ip_address)
+    _persist_state_change()
     return redirect(url_for("admin_page"))
 
 
 @app.route("/admin/visitors/<path:ip_address>/unblock", methods=["POST"])
 def unblock_visitor(ip_address: str):
     blocked_ips.discard(ip_address)
+    _persist_state_change()
     return redirect(url_for("admin_page"))
 
 
@@ -2342,6 +2572,7 @@ def mark_chat_as_read():
     data = request.get_json(silent=True) or {}
     visitor_id = (data.get("visitor_id") or request.form.get("visitor_id") or "").strip()
     _mark_conversation_as_read(visitor_id or None)
+    _persist_state_change()
     return ("", 204)
 
 
@@ -2364,6 +2595,13 @@ def chat_stream():
     response = Response(_chat_event_stream(role=role, visitor_id=visitor_id), mimetype="text/event-stream")
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+try:
+    if not load_data():
+        save_data(source="auto", record_history=False)
+except Exception as exc:  # pragma: no cover - defensive startup
+    app.logger.exception("State bootstrap failed: %s", exc)
 
 
 if __name__ == "__main__":
