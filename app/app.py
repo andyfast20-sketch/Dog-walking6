@@ -1978,6 +1978,7 @@ def admin_page():
         meet_greet_enabled=_meet_greet_setting(),
         auto_save_enabled=auto_save_enabled,
         auto_save_last_run=auto_save_last_run,
+        format_price_label=_format_price_label,
     )
 
 
