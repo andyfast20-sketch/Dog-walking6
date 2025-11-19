@@ -2645,6 +2645,8 @@
         let eventSource = null;
         let reconnectTimer = null;
         let legacyLastMessageId = 0;
+        let legacyPollingHandle = null;
+        let legacyPollingStarted = false;
 
         function ensureAudioContext() {
           if (audioCtx || !AudioContext) {
@@ -3018,6 +3020,23 @@
           }
         }
 
+        function stopLegacyPolling() {
+          if (legacyPollingHandle) {
+            clearInterval(legacyPollingHandle);
+            legacyPollingHandle = null;
+          }
+        }
+
+        function startLegacyPolling() {
+          if (legacyPollingStarted) return;
+          legacyPollingStarted = true;
+          stopLegacyPolling();
+          loadInitialHistory().finally(() => {
+            legacyPoll();
+            legacyPollingHandle = setInterval(legacyPoll, 4000);
+          });
+        }
+
         function disconnectStream() {
           if (eventSource) {
             eventSource.close();
@@ -3034,6 +3053,10 @@
             return;
           }
           eventSource = new EventSource("/chat/stream?role=admin");
+          eventSource.onopen = () => {
+            stopLegacyPolling();
+            legacyPollingStarted = false;
+          };
           eventSource.onmessage = (event) => {
             try {
               const payload = JSON.parse(event.data);
@@ -3044,6 +3067,7 @@
           };
           eventSource.onerror = () => {
             disconnectStream();
+            startLegacyPolling();
             reconnectTimer = setTimeout(connectStream, 2000);
           };
         }
@@ -3212,10 +3236,7 @@
           window.addEventListener("beforeunload", disconnectStream);
         } else {
           console.warn("EventSource not available; using fallback polling");
-          loadInitialHistory().finally(() => {
-            legacyPoll();
-            setInterval(legacyPoll, 4000);
-          });
+          startLegacyPolling();
         }
       })();
     </script>
