@@ -1515,6 +1515,20 @@ def _run_autopilot_if_needed(visitor_id: str):
     _add_chat_message("admin", reply, visitor_id, trigger_autopilot=False)
 
 
+def _schedule_autopilot(visitor_id: str):
+    def _worker():
+        try:
+            _run_autopilot_if_needed(visitor_id)
+        except Exception as exc:  # pragma: no cover - background guardrail
+            app.logger.exception("Autopilot worker failed: %s", exc)
+
+    thread = threading.Thread(
+        target=_worker, name=f"autopilot-{visitor_id}", daemon=True
+    )
+    thread.start()
+    return thread
+
+
 def _record_visit(ip_address: str):
     user_agent = request.headers.get("User-Agent", "Unknown")
     if _should_ignore_user_agent(user_agent):
@@ -1638,7 +1652,7 @@ def _add_chat_message(
     next_chat_message_id += 1
     _broadcast_chat_update({"type": "message", "message": message})
     if trigger_autopilot and sender == "visitor":
-        _run_autopilot_if_needed(visitor_id)
+        _schedule_autopilot(visitor_id)
     _persist_state_change()
     return message
 
