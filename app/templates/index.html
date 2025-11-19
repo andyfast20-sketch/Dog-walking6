@@ -832,6 +832,140 @@
         padding: 0.1rem 0.6rem;
         margin-left: 0.5rem;
       }
+      .whatsapp-tracking {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: clamp(1.25rem, 3vw, 2.5rem);
+        align-items: center;
+      }
+      .whatsapp-details {
+        display: grid;
+        gap: 0.65rem;
+        color: #475569;
+      }
+      .whatsapp-details ul {
+        margin: 0;
+        padding-left: 1.1rem;
+        display: grid;
+        gap: 0.4rem;
+      }
+      .whatsapp-window {
+        border-radius: 28px;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        background: linear-gradient(180deg, #0b141a, #0b141a 80px, #e8edef 80px, #e8edef);
+        box-shadow: 0 18px 50px rgba(15, 23, 42, 0.18);
+        overflow: hidden;
+        color: #f8fafc;
+      }
+      .whatsapp-header {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        padding: 1rem 1.25rem;
+        background: linear-gradient(135deg, #075e54, #128c7e);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        color: #f8fafc;
+      }
+      .whatsapp-avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #22d3ee, #a855f7);
+        display: grid;
+        place-items: center;
+        font-weight: 700;
+      }
+      .whatsapp-body {
+        padding: 1.25rem;
+        background: linear-gradient(180deg, #e8edef 0%, #dfe4ea 100%);
+        display: grid;
+        gap: 0.75rem;
+      }
+      .whatsapp-bubble {
+        padding: 0.8rem 1rem;
+        border-radius: 18px 18px 4px 18px;
+        background: #ffffff;
+        color: #0f172a;
+        box-shadow: 0 1px 0 rgba(15, 23, 42, 0.05);
+        display: grid;
+        gap: 0.5rem;
+        position: relative;
+      }
+      .whatsapp-bubble::after {
+        content: "";
+        position: absolute;
+        bottom: -8px;
+        right: 22px;
+        width: 12px;
+        height: 12px;
+        background: #ffffff;
+        transform: rotate(45deg);
+        box-shadow: -1px 1px 0 rgba(15, 23, 42, 0.05);
+      }
+      .whatsapp-map {
+        border-radius: 14px;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        overflow: hidden;
+        background: radial-gradient(circle at 20% 20%, #dbeafe 0 18%, transparent 20%),
+          radial-gradient(circle at 70% 35%, #fce7f3 0 22%, transparent 24%),
+          radial-gradient(circle at 40% 70%, #cffafe 0 20%, transparent 22%),
+          linear-gradient(135deg, rgba(37, 99, 235, 0.25), rgba(236, 72, 153, 0.2));
+        position: relative;
+        height: 180px;
+        display: grid;
+        place-items: center;
+      }
+      .whatsapp-map::before,
+      .whatsapp-map::after {
+        content: "";
+        position: absolute;
+        inset: 18% 12%;
+        border-radius: 18px;
+        border: 2px dashed rgba(15, 23, 42, 0.25);
+        pointer-events: none;
+      }
+      .whatsapp-map::after {
+        inset: 30% 24%;
+        border-color: rgba(59, 130, 246, 0.4);
+        border-style: solid;
+        opacity: 0.7;
+      }
+      .map-pin {
+        width: 58px;
+        height: 58px;
+        border-radius: 50%;
+        background: radial-gradient(circle, #ef4444 0 55%, #b91c1c 60% 100%);
+        box-shadow: 0 12px 30px rgba(239, 68, 68, 0.35);
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-weight: 800;
+        position: relative;
+      }
+      .map-pin::after {
+        content: "";
+        position: absolute;
+        inset: auto 50% -18px;
+        transform: translateX(50%);
+        width: 8px;
+        height: 18px;
+        background: linear-gradient(180deg, #b91c1c, transparent);
+      }
+      .whatsapp-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        color: #475569;
+        font-size: 0.9rem;
+      }
+      .whatsapp-meta span {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        color: #0f172a;
+        font-weight: 600;
+      }
       body.modal-open {
         overflow: hidden;
       }
@@ -1118,6 +1252,47 @@
               <h3>What about keys and security?</h3>
               <p>Keys are coded and stored in a locked cabinet. Smart lock access codes are rotated monthly.</p>
             </article>
+          </div>
+        </section>
+        <section id="whatsapp-tracking">
+          <div class="section-heading">
+            <p style="text-transform: uppercase; letter-spacing: 0.2em; color: #22c55e; font-weight: 700">Live updates</p>
+            <h2>Track the walk on WhatsApp</h2>
+            <p>Stay in the loop with a real-time map, quick photos, and ETA pings without opening another app.</p>
+          </div>
+          <div class="whatsapp-tracking">
+            <div class="whatsapp-details">
+              <p><strong>Included with every service</strong>—opt in once and we'll share a private WhatsApp thread for your pup.</p>
+              <ul>
+                <li>See the live route and distance in-app.</li>
+                <li>Tap the photo cards we drop mid-walk for quick updates.</li>
+                <li>Send notes or preferred detours in the same chat.</li>
+              </ul>
+            </div>
+            <div class="whatsapp-window" aria-label="WhatsApp tracking preview">
+              <div class="whatsapp-header">
+                <div class="whatsapp-avatar">HP</div>
+                <div>
+                  <strong style="display: block">Happy Trails Walks</strong>
+                  <small style="opacity: 0.85">Live now · 22 min remaining</small>
+                </div>
+              </div>
+              <div class="whatsapp-body">
+                <div class="whatsapp-bubble">
+                  <div class="whatsapp-map" role="presentation">
+                    <div class="map-pin">📍</div>
+                  </div>
+                  <div class="whatsapp-meta">
+                    <span>Route in progress</span>
+                    <small>Photo incoming…</small>
+                  </div>
+                </div>
+                <div class="whatsapp-bubble" style="background: #dcf8c6">
+                  <strong style="color: #0f172a">Photo shared</strong>
+                  <small style="color: #1f2937">"Finn spotted a squirrel—kept moving!"</small>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
         <section class="booking" id="booking" aria-labelledby="bookingTitle">
