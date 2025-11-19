@@ -1562,16 +1562,20 @@ def _serialize_conversation(visitor_id: str):
     conversation = chat_conversations.get(visitor_id)
     if not conversation:
         return None
+    messages = conversation.get("messages") or []
+    if not isinstance(messages, (list, tuple)):
+        messages = []
     unread = any(
-        message["sender"] == "visitor" and not message.get("seen_by_admin", False)
-        for message in conversation["messages"]
+        message.get("sender") == "visitor" and not message.get("seen_by_admin", False)
+        for message in messages
+        if isinstance(message, dict)
     )
     return {
         "visitor_id": visitor_id,
         "ip_address": conversation.get("ip_address", "Unknown"),
         "created_at": conversation.get("created_at", datetime.utcnow()).isoformat(),
         "unread": unread,
-        "message_count": len(conversation["messages"]),
+        "message_count": len(messages),
     }
 
 
