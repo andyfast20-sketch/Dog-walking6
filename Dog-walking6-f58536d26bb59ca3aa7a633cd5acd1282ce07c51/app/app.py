@@ -1903,6 +1903,7 @@ def admin_page():
         business_in_a_box=business_in_a_box,
         autopilot_model=AUTOPILOT_MODEL_NAME,
         autopilot_api_key_missing=_get_deepseek_api_key() is None,
+        format_price_label=_format_price_label,
         dog_breeds=_sorted_breeds(),
         breed_ai_suggestions=breed_ai_suggestions,
         new_enquiry_count=new_enquiry_count,
