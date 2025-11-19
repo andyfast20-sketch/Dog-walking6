@@ -230,6 +230,12 @@
         border: 1px solid rgba(15, 23, 42, 0.2);
         color: #0f172a;
       }
+      .btn-admin {
+        background: rgba(15, 23, 42, 0.9);
+        color: #f8fafc;
+        border: 1px solid rgba(15, 23, 42, 0.15);
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.25);
+      }
       .hero figure {
         background: rgba(255, 255, 255, 0.9);
         border-radius: 28px;
@@ -893,6 +899,9 @@
         text-align: center;
         color: #475569;
       }
+      .admin-cta {
+        margin-bottom: 1rem;
+      }
     </style>
   </head>
   <body>
@@ -1236,6 +1245,9 @@
         {% endif %}
       </main>
       <footer>
+        <div class="admin-cta">
+          <a class="btn btn-admin" href="{{ url_for('admin_page') }}">Go to admin</a>
+        </div>
         <p>© {{ current_year }} Happy Trails Dog Walking · Fully bonded & insured · Serving downtown & beyond</p>
       </footer>
     </div>
