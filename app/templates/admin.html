@@ -1119,6 +1119,21 @@
         margin: 0;
         color: #475569;
       }
+      .backup-upload-form {
+        display: grid;
+        gap: 0.5rem;
+      }
+      .backup-upload-form label {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #0f172a;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+      .backup-upload-form input[type="file"] {
+        font-size: 0.9rem;
+      }
       .backup-alert {
         border-radius: 16px;
         padding: 0.75rem 1rem;
@@ -1690,15 +1705,31 @@
               <div class="backup-panel">
                 <h3>Upload &amp; restore</h3>
                 <p>Reload everything from the same <code>{{ state_backup_metadata.export_filename }}</code> file you just downloaded.</p>
-                <form method="post" action="{{ url_for('import_admin_state') }}">
-                  <button type="submit" {% if not state_backup_metadata.exists %}disabled{% endif %}>Upload &amp; restore</button>
+                <form
+                  method="post"
+                  action="{{ url_for('import_admin_state') }}"
+                  enctype="multipart/form-data"
+                  class="backup-upload-form"
+                >
+                  <label for="stateFileInput">
+                    Choose a backup file (optional)
+                    <input
+                      type="file"
+                      id="stateFileInput"
+                      name="state_file"
+                      accept=".json,application/json"
+                    />
+                  </label>
+                  <button type="submit">Upload &amp; restore</button>
                 </form>
                 <p class="backup-note">
+                  Upload the JSON you downloaded&mdash;even if your computer renamed it to <code>andy(1).json</code>. Leave the
+                  file picker empty
                   {% if state_backup_metadata.exists %}
-                  We'll pull the copy saved at <code>{{ state_backup_metadata.export_path }}</code> so you don't have to pick a file manually.
+                  to load the server copy stored at <code>{{ state_backup_metadata.export_path }}</code>
                   {% else %}
-                  Download a backup first so we know where to load it from.
-                  {% endif %}
+                  if you want to pick a file later, but we recommend uploading one now so it's ready to go
+                  {% endif %}.
                 </p>
               </div>
             </div>
