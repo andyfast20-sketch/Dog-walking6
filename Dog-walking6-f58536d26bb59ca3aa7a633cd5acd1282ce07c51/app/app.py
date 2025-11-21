@@ -559,7 +559,22 @@ def _state_export_file_path() -> str:
 def _backup_directory_candidates():
     project_root = Path(app.root_path).parent
     backups_dir = project_root / "backups"
-    return [str(project_root), str(backups_dir)]
+    candidates = []
+
+    env_path = os.environ.get("DOG_WALKING_BACKUP_DB_PATH")
+    if env_path:
+        env_directory = Path(env_path).expanduser().resolve().parent
+        candidates.append(str(env_directory))
+
+    candidates.extend([str(project_root), str(backups_dir)])
+
+    unique_candidates = []
+    seen = set()
+    for candidate in candidates:
+        if candidate and candidate not in seen:
+            unique_candidates.append(candidate)
+            seen.add(candidate)
+    return unique_candidates
 
 
 def _r2_head_object(key: str):

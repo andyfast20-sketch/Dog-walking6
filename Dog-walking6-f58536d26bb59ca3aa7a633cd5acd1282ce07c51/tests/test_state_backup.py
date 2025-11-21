@@ -99,6 +99,15 @@ def test_backup_candidates_include_project_root_and_folder(app_module):
     assert str(project_root / "backups") in candidates
 
 
+def test_backup_candidates_include_env_directory(tmp_path, monkeypatch, app_module):
+    env_path = tmp_path / "nested" / "snapshots.sqlite3"
+    monkeypatch.setenv("DOG_WALKING_BACKUP_DB_PATH", str(env_path))
+
+    candidates = app_module._backup_directory_candidates()
+
+    assert str(env_path.parent.resolve()) in candidates
+
+
 def test_state_backup_includes_history_entries(tmp_path, monkeypatch, app_module):
     db_path = tmp_path / "snapshots.sqlite3"
     monkeypatch.setenv("DOG_WALKING_BACKUP_DB_PATH", str(db_path))
