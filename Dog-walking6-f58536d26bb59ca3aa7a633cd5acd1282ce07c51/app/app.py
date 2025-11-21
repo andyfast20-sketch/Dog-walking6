@@ -1329,12 +1329,13 @@ def _load_state(state: dict):
 
 def _get_state_backup_metadata() -> dict:
     export_path = _state_export_file_path()
+    database_path = os.environ.get("DOG_WALKING_BACKUP_DB_PATH") or _state_backup_db_path()
     metadata = {
         "exists": False,
         "filename": STATE_EXPORT_FILENAME,
-        "database_path": export_path,
+        "database_path": database_path,
         "directory": os.path.dirname(export_path) if export_path else "",
-        "total_snapshots": 0,
+        "total_snapshots": _count_backup_rows(),
         "export_path": export_path,
         "export_filename": STATE_EXPORT_FILENAME,
     }
