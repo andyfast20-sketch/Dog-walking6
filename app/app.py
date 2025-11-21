@@ -6,7 +6,7 @@ import threading
 import urllib.error
 import urllib.request
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -1090,12 +1090,10 @@ def _fetch_tameside_weather(start: datetime) -> dict:
     if not api_key:
         return {"status": "unknown", "summary": "Weather lookup unavailable (missing API key)."}
 
-    date_str = start.strftime("%Y-%m-%d")
-    hour = start.strftime("%H")
     query = urllib.parse.quote(WEATHER_LOCATION_QUERY)
     url = (
-        "https://api.weatherapi.com/v1/forecast.json"
-        f"?key={api_key}&q={query}&dt={date_str}&hour={hour}"
+        "https://api.openweathermap.org/data/2.5/forecast"
+        f"?q={query}&appid={api_key}&units=metric"
     )
     request = urllib.request.Request(url, headers={"User-Agent": "HappyTrails/1.0"})
     try:
@@ -1104,25 +1102,28 @@ def _fetch_tameside_weather(start: datetime) -> dict:
     except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError, json.JSONDecodeError):
         return {"status": "unknown", "summary": "Weather lookup unavailable."}
 
-    forecast_days = (payload.get("forecast") or {}).get("forecastday") or []
-    if not forecast_days:
+    forecasts = payload.get("list") or []
+    if not forecasts:
         return {"status": "unknown", "summary": "Weather data unavailable."}
 
-    # Try to find an hour-specific forecast, otherwise fall back to the day's condition text.
-    target_hour = int(hour)
-    condition_text = ""
-    for day in forecast_days:
-        if day.get("date") != date_str:
+    target_timestamp = int(start.replace(tzinfo=timezone.utc).timestamp())
+    closest_entry = None
+    closest_distance = None
+    for entry in forecasts:
+        entry_timestamp = entry.get("dt")
+        if not isinstance(entry_timestamp, (int, float)):
             continue
-        for hour_entry in day.get("hour", []):
-            if hour_entry.get("time") and hour_entry.get("time").endswith(f" {target_hour:02d}:00"):
-                condition_text = (hour_entry.get("condition") or {}).get("text", "")
-                break
-        if not condition_text:
-            condition_text = ((day.get("day") or {}).get("condition") or {}).get("text", "")
-        break
+        distance = abs(int(entry_timestamp) - target_timestamp)
+        if closest_distance is None or distance < closest_distance:
+            closest_entry = entry
+            closest_distance = distance
 
-    condition_text = condition_text or "Weather data unavailable"
+    if not closest_entry:
+        return {"status": "unknown", "summary": "Weather data unavailable."}
+
+    weather_entries = closest_entry.get("weather") or []
+    primary_weather = weather_entries[0] if weather_entries and isinstance(weather_entries[0], dict) else {}
+    condition_text = (primary_weather.get("description") or "").strip() or "Weather data unavailable"
     status = _classify_weather(condition_text)
     return {"status": status, "summary": condition_text}
 
