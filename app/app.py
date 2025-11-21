@@ -1046,6 +1046,45 @@ def _classify_weather(summary: str) -> str:
     return "unknown"
 
 
+def _cleanup_expired_slots() -> bool:
+    """Remove past appointment slots that were never booked."""
+
+    global appointment_slots
+
+    now = datetime.utcnow()
+    retained_slots = []
+    removed = False
+
+    for slot in appointment_slots:
+        start = slot.get("start")
+        if isinstance(start, datetime) and start < now and not slot.get("is_booked"):
+            removed = True
+            continue
+        retained_slots.append(slot)
+
+    if removed:
+        appointment_slots = retained_slots
+
+    return removed
+
+
+def _refresh_future_weather(now: datetime) -> bool:
+    """Ensure upcoming slots carry a weather forecast."""
+
+    updated = False
+
+    for slot in appointment_slots:
+        start = slot.get("start")
+        if not isinstance(start, datetime) or start < now:
+            continue
+        weather = slot.get("weather")
+        if not isinstance(weather, dict) or not weather.get("status"):
+            slot["weather"] = _fetch_tameside_weather(start)
+            updated = True
+
+    return updated
+
+
 def _fetch_tameside_weather(start: datetime) -> dict:
     api_key = _weather_api_key()
     if not api_key:
@@ -1433,6 +1472,7 @@ def _serialize_slot(slot: dict):
     weather = slot.get("weather") if isinstance(slot.get("weather"), dict) else {}
     weather_status = weather.get("status") or "unknown"
     weather_summary = weather.get("summary") or ""
+    weather_label = "Rain expected" if weather_status == "rain" else weather_summary or "Weather update unavailable"
     return {
         "id": slot["id"],
         "start_iso": slot["start"].isoformat(),
@@ -1455,11 +1495,19 @@ def _serialize_slot(slot: dict):
         "price_label": price_label,
         "weather_status": weather_status,
         "weather_summary": weather_summary,
+        "weather_label": weather_label,
+        "is_rainy": weather_status == "rain",
     }
 
 
 def _sorted_slots():
-    return sorted(appointment_slots, key=lambda slot: slot["start"])
+    now = datetime.utcnow()
+    slots_removed = _cleanup_expired_slots()
+    weather_updated = _refresh_future_weather(now)
+    appointment_slots.sort(key=lambda slot: slot["start"])
+    if slots_removed or weather_updated:
+        _persist_state_change()
+    return list(appointment_slots)
 
 
 def _get_client_ip() -> str:
