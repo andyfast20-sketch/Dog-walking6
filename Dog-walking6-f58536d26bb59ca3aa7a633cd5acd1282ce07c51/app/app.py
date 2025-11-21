@@ -5,7 +5,7 @@ import sqlite3
 import threading
 import urllib.error
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -2098,6 +2098,29 @@ def admin_page():
     }
     weather_message = weather_messages.get(weather_action)
     weather_message_is_error = weather_action == "auth_failed"
+    slot_ai_action = (request.args.get("slot_ai") or "").strip()
+    slot_ai_message = None
+    slot_ai_error = False
+    if slot_ai_action == "missing_key":
+        slot_ai_message = "Add a DEEPSEEK_API_KEY environment variable to enable the AI slot planner."
+        slot_ai_error = True
+    elif slot_ai_action == "error":
+        slot_ai_message = request.args.get("slot_ai_error") or "The AI slot planner ran into a problem."
+        slot_ai_error = True
+    elif slot_ai_action == "no_slots":
+        slot_ai_message = "The AI reply did not include any usable slots. Try a simpler prompt."
+        slot_ai_error = True
+    elif slot_ai_action == "created":
+        added = _coerce_int(request.args.get("slots_added")) or 0
+        skipped = _coerce_int(request.args.get("slots_skipped")) or 0
+        blocked = _coerce_int(request.args.get("slots_blocked")) or 0
+        slot_ai_message = (
+            f"Added {added} AI-planned slots"
+            + (f", skipped {skipped}" if skipped else "")
+            + (f", weather-blocked {blocked}" if blocked else "")
+            + "."
+        )
+
     return render_template(
         "admin.html",
         home_url=url_for("index"),
@@ -2143,6 +2166,8 @@ def admin_page():
         weather_location=WEATHER_LOCATION,
         weather_message=weather_message,
         weather_message_is_error=weather_message_is_error,
+        slot_ai_message=slot_ai_message,
+        slot_ai_error=slot_ai_error,
     )
 
 
@@ -2613,6 +2638,169 @@ def clear_breed_ai_suggestions():
     breed_ai_suggestions = None
     _persist_state_change()
     return redirect(url_for("admin_page", view="breeds"))
+
+
+@app.route("/admin/slots/ai", methods=["POST"])
+def ai_generate_appointment_slots():
+    global next_slot_id
+
+    if not _get_deepseek_api_key():
+        return redirect(url_for("admin_page", view="appointments", slot_ai="missing_key"))
+
+    today = datetime.utcnow().date()
+    prompt = (request.form.get("ai_prompt") or "").strip()
+    slot_count = _coerce_int(request.form.get("slot_count"), 6)
+    slot_count = max(1, min(slot_count, 40))
+    start_date_value = (request.form.get("start_date") or today.isoformat()).strip()
+    weeks_value = _coerce_int(request.form.get("weeks"), 2)
+    max_per_day = _coerce_int(request.form.get("max_per_day"), 3)
+    min_lead_days = max(0, _coerce_int(request.form.get("min_lead_days"), 1))
+    avoid_weekends = request.form.get("avoid_weekends") == "1"
+    avoid_tuesdays = request.form.get("avoid_tuesdays") == "1"
+    avoid_bad_weather = request.form.get("avoid_bad_weather") == "1"
+    allow_walks = request.form.get("allow_walks") != "0"
+    allow_meet = request.form.get("allow_meet") == "1"
+    default_walk_price = _parse_price(request.form.get("default_walk_price")) or 45.0
+    default_meet_price = _parse_price(request.form.get("default_meet_price")) or 0.0
+    allow_service_types = []
+    if allow_walks:
+        allow_service_types.append("walk")
+    if allow_meet:
+        allow_service_types.append("meet")
+    if not allow_service_types:
+        allow_service_types = ["walk"]
+
+    try:
+        start_date = datetime.strptime(start_date_value, "%Y-%m-%d").date()
+    except ValueError:
+        start_date = today
+    horizon_days = max(0, weeks_value) * 7
+    end_date = start_date + timedelta(days=horizon_days)
+    earliest_allowed = today + timedelta(days=min_lead_days)
+
+    constraints = [
+        f"Create up to {slot_count} appointment slots between {start_date.isoformat()} and {end_date.isoformat()}.",
+        f"Only use these service types: {', '.join(allow_service_types)}.",
+        "Avoid weekends." if avoid_weekends else "",
+        "Avoid Tuesdays." if avoid_tuesdays else "",
+        f"Limit to {max_per_day} slots per day." if max_per_day else "",
+        f"Ensure slots start on or after {earliest_allowed.isoformat()} based on minimum lead time." if min_lead_days else "",
+        "Prefer weather-friendly times if forecasts are rough (rain, snow, storms, extreme heat)." if avoid_bad_weather else "",
+    ]
+    constraints_text = "\n".join(filter(None, constraints))
+    system_message = (
+        "You assist a dog walking admin in planning a schedule. Respond ONLY with JSON following this schema: "
+        "{\"slots\": [{\"date\": \"YYYY-MM-DD\", \"time\": \"HH:MM\", "
+        "\"service_type\": \"walk|meet\", \"price\": <number>, \"note\": <optional string>}]}. "
+        "Pick smart spacing between slots, keep times on the hour or half-hour, and obey the provided constraints."
+    )
+    user_message = (
+        ("Admin instructions: " + prompt + "\n" if prompt else "")
+        + constraints_text
+        + "\nUse local time and keep to realistic walking hours (8am–7pm)."
+    )
+
+    try:
+        reply = _call_deepseek_chat_completion(
+            [
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": user_message},
+            ]
+        )
+        data = _extract_json_object(reply)
+    except Exception as exc:  # pylint: disable=broad-except
+        return redirect(
+            url_for(
+                "admin_page",
+                view="appointments",
+                slot_ai="error",
+                slot_ai_error=str(exc),
+            )
+        )
+
+    raw_slots = []
+    if isinstance(data, dict):
+        raw_slots = data.get("slots") or []
+    elif isinstance(data, list):
+        raw_slots = data
+    added = 0
+    skipped = 0
+    blocked = 0
+    per_day_counts = {}
+    for entry in raw_slots:
+        if added >= slot_count:
+            break
+        date_text = str((entry.get("date") or "").strip())
+        time_text = str((entry.get("time") or "").strip())
+        if not date_text or not time_text:
+            skipped += 1
+            continue
+        try:
+            start_dt = datetime.strptime(f"{date_text} {time_text}", "%Y-%m-%d %H:%M")
+        except ValueError:
+            skipped += 1
+            continue
+        if start_dt.date() < earliest_allowed or start_dt.date() < start_date or start_dt.date() > end_date:
+            skipped += 1
+            continue
+        if avoid_weekends and start_dt.weekday() >= 5:
+            skipped += 1
+            continue
+        if avoid_tuesdays and start_dt.weekday() == 1:
+            skipped += 1
+            continue
+        per_day = per_day_counts.get(start_dt.date(), 0)
+        if max_per_day and per_day >= max_per_day:
+            skipped += 1
+            continue
+        service_type = (entry.get("service_type") or allow_service_types[0]).strip().lower()
+        if service_type not in allow_service_types:
+            skipped += 1
+            continue
+        price_value = _parse_price(entry.get("price"))
+        if price_value is None:
+            price_value = default_meet_price if service_type == "meet" else default_walk_price
+        duplicate = any(
+            slot.get("start") == start_dt and (slot.get("service_type") or "walk") == service_type
+            for slot in appointment_slots
+        )
+        if duplicate:
+            skipped += 1
+            continue
+        slot = {
+            "id": next_slot_id,
+            "start": start_dt,
+            "is_booked": False,
+            "workflow_status": "",
+            "visitor_name": None,
+            "visitor_email": None,
+            "visitor_dog_breed": None,
+            "price": price_value,
+            "service_type": service_type,
+        }
+        _enrich_slot_with_weather(slot, force_refresh=True)
+        if avoid_bad_weather and slot.get("weather", {}).get("blocked"):
+            blocked += 1
+            continue
+        appointment_slots.append(slot)
+        appointment_slots.sort(key=lambda entry: entry["start"])
+        next_slot_id += 1
+        added += 1
+        per_day_counts[start_dt.date()] = per_day + 1
+    if added:
+        _persist_state_change()
+    if not added and not skipped:
+        return redirect(url_for("admin_page", view="appointments", slot_ai="no_slots"))
+    return redirect(
+        url_for(
+            "admin_page",
+            view="appointments",
+            slot_ai="created" if added else "no_slots",
+            slots_added=added,
+            slots_skipped=skipped,
+            slots_blocked=blocked,
+        )
+    )
 
 
 @app.route("/admin/slots", methods=["POST"])
