@@ -208,11 +208,63 @@
         gap: 0.5rem;
         align-items: center;
       }
-      .coverage-admin__empty {
-        margin: 0;
-        color: #94a3b8;
-        font-style: italic;
-      }
+        .coverage-admin__empty {
+          margin: 0;
+          color: #94a3b8;
+          font-style: italic;
+        }
+        .weather-admin {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          gap: 1rem;
+        }
+        .weather-card {
+          background: #fff;
+          border-radius: 16px;
+          padding: 1.25rem;
+          box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+          border: 1px solid rgba(15, 23, 42, 0.06);
+          display: flex;
+          flex-direction: column;
+          gap: 0.9rem;
+        }
+        .weather-status {
+          padding: 0.75rem 0.85rem;
+          border-radius: 12px;
+          background: #f8fafc;
+          border: 1px solid rgba(15, 23, 42, 0.05);
+        }
+        .weather-form {
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+        }
+        .weather-form label {
+          display: flex;
+          flex-direction: column;
+          gap: 0.35rem;
+          font-weight: 600;
+          color: #0f172a;
+        }
+        .weather-form input[type="text"],
+        .weather-form input[type="password"] {
+          border-radius: 12px;
+          border: 1px solid rgba(15, 23, 42, 0.12);
+          padding: 0.65rem 0.75rem;
+          font-size: 0.95rem;
+          font-family: inherit;
+        }
+        .weather-form__error {
+          margin: 0;
+          color: #b91c1c;
+          font-weight: 600;
+        }
+        .weather-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+          align-items: center;
+        }
       .photo-admin {
         display: flex;
         flex-direction: column;
@@ -1315,12 +1367,13 @@
         <button type="button" data-open-view="backups">Save &amp; load</button>
         <button type="button" data-open-view="photos">Site photos</button>
         <button type="button" data-open-view="breeds">Dog breeds</button>
-        <button type="button" data-open-view="enquiries">Enquiries</button>
-        <button type="button" data-open-view="appointments">Appointments</button>
-        <button type="button" data-open-view="coverage">Service area</button>
-        <button type="button" data-open-view="credentials">Credentials</button>
-        <button type="button" data-open-view="visitors">Visitor insights</button>
-        <button type="button" data-open-view="chat">Live chat</button>
+          <button type="button" data-open-view="enquiries">Enquiries</button>
+          <button type="button" data-open-view="appointments">Appointments</button>
+          <button type="button" data-open-view="coverage">Service area</button>
+          <button type="button" data-open-view="weather">Weather API</button>
+          <button type="button" data-open-view="credentials">Credentials</button>
+          <button type="button" data-open-view="visitors">Visitor insights</button>
+          <button type="button" data-open-view="chat">Live chat</button>
       </nav>
       <main class="admin-main">
         <section class="view view--active" data-view="menu" aria-label="Main admin menu">
@@ -1492,24 +1545,53 @@
                 {% endif %}
               </div>
             </button>
-            <button type="button" class="menu-card" data-open-view="coverage">
-              <div class="menu-card__top">
-                <div>
-                  <p class="menu-card__eyebrow">Service area</p>
-                  <h3>{{ coverage_areas | length }} live</h3>
-                  <p>Manage the neighbourhood cards shown on the homepage.</p>
+              <button type="button" class="menu-card" data-open-view="coverage">
+                <div class="menu-card__top">
+                  <div>
+                    <p class="menu-card__eyebrow">Service area</p>
+                    <h3>{{ coverage_areas | length }} live</h3>
+                    <p>Manage the neighbourhood cards shown on the homepage.</p>
+                  </div>
+                  <div class="menu-card__icon">🗺️</div>
                 </div>
-                <div class="menu-card__icon">🗺️</div>
-              </div>
-              <div class="menu-card__meta">
-                <span class="menu-pill">Update copy &amp; order anytime</span>
-              </div>
-            </button>
-            <button type="button" class="menu-card" data-open-view="credentials">
-              <div class="menu-card__top">
-                <div>
-                  <p class="menu-card__eyebrow">Credentials</p>
-                  <h3>{{ certificates | length }} published</h3>
+                <div class="menu-card__meta">
+                  <span class="menu-pill">Update copy &amp; order anytime</span>
+                </div>
+              </button>
+              <button type="button" class="menu-card" data-open-view="weather">
+                <div class="menu-card__top">
+                  <div>
+                    <p class="menu-card__eyebrow">Weather API</p>
+                    <h3>
+                      {% if weather_api_key_source == 'stored' %}
+                      Saved in admin
+                      {% elif weather_api_key_source == 'environment' %}
+                      Using env var
+                      {% else %}
+                      Missing key
+                      {% endif %}
+                    </h3>
+                    <p>Update the OpenWeatherMap key for slot forecasts.</p>
+                  </div>
+                  <div class="menu-card__icon">🌦️</div>
+                </div>
+                <div class="menu-card__meta">
+                  <span class="menu-pill">
+                    {% if weather_api_key_source == 'stored' %}
+                    Ready for new lookups
+                    {% elif weather_api_key_source == 'environment' %}
+                    Pulling from server settings
+                    {% else %}
+                    Weather fetch disabled
+                    {% endif %}
+                  </span>
+                </div>
+              </button>
+              <button type="button" class="menu-card" data-open-view="credentials">
+                <div class="menu-card__top">
+                  <div>
+                    <p class="menu-card__eyebrow">Credentials</p>
+                    <h3>{{ certificates | length }} published</h3>
                   <p>Showcase qualifications on the About page.</p>
                 </div>
                 <div class="menu-card__icon">📜</div>
@@ -2381,6 +2463,77 @@
               <p class="coverage-admin__empty">No coverage areas published yet.</p>
               {% endif %}
             </div>
+          </section>
+        </section>
+
+        <section class="view" data-view="weather" aria-labelledby="weatherHeading">
+          <div class="view-heading">
+            <div>
+              <p class="eyebrow">Bookings</p>
+              <h2 id="weatherHeading">Weather API key</h2>
+              <p>Unlock this panel to store or remove the OpenWeatherMap key used for slot forecasts.</p>
+            </div>
+            <button type="button" class="ghost-button" data-open-view="menu">Back to main menu</button>
+          </div>
+          <section class="weather-admin" aria-labelledby="weatherHeading">
+            {% if not weather_admin_unlocked %}
+            <article class="weather-card">
+              <h3>Enter the passcode</h3>
+              <p>Protect this section so only admins can change the saved API key.</p>
+              <form method="post" action="{{ url_for('unlock_weather_admin') }}" class="weather-form">
+                <label>
+                  Password (891133kk)
+                  <input type="password" name="password" autocomplete="off" required />
+                </label>
+                {% if weather_unlock_error %}
+                <p class="weather-form__error">That password was incorrect. Try again.</p>
+                {% endif %}
+                <div class="weather-actions">
+                  <button type="submit">Unlock weather settings</button>
+                </div>
+              </form>
+            </article>
+            {% else %}
+            <article class="weather-card">
+              <div class="weather-status">
+                <p class="eyebrow" style="margin: 0">Current source</p>
+                {% if weather_api_key_source == 'stored' %}
+                <p><strong>Using the key saved in admin.</strong></p>
+                {% elif weather_api_key_source == 'environment' %}
+                <p>
+                  <strong>Using a server environment key.</strong> Save a new key here to override it without a deploy.
+                </p>
+                {% else %}
+                <p><strong>No API key saved.</strong> Slots will show "missing API key" until you add one.</p>
+                {% endif %}
+                {% if weather_api_key %}
+                <p class="muted" style="margin: 0">Saved key preview: …{{ weather_api_key[-4:] }}</p>
+                {% endif %}
+              </div>
+              <form method="post" action="{{ url_for('save_weather_api_key') }}" class="weather-form">
+                <label>
+                  OpenWeatherMap API key
+                  <input
+                    type="text"
+                    name="api_key"
+                    value="{{ weather_api_key or '' }}"
+                    placeholder="Enter or paste your key"
+                    autocomplete="off"
+                  />
+                </label>
+                <p class="muted" style="margin: 0">
+                  Save a key to refresh all future slot forecasts. Clear it to fall back to environment variables.
+                </p>
+                <div class="weather-actions">
+                  <button type="submit">Save API key</button>
+                  <button type="submit" formaction="{{ url_for('delete_weather_api_key') }}" class="ghost-button" {% if not weather_api_key %}disabled{% endif %}>
+                    Remove saved key
+                  </button>
+                  <button type="submit" formaction="{{ url_for('lock_weather_admin') }}" class="link-button">Lock this section</button>
+                </div>
+              </form>
+            </article>
+            {% endif %}
           </section>
         </section>
 
