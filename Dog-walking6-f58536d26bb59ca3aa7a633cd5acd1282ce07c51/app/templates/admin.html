@@ -212,6 +212,43 @@
         color: #94a3b8;
         font-style: italic;
       }
+      .weather-card {
+        background: #fff;
+        border-radius: 18px;
+        padding: 1.2rem;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+        border: 1px solid rgba(37, 99, 235, 0.12);
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+      .weather-card h3 {
+        margin: 0;
+      }
+      .weather-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 1rem;
+        align-items: start;
+      }
+      .weather-options {
+        display: grid;
+        gap: 0.6rem;
+      }
+      .pill-note {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.45rem 0.75rem;
+        border-radius: 999px;
+        background: rgba(99, 102, 241, 0.08);
+        color: #312e81;
+        font-weight: 600;
+      }
+      .note-error {
+        background: rgba(248, 113, 113, 0.12);
+        color: #991b1b;
+      }
       .photo-admin {
         display: flex;
         flex-direction: column;
@@ -1255,6 +1292,7 @@
         <button type="button" data-open-view="breeds">Dog breeds</button>
         <button type="button" data-open-view="enquiries">Enquiries</button>
         <button type="button" data-open-view="appointments">Appointments</button>
+        <button type="button" data-open-view="weather">Weather</button>
         <button type="button" data-open-view="coverage">Service area</button>
         <button type="button" data-open-view="credentials">Credentials</button>
         <button type="button" data-open-view="visitors">Visitor insights</button>
@@ -1428,6 +1466,21 @@
                 {% else %}
                 <span class="menu-pill">All bookings handled</span>
                 {% endif %}
+              </div>
+            </button>
+            <button type="button" class="menu-card" data-open-view="weather">
+              <div class="menu-card__top">
+                <div>
+                  <p class="menu-card__eyebrow">Weather guard</p>
+                  <h3>{{ weather_location.label }}</h3>
+                  <p>Pause risky walking slots when rain, storms, or heat are forecast.</p>
+                </div>
+                <div class="menu-card__icon">🌦️</div>
+              </div>
+              <div class="menu-card__meta">
+                <span class="menu-pill">
+                  {% if weather_settings.api_key %}API key saved{% else %}API key missing{% endif %}
+                </span>
               </div>
             </button>
             <button type="button" class="menu-card" data-open-view="coverage">
@@ -2224,6 +2277,100 @@
               </div>
             </div>
           </section>
+        </section>
+
+        <section class="view" data-view="weather" aria-labelledby="weatherHeading">
+          <div class="view-heading">
+            <div>
+              <p class="eyebrow">Weather guard</p>
+              <h2 id="weatherHeading">Protect bookings when conditions look risky</h2>
+              <p>Forecasts are pulled for {{ weather_location.label }}. Meet &amp; greets stay open indoors.</p>
+            </div>
+            <button type="button" class="ghost-button" data-open-view="menu">Back to main menu</button>
+          </div>
+          {% if weather_message %}
+          <div class="pill-note {% if weather_message_is_error %}note-error{% endif %}" role="status" aria-live="polite">
+            {{ weather_message }}
+          </div>
+          {% endif %}
+          <div class="weather-grid">
+            <article class="weather-card">
+              <h3>API + guardrails</h3>
+              <p>Enter your OpenWeatherMap API key, choose conditions to pause, and set a max safe walking temperature.</p>
+              <form method="post" action="{{ url_for('update_weather_settings') }}" class="weather-options">
+                <label>
+                  Admin password (required)
+                  <input type="password" name="password" placeholder="Required" required />
+                </label>
+                <label>
+                  OpenWeatherMap API key
+                  <input type="text" name="api_key" value="{{ weather_settings.api_key or '' }}" placeholder="sk_..." />
+                </label>
+                {% set blocked = weather_settings.blocked_conditions or [] %}
+                <div>
+                  <p style="margin: 0 0 0.35rem; font-weight: 700">Pause walking slots when:</p>
+                  {% set block_options = [
+                    ('rain', 'Rain or showers'),
+                    ('drizzle', 'Light rain / drizzle'),
+                    ('thunderstorm', 'Thunderstorms'),
+                    ('snow', 'Snow or ice'),
+                    ('extreme', 'Extreme alerts'),
+                  ] %}
+                  <div class="weather-options">
+                    {% for value, label in block_options %}
+                    <label style="font-weight: 500; flex-direction: row; gap: 0.5rem; align-items: center">
+                      <input type="checkbox" name="blocked_condition" value="{{ value }}" {% if value in blocked %}checked{% endif %} />
+                      <span>{{ label }}</span>
+                    </label>
+                    {% endfor %}
+                  </div>
+                </div>
+                <label>
+                  Max safe walking temperature (°C)
+                  <input
+                    type="number"
+                    name="max_temp_c"
+                    step="0.5"
+                    min="0"
+                    placeholder="28"
+                    value="{{ '%.1f'|format(weather_settings.max_temp_c) if weather_settings.max_temp_c is not none else '' }}"
+                  />
+                </label>
+                <p class="muted" style="margin: 0">Meet &amp; greet slots ignore weather locks.</p>
+                <button type="submit">Save weather settings</button>
+              </form>
+            </article>
+            <article class="weather-card">
+              <h3>Upcoming slot outlook</h3>
+              <p style="margin: 0">All walking slots remain visible to visitors. If a blocked condition is forecast, they see why booking is paused.</p>
+              {% set future_slots = (available_slots | selectattr('service_type', 'ne', 'meet') | list)[:6] %}
+              {% if future_slots %}
+              <ul class="slot-list">
+                {% for slot in future_slots %}
+                <li>
+                  <strong>{{ slot.long_date_label }}</strong>
+                  <div class="muted">{{ slot.time_label }} · {{ slot.service_label }}</div>
+                  {% if slot.weather_label %}
+                  <div class="slot-label">{{ slot.weather_label }}</div>
+                  {% endif %}
+                  {% if slot.weather_blocked %}
+                  <div class="slot-price" style="color: #b91c1c">{{ slot.weather_blocked_reason }}</div>
+                  {% else %}
+                  <div class="slot-price">Bookings allowed</div>
+                  {% endif %}
+                </li>
+                {% endfor %}
+              </ul>
+              {% else %}
+              <p class="empty-state">No upcoming slots to preview yet.</p>
+              {% endif %}
+              {% if not weather_settings.api_key %}
+              <p class="muted" style="margin: 0.75rem 0 0">
+                Add an API key to display forecast info and weather effects on booking cards.
+              </p>
+              {% endif %}
+            </article>
+          </div>
         </section>
 
         <section class="view" data-view="coverage" aria-labelledby="coverageAdminHeading">

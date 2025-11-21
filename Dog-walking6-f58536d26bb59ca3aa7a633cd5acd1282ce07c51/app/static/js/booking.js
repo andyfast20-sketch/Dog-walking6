@@ -25,10 +25,14 @@
     const statusEl = button.querySelector(".slot-card__status");
     const priceEl = button.querySelector(".slot-card__price");
     const isBooked = Boolean(slot.is_booked);
+    const weatherBlocked = Boolean(slot.weather_blocked);
     button.dataset.state = isBooked ? "booked" : "available";
+    button.dataset.blockedReason = slot.weather_blocked_reason || "";
+    button.dataset.serviceType = slot.service_type || button.dataset.serviceType || "";
     button.disabled = isBooked;
     button.setAttribute("aria-disabled", isBooked ? "true" : "false");
     button.classList.toggle("is-booked", isBooked);
+    button.classList.toggle("is-weather-blocked", weatherBlocked);
     if (slot.friendly_label) {
       button.dataset.friendlyLabel = slot.friendly_label;
     }
@@ -43,7 +47,8 @@
       button.dataset.priceLabel = slot.price_label || "";
     }
     if (statusEl) {
-      statusEl.textContent = isBooked ? "Booked" : "Available";
+      statusEl.textContent = isBooked ? "Booked" : weatherBlocked ? "Weather hold" : "Available";
+      statusEl.classList.toggle("slot-card__status--blocked", weatherBlocked);
     }
   }
 
@@ -103,6 +108,14 @@
       if (button.dataset.state !== "available") {
         return;
       }
+      if (button.dataset.serviceType !== "meet" && button.dataset.blockedReason) {
+        if (bookingSuccess) {
+          bookingSuccess.textContent = button.dataset.blockedReason;
+          bookingSuccess.classList.remove("hidden");
+          bookingSuccess.classList.add("is-error");
+        }
+        return;
+      }
       openBookingModal(button);
     });
   });
@@ -160,6 +173,7 @@
         const label = (data.slot && data.slot.friendly_label) || friendlyLabel;
         bookingSuccess.textContent = `Thanks ${visitorName}! ${label} is now reserved.`;
         bookingSuccess.classList.remove("hidden");
+        bookingSuccess.classList.remove("is-error");
       }
       closeBookingModal();
     } catch (error) {

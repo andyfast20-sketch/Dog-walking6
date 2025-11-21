@@ -279,6 +279,26 @@ breed_ai_suggestions = None
 meet_greet_enabled = True
 backup_history = []
 next_backup_history_id = 1
+weather_settings = {
+    "api_key": None,
+    "blocked_conditions": [],
+    "max_temp_c": None,
+}
+_weather_cache = {"fetched_at": None, "entries": []}
+
+WEATHER_LOCATION = {
+    "label": "Audenshaw, Manchester",
+    "latitude": 53.474,
+    "longitude": -2.12,
+}
+WEATHER_EFFECTS = {
+    "rain": "rainy",
+    "drizzle": "rainy",
+    "thunderstorm": "storm",
+    "snow": "snow",
+    "clear": "sunny",
+    "clouds": "cloudy",
+}
 
 ADMIN_VIEWS = {
     "menu",
@@ -287,6 +307,7 @@ ADMIN_VIEWS = {
     "backups",
     "coverage",
     "credentials",
+    "weather",
     "breeds",
     "photos",
     "enquiries",
@@ -1068,6 +1089,7 @@ def _serialize_state() -> dict:
                 "booked_at": _serialize_datetime(slot.get("booked_at")),
                 "price": slot.get("price"),
                 "service_type": slot.get("service_type", "walk"),
+                "weather": slot.get("weather"),
             }
         )
     state = {
@@ -1098,6 +1120,7 @@ def _serialize_state() -> dict:
         "auto_save_last_run": _serialize_datetime(auto_save_last_run),
         "backup_history": [_serialize_backup_history_entry(entry) for entry in backup_history],
         "next_backup_history_id": next_backup_history_id,
+        "weather_settings": dict(weather_settings),
     }
     return state
 
@@ -1110,7 +1133,7 @@ def _load_state(state: dict):
     global coverage_areas, next_coverage_area_id, team_certificates, next_certificate_id
     global site_photos, site_service_notice, meet_greet_enabled
     global auto_save_enabled, auto_save_last_run
-    global backup_history, next_backup_history_id
+    global backup_history, next_backup_history_id, weather_settings, _weather_cache
 
     submissions = [dict(row) for row in state.get("submissions", []) if isinstance(row, dict)]
     next_submission_id = _coerce_int(state.get("next_submission_id"), _next_id_from_rows(submissions))
@@ -1168,6 +1191,8 @@ def _load_state(state: dict):
             "price": _parse_price(payload.get("price")),
             "service_type": payload.get("service_type", "walk"),
         }
+        if isinstance(payload.get("weather"), dict):
+            slot["weather"] = payload.get("weather")
         slots.append(slot)
     appointment_slots = sorted(slots, key=lambda slot: slot["start"])
     next_slot_id = _coerce_int(state.get("next_slot_id"), _next_id_from_rows(appointment_slots))
@@ -1214,6 +1239,22 @@ def _load_state(state: dict):
             "last_reply_preview": loaded_status.get("last_reply_preview"),
             "last_visitor_id": loaded_status.get("last_visitor_id"),
         }
+
+    loaded_weather = state.get("weather_settings")
+    if isinstance(loaded_weather, dict):
+        parsed_settings = {
+            "api_key": (loaded_weather.get("api_key") or "").strip() or None,
+            "blocked_conditions": loaded_weather.get("blocked_conditions") or [],
+            "max_temp_c": _parse_price(loaded_weather.get("max_temp_c")),
+        }
+        weather_settings.update(parsed_settings)
+    else:
+        weather_settings = {
+            "api_key": None,
+            "blocked_conditions": [],
+            "max_temp_c": None,
+        }
+    _weather_cache = {"fetched_at": None, "entries": []}
 
     site_photos = _initial_site_photo_state()
     loaded_photos = state.get("site_photos")
@@ -1267,6 +1308,8 @@ def _load_state(state: dict):
         state.get("next_backup_history_id"),
         max_existing_id + 1,
     )
+
+    _refresh_weather_for_upcoming_slots(force_refresh=True)
 
 
 def _get_state_backup_metadata() -> dict:
@@ -1364,6 +1407,15 @@ def _serialize_slot(slot: dict):
     visitor_area_name = slot.get("visitor_service_area_name") or ""
     visitor_travel_fee = _parse_price(slot.get("visitor_travel_fee"))
     visitor_travel_fee_label = _format_price_label(visitor_travel_fee)
+    weather_payload = slot.get("weather") if isinstance(slot.get("weather"), dict) else {}
+    weather_summary = weather_payload.get("summary") or ""
+    weather_temp_c = weather_payload.get("temp_c")
+    weather_effect = weather_payload.get("effect") or ""
+    weather_blocked = bool(weather_payload.get("blocked")) if weather_payload else False
+    weather_blocked_reason = weather_payload.get("blocked_reason") or ""
+    weather_label = weather_summary
+    if weather_temp_c is not None and weather_summary:
+        weather_label = f"{weather_summary} · {weather_temp_c:.0f}°C"
     return {
         "id": slot["id"],
         "start_iso": slot["start"].isoformat(),
@@ -1384,6 +1436,13 @@ def _serialize_slot(slot: dict):
         "service_label": service_label,
         "price": price_amount,
         "price_label": price_label,
+        "weather": weather_payload or None,
+        "weather_summary": weather_summary,
+        "weather_temp_c": weather_temp_c,
+        "weather_effect": weather_effect,
+        "weather_blocked": weather_blocked,
+        "weather_blocked_reason": weather_blocked_reason,
+        "weather_label": weather_label,
     }
 
 
@@ -1419,6 +1478,139 @@ def _get_deepseek_api_key() -> Optional[str]:
     return os.environ.get("DEEPSEEK_API_KEY")
 
 
+def _get_weather_api_key() -> Optional[str]:
+    key = weather_settings.get("api_key")
+    if key:
+        return key.strip()
+    env_key = os.environ.get("WEATHER_API_KEY") or os.environ.get("OPENWEATHER_API_KEY")
+    return env_key.strip() if env_key else None
+
+
+def _fetch_forecast_entries():
+    api_key = _get_weather_api_key()
+    if not api_key:
+        return None
+    now = datetime.utcnow()
+    fetched_at = _weather_cache.get("fetched_at")
+    if fetched_at and (now - fetched_at).total_seconds() < 900:
+        return _weather_cache.get("entries") or []
+    url = (
+        "https://api.openweathermap.org/data/2.5/forecast"
+        f"?lat={WEATHER_LOCATION['latitude']}&lon={WEATHER_LOCATION['longitude']}"
+        f"&units=metric&appid={api_key}"
+    )
+    try:
+        with urllib.request.urlopen(url, timeout=10) as response:  # nosec - external call
+            payload = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, json.JSONDecodeError):
+        return None
+    entries = payload.get("list") if isinstance(payload, dict) else None
+    if isinstance(entries, list):
+        _weather_cache["entries"] = entries
+        _weather_cache["fetched_at"] = now
+        return entries
+    return None
+
+
+def _closest_forecast_entry(slot_time: datetime):
+    entries = _fetch_forecast_entries()
+    if not entries:
+        return None
+    closest = None
+    min_diff = None
+    for entry in entries:
+        ts = entry.get("dt")
+        if ts is None:
+            continue
+        try:
+            forecast_time = datetime.utcfromtimestamp(int(ts))
+        except (TypeError, ValueError, OSError, OverflowError):
+            continue
+        delta = abs((forecast_time - slot_time).total_seconds())
+        if min_diff is None or delta < min_diff:
+            min_diff = delta
+            closest = (forecast_time, entry)
+    return closest
+
+
+def _build_weather_payload(slot: dict):
+    if not slot or not isinstance(slot.get("start"), datetime):
+        return None
+    closest = _closest_forecast_entry(slot["start"])
+    if not closest:
+        return None
+    forecast_time, entry = closest
+    weather_meta = (entry.get("weather") or [{}])[0] if isinstance(entry.get("weather"), list) else {}
+    main_block = entry.get("main") or {}
+    condition = (weather_meta.get("main") or "").strip().lower()
+    description = (weather_meta.get("description") or "").strip()
+    summary = description.capitalize() if description else condition.title() or "Forecast pending"
+    temp_c = None
+    feels_like_c = None
+    try:
+        temp_c = float(main_block.get("temp"))
+    except (TypeError, ValueError):
+        temp_c = None
+    try:
+        feels_like_c = float(main_block.get("feels_like"))
+    except (TypeError, ValueError):
+        feels_like_c = None
+    condition_key = condition.split()[0] if condition else ""
+    effect = WEATHER_EFFECTS.get(condition_key, "neutral")
+    blocked = False
+    blocked_reason = None
+    blocked_conditions = {
+        value.strip().lower()
+        for value in weather_settings.get("blocked_conditions", [])
+        if isinstance(value, str) and value.strip()
+    }
+    if (slot.get("service_type") or "walk") != "meet":
+        if condition_key in blocked_conditions:
+            blocked = True
+            blocked_reason = (
+                f"{summary} is expected in {WEATHER_LOCATION['label']}, so this walking slot is paused."
+            )
+        max_temp_c = weather_settings.get("max_temp_c")
+        if max_temp_c is not None and temp_c is not None and temp_c >= max_temp_c:
+            blocked = True
+            blocked_reason = (
+                f"Forecast temperature of {temp_c:.0f}°C meets the limit ({max_temp_c:.0f}°C) set for walks."
+            )
+    return {
+        "summary": summary,
+        "description": description,
+        "condition": condition_key,
+        "effect": effect,
+        "temp_c": temp_c,
+        "feels_like_c": feels_like_c,
+        "blocked": blocked,
+        "blocked_reason": blocked_reason,
+        "forecast_time": forecast_time.isoformat(),
+        "icon": weather_meta.get("icon"),
+        "source": "openweathermap",
+        "location": WEATHER_LOCATION["label"],
+    }
+
+
+def _enrich_slot_with_weather(slot: dict, force_refresh: bool = False):
+    if not slot or not isinstance(slot.get("start"), datetime):
+        return
+    if not _get_weather_api_key():
+        return
+    if slot.get("start") < datetime.utcnow() and not force_refresh:
+        return
+    if slot.get("weather") and not force_refresh:
+        return
+    payload = _build_weather_payload(slot)
+    if payload:
+        slot["weather"] = payload
+
+
+def _refresh_weather_for_upcoming_slots(force_refresh: bool = False):
+    now = datetime.utcnow()
+    for slot in appointment_slots:
+        if slot.get("start") and slot["start"] >= now:
+            _enrich_slot_with_weather(slot, force_refresh=force_refresh)
 def _build_autopilot_messages(conversation: dict):
     global business_in_a_box
     history = conversation.get("messages", [])
@@ -1772,6 +1964,7 @@ def index():
         _persist_state_change()
         return redirect(url_for("index", submitted=1))
 
+    _refresh_weather_for_upcoming_slots()
     page_links = [
         {"label": "About Happy Trails", "href": url_for("hello_world_page", page_id=1)},
         {"label": "Our Services", "href": url_for("hello_world_page", page_id=2)},
@@ -1805,6 +1998,7 @@ def index():
 
 @app.route("/bookings", methods=["GET"])
 def bookings_page():
+    _refresh_weather_for_upcoming_slots()
     slot_rows = [_serialize_slot(slot) for slot in _sorted_slots()]
     meet_slots = [slot for slot in slot_rows if slot.get("service_type") == "meet"]
 
@@ -1850,6 +2044,7 @@ def admin_page():
         key=lambda item: item[1]["last_visit"],
         reverse=True,
     )
+    _refresh_weather_for_upcoming_slots()
     conversation_rows = [
         data for data in (_serialize_conversation(cid) for cid in chat_conversations)
         if data is not None
@@ -1895,6 +2090,14 @@ def admin_page():
         "history_missing",
     }
     state_backup_is_error = state_action in error_actions
+    weather_action = (request.args.get("weather_action") or "").strip()
+    weather_messages = {
+        "saved": "Weather controls updated and forecasts refreshed.",
+        "cleared": "Weather settings cleared.",
+        "auth_failed": "Password did not match. Please try again.",
+    }
+    weather_message = weather_messages.get(weather_action)
+    weather_message_is_error = weather_action == "auth_failed"
     return render_template(
         "admin.html",
         home_url=url_for("index"),
@@ -1936,7 +2139,45 @@ def admin_page():
         meet_greet_enabled=_meet_greet_setting(),
         auto_save_enabled=auto_save_enabled,
         auto_save_last_run=auto_save_last_run,
+        weather_settings=weather_settings,
+        weather_location=WEATHER_LOCATION,
+        weather_message=weather_message,
+        weather_message_is_error=weather_message_is_error,
     )
+
+
+@app.route("/admin/weather", methods=["POST"])
+def update_weather_settings():
+    global weather_settings, _weather_cache
+
+    password = (request.form.get("password") or "").strip()
+    if password != "891133kk":
+        return redirect(url_for("admin_page", view="weather", weather_action="auth_failed"))
+
+    blocked_raw = request.form.getlist("blocked_condition")
+    blocked_conditions = sorted(
+        {value.strip().lower() for value in blocked_raw if isinstance(value, str) and value.strip()}
+    )
+    api_key_input = (request.form.get("api_key") or "").strip()
+    max_temp_value = (request.form.get("max_temp_c") or "").strip()
+    max_temp_c = None
+    if max_temp_value:
+        try:
+            max_temp_c = float(max_temp_value)
+        except (TypeError, ValueError):
+            max_temp_c = None
+    weather_settings.update(
+        {
+            "api_key": api_key_input or None,
+            "blocked_conditions": blocked_conditions,
+            "max_temp_c": max_temp_c,
+        }
+    )
+    _weather_cache = {"fetched_at": None, "entries": []}
+    _refresh_weather_for_upcoming_slots(force_refresh=True)
+    _persist_state_change()
+    action = "saved" if api_key_input or blocked_conditions or max_temp_c is not None else "cleared"
+    return redirect(url_for("admin_page", view="weather", weather_action=action))
 
 
 @app.route("/admin/site-photos", methods=["POST"])
@@ -2404,6 +2645,7 @@ def create_appointment_slot():
         "price": price_amount,
         "service_type": service_type,
     }
+    _enrich_slot_with_weather(slot, force_refresh=True)
     appointment_slots.append(slot)
     appointment_slots.sort(key=lambda entry: entry["start"])
     next_slot_id += 1
@@ -2448,6 +2690,7 @@ def update_appointment_slot(slot_id: int):
         if price_amount is None:
             return redirect(appointments_url)
     slot.update({"start": start, "service_type": service_type, "price": price_amount})
+    _enrich_slot_with_weather(slot, force_refresh=True)
     appointment_slots.sort(key=lambda entry: entry["start"])
     _persist_state_change()
     return redirect(appointments_url)
@@ -2471,6 +2714,11 @@ def book_appointment_slot(slot_id: int):
         return jsonify({"error": "Slot not found"}), 404
     if slot.get("is_booked"):
         return jsonify({"error": "This slot has already been booked"}), 400
+    _enrich_slot_with_weather(slot, force_refresh=False)
+    if (slot.get("service_type") or "walk") != "meet":
+        weather = slot.get("weather") or {}
+        if weather.get("blocked") and weather.get("blocked_reason"):
+            return jsonify({"error": weather.get("blocked_reason")}), 400
     payload = request.get_json(silent=True) or {}
     name = (payload.get("name") or request.form.get("name") or "").strip()
     email = (payload.get("email") or request.form.get("email") or "").strip()
