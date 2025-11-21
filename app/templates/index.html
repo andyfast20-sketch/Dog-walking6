@@ -433,6 +433,24 @@
         letter-spacing: 0.1em;
         color: rgba(248, 250, 252, 0.8);
       }
+      .slot-card__weather {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        margin-top: 0.35rem;
+        padding: 0.35rem 0.55rem;
+        border-radius: 999px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #0f172a;
+        background: rgba(59, 130, 246, 0.12);
+        border: 1px solid rgba(125, 211, 252, 0.5);
+      }
+      .slot-card__weather.is-rain {
+        background: rgba(244, 63, 94, 0.14);
+        border-color: rgba(248, 113, 113, 0.6);
+        color: #fecdd3;
+      }
       .slot-card__price {
         font-size: 1.1rem;
         font-weight: 600;
@@ -1319,6 +1337,14 @@
               <strong>{{ slot.date_label }}</strong>
               <span class="slot-card__time">{{ slot.time_label }}</span>
               <span class="slot-card__service">{{ slot.service_label }}</span>
+              {% if slot.weather_label %}
+              <span
+                class="slot-card__weather {% if slot.is_rainy %}is-rain{% endif %}"
+                aria-label="Weather forecast"
+              >
+                {{ slot.weather_label }}
+              </span>
+              {% endif %}
               {% if slot.price_label %}
               <span class="slot-card__price">{{ slot.price_label }}</span>
               {% endif %}
