@@ -2047,6 +2047,91 @@
               <h2>Appointment slots</h2>
               <p style="margin: 0; color: #475569">Publish dates and times visitors can book instantly.</p>
             </div>
+            <div class="card" style="margin: 1rem 0; padding: 1rem; border: 1px solid #e2e8f0; border-radius: 8px">
+              <div style="display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap">
+                <div style="flex: 1 1 240px">
+                  <p class="eyebrow" style="margin-bottom: 0.25rem">AI planner</p>
+                  <h3 style="margin-top: 0">Ask AI to propose slots</h3>
+                  <p style="margin: 0; color: #475569">
+                    Describe the weeks ahead and the assistant will suggest slots that respect your rules and weather guardrails.
+                  </p>
+                  {% if slot_ai_message %}
+                  <div
+                    role="status"
+                    style="margin-top: 0.75rem; padding: 0.75rem; border-radius: 6px; background: {% if slot_ai_error %}#fef2f2{% else %}#f0f9ff{% endif %}; color: {% if slot_ai_error %}#b91c1c{% else %}#0c4a6e{% endif %};"
+                  >
+                    {{ slot_ai_message }}
+                  </div>
+                  {% endif %}
+                  {% if autopilot_api_key_missing %}
+                  <p class="muted" style="margin-top: 0.5rem">
+                    Set <code>DEEPSEEK_API_KEY</code> in the environment to enable the AI planner.
+                  </p>
+                  {% endif %}
+                </div>
+                <form
+                  method="post"
+                  action="{{ url_for('ai_generate_appointment_slots') }}"
+                  style="flex: 2 1 360px; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem"
+                >
+                  <label style="grid-column: 1 / -1">
+                    Planning instructions
+                    <textarea
+                      name="ai_prompt"
+                      rows="3"
+                      placeholder="e.g., Add more meet & greet slots on Mondays and avoid rush-hour travel days"
+                      style="width: 100%"
+                    ></textarea>
+                  </label>
+                  <label>
+                    Total slots to add
+                    <input type="number" name="slot_count" min="1" max="40" value="6" />
+                  </label>
+                  <label>
+                    Start week
+                    <input type="date" name="start_date" min="{{ today }}" value="{{ today }}" />
+                  </label>
+                  <label>
+                    Weeks to cover
+                    <input type="number" name="weeks" min="1" max="12" value="2" />
+                  </label>
+                  <label>
+                    Max per day
+                    <input type="number" name="max_per_day" min="0" max="8" value="3" />
+                  </label>
+                  <label>
+                    Min lead time (days)
+                    <input type="number" name="min_lead_days" min="0" max="14" value="1" />
+                  </label>
+                  <label class="checkbox">
+                    <input type="checkbox" name="avoid_weekends" value="1" checked /> Avoid weekends
+                  </label>
+                  <label class="checkbox">
+                    <input type="checkbox" name="avoid_tuesdays" value="1" /> Avoid Tuesdays
+                  </label>
+                  <label class="checkbox">
+                    <input type="checkbox" name="avoid_bad_weather" value="1" /> Avoid bad weather (walks only)
+                  </label>
+                  <label class="checkbox">
+                    <input type="checkbox" name="allow_walks" value="1" checked /> Include walking slots
+                  </label>
+                  <label class="checkbox">
+                    <input type="checkbox" name="allow_meet" value="1" /> Include meet &amp; greet slots
+                  </label>
+                  <label>
+                    Default walk price
+                    <input type="number" name="default_walk_price" min="0" step="0.01" placeholder="45" />
+                  </label>
+                  <label>
+                    Default meet &amp; greet price
+                    <input type="number" name="default_meet_price" min="0" step="0.01" placeholder="0" />
+                  </label>
+                  <div style="grid-column: 1 / -1; display: flex; justify-content: flex-end">
+                    <button type="submit">Ask AI to add slots</button>
+                  </div>
+                </form>
+              </div>
+            </div>
             <form class="slot-form" method="post" action="{{ url_for('create_appointment_slot') }}">
               <label>
                 Pick a date
