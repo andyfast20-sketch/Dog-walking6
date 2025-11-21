@@ -22,11 +22,13 @@ from flask import (
     redirect,
     render_template,
     request,
+    session,
     stream_with_context,
     url_for,
 )
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key")
 
 
 PRIMARY_NAV_CONFIG = [
@@ -275,6 +277,8 @@ chat_subscribers_lock = threading.Lock()
 appointment_slots = []
 next_slot_id = 1
 WEATHER_LOCATION_QUERY = "Tameside, Manchester"
+WEATHER_ADMIN_PASSWORD = "891133kk"
+weather_api_key = None
 dog_breeds = []
 next_dog_breed_id = 1
 breed_ai_suggestions = None
@@ -289,6 +293,7 @@ ADMIN_VIEWS = {
     "backups",
     "coverage",
     "credentials",
+    "weather",
     "breeds",
     "photos",
     "enquiries",
@@ -1032,7 +1037,17 @@ def _format_price_label(value) -> str:
 
 
 def _weather_api_key() -> Optional[str]:
+    if weather_api_key:
+        return weather_api_key
     return os.environ.get("BBC_WEATHER_API_KEY") or os.environ.get("WEATHER_API_KEY")
+
+
+def _weather_key_source() -> str:
+    if weather_api_key:
+        return "stored"
+    if os.environ.get("BBC_WEATHER_API_KEY") or os.environ.get("WEATHER_API_KEY"):
+        return "environment"
+    return "missing"
 
 
 def _classify_weather(summary: str) -> str:
@@ -1078,7 +1093,7 @@ def _refresh_future_weather(now: datetime) -> bool:
         if not isinstance(start, datetime) or start < now:
             continue
         weather = slot.get("weather")
-        if not isinstance(weather, dict) or not weather.get("status"):
+        if not isinstance(weather, dict) or not weather.get("status") or weather.get("status") == "unknown":
             slot["weather"] = _fetch_tameside_weather(start)
             updated = True
 
@@ -1203,6 +1218,7 @@ def _serialize_state() -> dict:
         "auto_save_last_run": _serialize_datetime(auto_save_last_run),
         "backup_history": [_serialize_backup_history_entry(entry) for entry in backup_history],
         "next_backup_history_id": next_backup_history_id,
+        "weather_api_key": weather_api_key,
     }
     return state
 
@@ -1216,6 +1232,7 @@ def _load_state(state: dict):
     global site_photos, site_service_notice, meet_greet_enabled
     global auto_save_enabled, auto_save_last_run
     global backup_history, next_backup_history_id
+    global weather_api_key
 
     submissions = [dict(row) for row in state.get("submissions", []) if isinstance(row, dict)]
     next_submission_id = _coerce_int(state.get("next_submission_id"), _next_id_from_rows(submissions))
@@ -1342,6 +1359,11 @@ def _load_state(state: dict):
     meet_greet_enabled = bool(state.get("meet_greet_enabled", True))
     auto_save_enabled = bool(state.get("auto_save_enabled", False))
     auto_save_last_run = _parse_datetime(state.get("auto_save_last_run"))
+    stored_weather_key = state.get("weather_api_key")
+    if isinstance(stored_weather_key, str):
+        weather_api_key = stored_weather_key.strip() or None
+    else:
+        weather_api_key = None
 
     history_entries = []
     for payload in state.get("backup_history", []):
@@ -2053,6 +2075,8 @@ def admin_page():
         "history_missing",
     }
     state_backup_is_error = state_action in error_actions
+    weather_admin_unlocked = bool(session.get("weather_admin_unlocked", False))
+    weather_unlock_error = request.args.get("weather_error") == "1"
     return render_template(
         "admin.html",
         home_url=url_for("index"),
@@ -2094,7 +2118,53 @@ def admin_page():
         auto_save_enabled=auto_save_enabled,
         auto_save_last_run=auto_save_last_run,
         format_price_label=_format_price_label,
+        weather_api_key=weather_api_key,
+        weather_api_key_source=_weather_key_source(),
+        weather_admin_unlocked=weather_admin_unlocked,
+        weather_unlock_error=weather_unlock_error,
     )
+
+
+@app.route("/admin/weather/unlock", methods=["POST"])
+def unlock_weather_admin():
+    password = (request.form.get("password") or "").strip()
+    if password != WEATHER_ADMIN_PASSWORD:
+        session.pop("weather_admin_unlocked", None)
+        return redirect(url_for("admin_page", view="weather", weather_error="1"))
+    session["weather_admin_unlocked"] = True
+    return redirect(url_for("admin_page", view="weather"))
+
+
+@app.route("/admin/weather/lock", methods=["POST"])
+def lock_weather_admin():
+    session.pop("weather_admin_unlocked", None)
+    return redirect(url_for("admin_page", view="weather"))
+
+
+@app.route("/admin/weather/api-key", methods=["POST"])
+def save_weather_api_key():
+    global weather_api_key
+
+    if not session.get("weather_admin_unlocked"):
+        return redirect(url_for("admin_page", view="weather"))
+
+    weather_api_key = (request.form.get("api_key") or "").strip() or None
+    _refresh_future_weather(datetime.utcnow())
+    _persist_state_change()
+    return redirect(url_for("admin_page", view="weather"))
+
+
+@app.route("/admin/weather/api-key/delete", methods=["POST"])
+def delete_weather_api_key():
+    global weather_api_key
+
+    if not session.get("weather_admin_unlocked"):
+        return redirect(url_for("admin_page", view="weather"))
+
+    weather_api_key = None
+    _refresh_future_weather(datetime.utcnow())
+    _persist_state_change()
+    return redirect(url_for("admin_page", view="weather"))
 
 
 @app.route("/admin/site-photos", methods=["POST"])
