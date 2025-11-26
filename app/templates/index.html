@@ -86,7 +86,7 @@
         letter-spacing: 0.02em;
         text-decoration: none;
       }
-      .logo span {
+      .logo__mark {
         width: 42px;
         height: 42px;
         border-radius: 12px;
@@ -95,25 +95,44 @@
         place-items: center;
         color: #fff;
         font-size: 1.35rem;
+        box-shadow: 0 12px 30px rgba(236, 72, 153, 0.35);
       }
       .logo__text {
-        display: inline-block;
-        animation: logo-flicker 2.8s ease-in-out infinite;
-        text-shadow: 0 0 12px rgba(255, 255, 255, 0.35);
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.2rem 0.35rem;
+        background: linear-gradient(120deg, #c7d2fe, #5eead4 35%, #f472b6 70%, #c7d2fe 95%);
+        background-size: 220% 220%;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        font-weight: 800;
+        font-size: 1.35rem;
+        letter-spacing: 0.04em;
+        filter: drop-shadow(0 10px 25px rgba(94, 234, 212, 0.35));
+        animation: logo-shimmer 3.5s ease-in-out infinite;
       }
-      @keyframes logo-flicker {
+      .logo__text::after {
+        content: "";
+        position: absolute;
+        inset: auto 5% -0.35rem 5%;
+        height: 3px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, rgba(94, 234, 212, 0.6), rgba(167, 139, 250, 0.75), rgba(236, 72, 153, 0.7));
+        opacity: 0.95;
+        filter: blur(0.4px);
+      }
+      @keyframes logo-shimmer {
         0%,
         100% {
-          opacity: 1;
-          text-shadow: 0 0 10px rgba(255, 255, 255, 0.35), 0 0 18px rgba(94, 234, 212, 0.25);
+          background-position: 0% 50%;
+          filter: drop-shadow(0 10px 25px rgba(94, 234, 212, 0.35));
         }
-        45% {
-          opacity: 0.92;
-          text-shadow: 0 0 8px rgba(255, 255, 255, 0.25), 0 0 14px rgba(236, 72, 153, 0.2);
-        }
-        55% {
-          opacity: 1;
-          text-shadow: 0 0 16px rgba(255, 255, 255, 0.45), 0 0 24px rgba(94, 234, 212, 0.4);
+        50% {
+          background-position: 100% 50%;
+          filter: drop-shadow(0 15px 30px rgba(236, 72, 153, 0.35));
         }
       }
       .nav-links {
@@ -1080,7 +1099,10 @@
     <div class="site-shell">
       <header class="site-header">
         <nav class="primary-nav" aria-label="Primary">
-          <a class="logo" href="{{ url_for('index') }}"><span>🐾</span><span class="logo__text">Happy Paws</span></a>
+          <a class="logo" href="{{ url_for('index') }}">
+            <span class="logo__mark">🐾</span>
+            <span class="logo__text">Happy Paws</span>
+          </a>
           <div class="nav-links">
             {% for link in primary_nav %}
             <a
