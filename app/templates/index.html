@@ -109,10 +109,11 @@
         background-clip: text;
         color: transparent;
         font-weight: 800;
-        font-size: 1.35rem;
+        font-size: 1.45rem;
         letter-spacing: 0.04em;
         filter: drop-shadow(0 10px 25px rgba(94, 234, 212, 0.35));
-        animation: logo-shimmer 3.5s ease-in-out infinite;
+        animation: logo-shimmer 3.5s ease-in-out infinite,
+          logo-pulse 2.8s ease-in-out infinite;
       }
       .logo__text::after {
         content: "";
@@ -133,6 +134,15 @@
         50% {
           background-position: 100% 50%;
           filter: drop-shadow(0 15px 30px rgba(236, 72, 153, 0.35));
+        }
+      }
+      @keyframes logo-pulse {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.025);
         }
       }
       .nav-links {
