@@ -96,6 +96,26 @@
         color: #fff;
         font-size: 1.35rem;
       }
+      .logo__text {
+        display: inline-block;
+        animation: logo-flicker 2.8s ease-in-out infinite;
+        text-shadow: 0 0 12px rgba(255, 255, 255, 0.35);
+      }
+      @keyframes logo-flicker {
+        0%,
+        100% {
+          opacity: 1;
+          text-shadow: 0 0 10px rgba(255, 255, 255, 0.35), 0 0 18px rgba(94, 234, 212, 0.25);
+        }
+        45% {
+          opacity: 0.92;
+          text-shadow: 0 0 8px rgba(255, 255, 255, 0.25), 0 0 14px rgba(236, 72, 153, 0.2);
+        }
+        55% {
+          opacity: 1;
+          text-shadow: 0 0 16px rgba(255, 255, 255, 0.45), 0 0 24px rgba(94, 234, 212, 0.4);
+        }
+      }
       .nav-links {
         display: flex;
         gap: 1.25rem;
@@ -1060,7 +1080,7 @@
     <div class="site-shell">
       <header class="site-header">
         <nav class="primary-nav" aria-label="Primary">
-          <a class="logo" href="{{ url_for('index') }}"><span>🐾</span>Happy Paws</a>
+          <a class="logo" href="{{ url_for('index') }}"><span>🐾</span><span class="logo__text">Happy Paws</span></a>
           <div class="nav-links">
             {% for link in primary_nav %}
             <a
