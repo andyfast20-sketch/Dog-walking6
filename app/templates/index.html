@@ -285,16 +285,35 @@
         border: 1px solid rgba(15, 23, 42, 0.15);
         box-shadow: 0 12px 30px rgba(15, 23, 42, 0.25);
       }
-      .hero figure {
-        background: rgba(255, 255, 255, 0.9);
-        border-radius: 28px;
-        padding: 1.5rem;
+      .hero-media {
+        position: relative;
+        background: linear-gradient(145deg, rgba(37, 99, 235, 0.12), rgba(94, 234, 212, 0.08));
+        border-radius: 30px;
+        padding: 1.25rem;
         box-shadow: 0 30px 80px rgba(15, 23, 42, 0.15);
+        overflow: hidden;
+        isolation: isolate;
       }
-      .hero figure img {
-        border-radius: 24px;
-        object-fit: cover;
+      .hero-media__glow {
+        position: absolute;
+        inset: -20%;
+        background: radial-gradient(circle at 20% 20%, rgba(94, 234, 212, 0.28), transparent 35%),
+          radial-gradient(circle at 80% 80%, rgba(59, 130, 246, 0.25), transparent 40%);
+        filter: blur(16px);
+        z-index: 0;
+      }
+      .hero-video {
+        position: relative;
+        z-index: 1;
+        width: 100%;
         height: 100%;
+        max-height: 440px;
+        border-radius: 22px;
+        object-fit: cover;
+        display: block;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 25px 60px rgba(15, 23, 42, 0.22);
+        background: #0f172a;
       }
       .stats {
         display: flex;
@@ -339,23 +358,6 @@
       .section-heading p {
         margin: 0;
         color: #475569;
-      }
-      .page-links {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 1rem;
-      }
-      .page-links a {
-        padding: 1rem 1.25rem;
-        border-radius: 18px;
-        background: linear-gradient(135deg, rgba(37, 99, 235, 0.07), rgba(94, 234, 212, 0.12));
-        text-decoration: none;
-        color: #0f172a;
-        font-weight: 600;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 1rem;
       }
       .services-grid {
         display: grid;
@@ -1165,8 +1167,20 @@
               </div>
             </div>
           </div>
-          <figure>
-            <img src="{{ home_hero_image }}" alt="Dog enjoying a walk" loading="lazy" />
+          <figure class="hero-media">
+            <span class="hero-media__glow" aria-hidden="true"></span>
+            <video
+              id="heroVideo"
+              class="hero-video"
+              src="https://videos.pexels.com/video-files/1809430/1809430-uhd_2560_1440_25fps.mp4"
+              autoplay
+              loop
+              playsinline
+              controls
+              poster="{{ home_hero_image }}"
+            >
+              Your browser does not support the video tag.
+            </video>
           </figure>
         </div>
       </header>
@@ -1250,20 +1264,6 @@
               <p style="margin: 0">Add coverage areas from the admin dashboard.</p>
               {% endif %}
             </article>
-          </div>
-        </section>
-        <section id="pages">
-          <div class="section-heading">
-            <p style="text-transform: uppercase; letter-spacing: 0.2em; color: #a855f7; font-weight: 700">
-              Explore
-            </p>
-            <h2>Need something else?</h2>
-            <p>Hop into our supporting pages for blocklists, submissions, and more.</p>
-          </div>
-          <div class="page-links">
-            {% for link in page_links %}
-            <a href="{{ link.href }}">{{ link.label }} <span aria-hidden="true">→</span></a>
-            {% endfor %}
           </div>
         </section>
         <section>
@@ -1564,6 +1564,17 @@
       </div>
     </div>
     {% include "chat_widget.html" %}
+    <script>
+      const heroVideo = document.getElementById("heroVideo");
+      if (heroVideo) {
+        const enableAudio = () => {
+          heroVideo.muted = false;
+          heroVideo.volume = 1;
+        };
+        heroVideo.addEventListener("loadedmetadata", enableAudio, { once: true });
+        heroVideo.addEventListener("play", enableAudio, { once: true });
+      }
+    </script>
     <script src="{{ url_for('static', filename='js/booking.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/chat-widget.js') }}" defer></script>
   </body>

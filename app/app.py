@@ -1945,13 +1945,6 @@ def index():
         _persist_state_change()
         return redirect(url_for("index", submitted=1))
 
-    page_links = [
-        {"label": "About Happy Trails", "href": url_for("hello_world_page", page_id=1)},
-        {"label": "Our Services", "href": url_for("hello_world_page", page_id=2)},
-        {"label": "Pricing Guide", "href": url_for("hello_world_page", page_id=3)},
-        {"label": "Contact Options", "href": url_for("hello_world_page", page_id=4)},
-        {"label": "Admin Page", "href": url_for("admin_page")},
-    ]
     submission_success = request.args.get("submitted") == "1"
     slot_rows = [
         serialized
@@ -1960,7 +1953,6 @@ def index():
     ]
     return render_template(
         "index.html",
-        page_links=page_links,
         form_action=url_for("index"),
         submission_success=submission_success,
         booking_slots=slot_rows,
