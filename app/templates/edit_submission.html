@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Edit Submission</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chat-widget.css') }}" />
+    <style>
+      body {
+        font-family: Arial, Helvetica, sans-serif;
+        margin: 2rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      form {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        max-width: 420px;
+      }
+      label {
+        display: flex;
+        flex-direction: column;
+        font-weight: 600;
+        gap: 0.35rem;
+      }
+      input,
+      textarea {
+        padding: 0.5rem;
+        border: 1px solid #cbd2d9;
+        border-radius: 4px;
+        font-size: 1rem;
+      }
+      textarea {
+        min-height: 120px;
+        resize: vertical;
+      }
+      button {
+        width: fit-content;
+        padding: 0.5rem 1rem;
+      }
+      .links {
+        display: flex;
+        gap: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Edit Submission</h1>
+    <form method="post">
+      <label>
+        Name
+        <input type="text" name="name" value="{{ submission.name }}" required />
+      </label>
+      <label>
+        Email
+        <input type="email" name="email" value="{{ submission.email }}" required />
+      </label>
+      <label>
+        Phone
+        <input type="tel" name="phone" value="{{ submission.phone }}" required />
+      </label>
+      <label>
+        Message
+        <textarea name="message" required>{{ submission.message }}</textarea>
+      </label>
+      <label>
+        Status
+        <select name="status">
+          {% for option in status_options %}
+          <option value="{{ option }}" {% if submission.status == option %}selected{% endif %}>{{ option }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button type="submit">Save Changes</button>
+    </form>
+    <div class="links">
+      <a href="{{ admin_url }}">Back to Admin</a>
+      <a href="{{ home_url }}">Return Home</a>
+    </div>
+    {% include "chat_widget.html" %}
+    <script src="{{ url_for('static', filename='js/chat-widget.js') }}" defer></script>
+  </body>
+</html>

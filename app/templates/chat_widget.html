@@ -1,0 +1,24 @@
+<button class="chat-toggle" id="chatToggle" aria-expanded="false" type="button">
+  <span class="chat-toggle-glow" aria-hidden="true"></span>
+  <span class="chat-toggle-content">
+    <span class="chat-avatar" aria-hidden="true">🐶</span>
+    <span class="chat-label">
+      <span class="chat-label-title">Live Chat</span>
+      <span class="chat-label-subtitle">We're online now</span>
+    </span>
+  </span>
+</button>
+<div class="chat-widget hidden" id="chatWidget" role="dialog" aria-label="Live chat">
+  <div class="chat-header">
+    <div>
+      <strong>Chat with us</strong>
+      <p>We're online and happy to help.</p>
+    </div>
+    <button class="chat-close" id="chatClose" aria-label="Close chat">&times;</button>
+  </div>
+  <div class="chat-messages" id="chatMessages" aria-live="polite"></div>
+  <form class="chat-form" id="chatForm">
+    <input type="text" id="chatInput" autocomplete="off" placeholder="Type your message..." required />
+    <button type="submit">Send</button>
+  </form>
+</div>
