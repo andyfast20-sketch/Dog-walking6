@@ -856,6 +856,38 @@
         padding: 0.75rem;
         font-size: 1rem;
       }
+      .deepseek-key-form {
+        display: grid;
+        gap: 0.75rem;
+        padding: 1rem;
+        border-radius: 12px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+      }
+      .deepseek-key-form label {
+        display: grid;
+        gap: 0.35rem;
+        font-weight: 700;
+        color: #334155;
+      }
+      .deepseek-key-form input[type="password"] {
+        width: 100%;
+        border-radius: 10px;
+        border: 1px solid #cbd2d9;
+        padding: 0.7rem 0.75rem;
+        font-size: 1rem;
+      }
+      .deepseek-key-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+        align-items: center;
+      }
+      .deepseek-key-status {
+        margin: 0;
+        color: #475569;
+        font-size: 0.92rem;
+      }
       .business-brief-form button {
         margin-top: 0.5rem;
       }
@@ -1286,6 +1318,7 @@
       <nav class="view-nav" aria-label="Admin menu">
         <button type="button" class="is-active" data-open-view="menu">Main menu</button>
         <button type="button" data-open-view="autopilot">Autopilot</button>
+        <button type="button" data-open-view="deepseek">DeepSeek API</button>
         <button type="button" data-open-view="status">Service notice</button>
         <button type="button" data-open-view="backups">Save &amp; load</button>
         <button type="button" data-open-view="photos">Site photos</button>
@@ -1325,6 +1358,35 @@
               </div>
               <div class="menu-card__meta">
                 <span class="menu-pill">Last run: {{ autopilot_status.last_run or 'Never' }}</span>
+              </div>
+            </button>
+            <button type="button" class="menu-card" data-open-view="deepseek">
+              <div class="menu-card__top">
+                <div>
+                  <p class="menu-card__eyebrow">DeepSeek API</p>
+                  <h3>
+                    {% if deepseek_api_key_source == 'stored' %}
+                    Saved
+                    {% elif deepseek_api_key_source == 'environment' %}
+                    Env var
+                    {% else %}
+                    Missing key
+                    {% endif %}
+                  </h3>
+                  <p>Save the encrypted key used by Dog Breed AI, slot planning, and Autopilot.</p>
+                </div>
+                <div class="menu-card__icon">AI</div>
+              </div>
+              <div class="menu-card__meta">
+                <span class="menu-pill">
+                  {% if deepseek_api_key_source == 'stored' %}
+                  Encrypted key ready
+                  {% elif deepseek_api_key_source == 'environment' %}
+                  Using server settings
+                  {% else %}
+                  Add key before using AI
+                  {% endif %}
+                </span>
               </div>
             </button>
             <button
@@ -1619,6 +1681,64 @@
                 Share your differentiators, tone, and booking steps. Autopilot reads this before answering.
               </p>
               <button type="submit">Save playbook</button>
+            </form>
+          </section>
+        </section>
+
+        <section class="view" data-view="deepseek" aria-labelledby="deepseekHeading">
+          <div class="view-heading">
+            <div>
+              <p class="eyebrow">AI settings</p>
+              <h2 id="deepseekHeading">DeepSeek API key</h2>
+              <p>Add the key used by Dog Breed AI, appointment planning, and Autopilot.</p>
+            </div>
+            <button type="button" class="ghost-button" data-open-view="menu">Back to main menu</button>
+          </div>
+          <section class="autopilot-card">
+            {% if autopilot_api_key_missing %}
+            <p class="autopilot-warning">No DeepSeek key is configured yet.</p>
+            {% endif %}
+            <form class="deepseek-key-form" method="post" action="{{ url_for('save_deepseek_api_key') }}">
+              <input type="hidden" name="return_view" value="deepseek" />
+              <label>
+                DeepSeek API key
+                <input
+                  type="password"
+                  name="api_key"
+                  placeholder="Paste a DeepSeek API key"
+                  autocomplete="off"
+                  required
+                />
+              </label>
+              <p class="deepseek-key-status">
+                {% if deepseek_api_key_source == 'stored' %}
+                Encrypted key saved and ready for AI features.
+                {% elif deepseek_api_key_source == 'environment' %}
+                Using the server DEEPSEEK_API_KEY environment variable.
+                {% else %}
+                Paste your DeepSeek API key here, then save it before using AI.
+                {% endif %}
+              </p>
+              <div class="deepseek-key-actions">
+                <button type="submit">Save encrypted key</button>
+                {% if deepseek_api_key_source == 'stored' %}
+                <button
+                  type="submit"
+                  class="ghost-button ghost-button--danger"
+                  form="deleteDeepseekSettingsKeyForm"
+                  onclick="return confirm('Delete the saved DeepSeek API key?');"
+                >
+                  Delete saved key
+                </button>
+                {% endif %}
+              </div>
+            </form>
+            <form
+              id="deleteDeepseekSettingsKeyForm"
+              method="post"
+              action="{{ url_for('delete_deepseek_api_key') }}"
+            >
+              <input type="hidden" name="return_view" value="deepseek" />
             </form>
           </section>
         </section>
@@ -1919,6 +2039,48 @@
                 DeepSeek will suggest breeds to add or remove. Describe what you need and review the results before
                 applying them.
               </p>
+              <form class="deepseek-key-form" method="post" action="{{ url_for('save_deepseek_api_key') }}">
+                <input type="hidden" name="return_view" value="breeds" />
+                <label>
+                  DeepSeek API key
+                  <input
+                    type="password"
+                    name="api_key"
+                    placeholder="Paste a DeepSeek API key"
+                    autocomplete="off"
+                    required
+                  />
+                </label>
+                <p class="deepseek-key-status">
+                  {% if deepseek_api_key_source == 'stored' %}
+                  Encrypted key saved and ready for Dog Breed AI.
+                  {% elif deepseek_api_key_source == 'environment' %}
+                  Using the server DEEPSEEK_API_KEY environment variable.
+                  {% else %}
+                  Add your DeepSeek key here before asking AI for breed suggestions.
+                  {% endif %}
+                </p>
+                <div class="deepseek-key-actions">
+                  <button type="submit">Save encrypted key</button>
+                  {% if deepseek_api_key_source == 'stored' %}
+                  <button
+                    type="submit"
+                    class="ghost-button ghost-button--danger"
+                    form="deleteBreedDeepseekKeyForm"
+                    onclick="return confirm('Delete the saved DeepSeek API key?');"
+                  >
+                    Delete saved key
+                  </button>
+                  {% endif %}
+                </div>
+              </form>
+              <form
+                id="deleteBreedDeepseekKeyForm"
+                method="post"
+                action="{{ url_for('delete_deepseek_api_key') }}"
+              >
+                <input type="hidden" name="return_view" value="breeds" />
+              </form>
               <form class="breed-ai-panel__form" method="post" action="{{ url_for('request_breed_ai') }}">
                 <label>
                   Prompt

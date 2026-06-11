@@ -55,6 +55,30 @@ def test_serialize_state_includes_chats_breeds_and_photos(app_module):
     assert payload["meet_greet_enabled"] is False
 
 
+def test_serialize_state_stores_deepseek_key_encrypted(app_module, monkeypatch):
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    app_module.encrypted_deepseek_api_key = app_module._encrypt_secret("sk-test-secret")
+
+    payload = app_module._serialize_state()
+
+    assert payload["deepseek_api_key_encrypted"]
+    assert payload["deepseek_api_key_encrypted"] != "sk-test-secret"
+    assert "deepseek_api_key" not in payload
+    assert app_module._get_deepseek_api_key() == "sk-test-secret"
+
+
+def test_load_state_encrypts_legacy_deepseek_key(app_module, monkeypatch):
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    state = app_module._serialize_state()
+    state.pop("deepseek_api_key_encrypted", None)
+    state["deepseek_api_key"] = "sk-legacy-secret"
+
+    app_module._load_state(state)
+
+    assert app_module.encrypted_deepseek_api_key != "sk-legacy-secret"
+    assert app_module._get_deepseek_api_key() == "sk-legacy-secret"
+
+
 def test_load_state_restores_chats_breeds_and_photos(app_module):
     state = app_module._serialize_state()
     state["chat_conversations"] = {

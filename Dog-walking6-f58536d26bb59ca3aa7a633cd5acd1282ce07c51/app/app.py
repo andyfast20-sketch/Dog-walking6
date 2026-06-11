@@ -1,6 +1,8 @@
 import json
 import os
 import queue
+import base64
+import hashlib
 import sqlite3
 import threading
 import urllib.error
@@ -12,6 +14,7 @@ from typing import Optional
 import boto3
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
+from cryptography.fernet import Fernet, InvalidToken
 
 from flask import (
     Flask,
@@ -26,6 +29,7 @@ from flask import (
 )
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key")
 
 
 PRIMARY_NAV_CONFIG = [
@@ -273,6 +277,7 @@ chat_stream_subscribers = []
 chat_subscribers_lock = threading.Lock()
 appointment_slots = []
 next_slot_id = 1
+encrypted_deepseek_api_key = None
 dog_breeds = []
 next_dog_breed_id = 1
 breed_ai_suggestions = None
@@ -303,6 +308,7 @@ WEATHER_EFFECTS = {
 ADMIN_VIEWS = {
     "menu",
     "autopilot",
+    "deepseek",
     "status",
     "backups",
     "coverage",
@@ -1136,6 +1142,7 @@ def _serialize_state() -> dict:
         "backup_history": [_serialize_backup_history_entry(entry) for entry in backup_history],
         "next_backup_history_id": next_backup_history_id,
         "weather_settings": dict(weather_settings),
+        "deepseek_api_key_encrypted": encrypted_deepseek_api_key,
     }
     return state
 
@@ -1149,6 +1156,7 @@ def _load_state(state: dict):
     global site_photos, site_service_notice, meet_greet_enabled
     global auto_save_enabled, auto_save_last_run
     global backup_history, next_backup_history_id, weather_settings, _weather_cache
+    global encrypted_deepseek_api_key
 
     submissions = [dict(row) for row in state.get("submissions", []) if isinstance(row, dict)]
     next_submission_id = _coerce_int(state.get("next_submission_id"), _next_id_from_rows(submissions))
@@ -1270,6 +1278,16 @@ def _load_state(state: dict):
             "max_temp_c": None,
         }
     _weather_cache = {"fetched_at": None, "entries": []}
+    stored_deepseek_key = state.get("deepseek_api_key_encrypted")
+    if isinstance(stored_deepseek_key, str):
+        encrypted_deepseek_api_key = stored_deepseek_key.strip() or None
+    else:
+        legacy_deepseek_key = state.get("deepseek_api_key")
+        encrypted_deepseek_api_key = (
+            _encrypt_secret(legacy_deepseek_key.strip())
+            if isinstance(legacy_deepseek_key, str) and legacy_deepseek_key.strip()
+            else None
+        )
 
     site_photos = _initial_site_photo_state()
     loaded_photos = state.get("site_photos")
@@ -1491,7 +1509,42 @@ def _should_ignore_user_agent(user_agent: str) -> bool:
 
 
 def _get_deepseek_api_key() -> Optional[str]:
+    stored_key = _decrypt_secret(encrypted_deepseek_api_key)
+    if stored_key:
+        return stored_key
     return os.environ.get("DEEPSEEK_API_KEY")
+
+
+def _deepseek_key_source() -> str:
+    if _decrypt_secret(encrypted_deepseek_api_key):
+        return "stored"
+    if os.environ.get("DEEPSEEK_API_KEY"):
+        return "environment"
+    return "missing"
+
+
+def _secret_cipher() -> Fernet:
+    secret = (
+        os.environ.get("DEEPSEEK_ENCRYPTION_SECRET")
+        or os.environ.get("FLASK_SECRET_KEY")
+        or app.secret_key
+    )
+    digest = hashlib.sha256(str(secret).encode("utf-8")).digest()
+    return Fernet(base64.urlsafe_b64encode(digest))
+
+
+def _encrypt_secret(value: str) -> str:
+    return _secret_cipher().encrypt(value.encode("utf-8")).decode("utf-8")
+
+
+def _decrypt_secret(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    try:
+        return _secret_cipher().decrypt(value.encode("utf-8")).decode("utf-8")
+    except (InvalidToken, ValueError):
+        app.logger.warning("Unable to decrypt stored DeepSeek API key")
+        return None
 
 
 def _get_weather_api_key() -> Optional[str]:
@@ -2159,6 +2212,7 @@ def admin_page():
         business_in_a_box=business_in_a_box,
         autopilot_model=AUTOPILOT_MODEL_NAME,
         autopilot_api_key_missing=_get_deepseek_api_key() is None,
+        deepseek_api_key_source=_deepseek_key_source(),
         format_price_label=_format_price_label,
         dog_breeds=_sorted_breeds(),
         breed_ai_suggestions=breed_ai_suggestions,
@@ -2387,6 +2441,34 @@ def toggle_autopilot():
     )
     _persist_state_change()
     return redirect(url_for("admin_page"))
+
+
+@app.route("/admin/deepseek/api-key", methods=["POST"])
+def save_deepseek_api_key():
+    global encrypted_deepseek_api_key
+
+    api_key = (request.form.get("api_key") or "").strip()
+    return_view = (request.form.get("return_view") or "deepseek").strip().lower()
+    if return_view not in ADMIN_VIEWS:
+        return_view = "deepseek"
+    if api_key:
+        encrypted_deepseek_api_key = _encrypt_secret(api_key)
+        if autopilot_status.get("last_error") == "Missing DEEPSEEK_API_KEY environment variable":
+            autopilot_status["last_error"] = None
+    _persist_state_change()
+    return redirect(url_for("admin_page", view=return_view))
+
+
+@app.route("/admin/deepseek/api-key/delete", methods=["POST"])
+def delete_deepseek_api_key():
+    global encrypted_deepseek_api_key
+
+    return_view = (request.form.get("return_view") or "deepseek").strip().lower()
+    if return_view not in ADMIN_VIEWS:
+        return_view = "deepseek"
+    encrypted_deepseek_api_key = None
+    _persist_state_change()
+    return redirect(url_for("admin_page", view=return_view))
 
 
 @app.route("/admin/service-notice", methods=["POST"])

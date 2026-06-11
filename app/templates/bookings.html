@@ -561,7 +561,7 @@
     <div class="site-shell">
         <header>
           <nav class="primary-nav" aria-label="Primary">
-            <a class="logo" href="{{ url_for('index') }}"><span>🐾</span>Happy Paws</a>
+            <a class="logo" href="{{ url_for('index') }}"><span>HT</span>Happy Trails</a>
             <div class="nav-links">
               {% for link in primary_nav %}
               <a
@@ -586,10 +586,10 @@
         <section class="hero">
           <div>
             <p class="eyebrow">Bookings</p>
-            <h1>Choose the perfect first step for your pup.</h1>
+            <h1>Book a free meet and greet.</h1>
             <p>
-              Book a walk instantly or schedule a concierge-style meet &amp; greet so we can learn every quirk,
-              routine, and cuddle cue before services begin.
+              A short first meeting helps me learn your dog's routine, walking style, and any important
+              care notes before the first proper walk.
               {% if not meet_greet_enabled %}
               <span class="inline-note">Meet &amp; greet bookings stay available here even when the homepage CTA is turned off.</span>
               {% endif %}
@@ -597,12 +597,12 @@
             <div class="options-grid">
               <div class="option-card">
                 <h3>Book a Walk</h3>
-                <p>Grab an available time from our live calendar and get instant confirmation.</p>
+                <p>Ready to choose a walking time? Go back to the homepage and pick an open slot.</p>
                 <a href="{{ home_booking_url }}">Browse walk times</a>
               </div>
               <div class="option-card {% if not meet_greet_enabled %}is-muted{% endif %}">
                 <h3>Book a Meet &amp; Greet</h3>
-                <p>Invite us over for a relaxed 30-minute visit where we connect with your dog and walk your setup.</p>
+                <p>Choose a relaxed 30-minute visit so I can meet your dog and understand the basics.</p>
                 {% if not meet_greet_enabled %}
                 <p class="option-card__note">This option is hidden from the homepage, but you can still reserve a time on this page.</p>
                 {% endif %}
@@ -623,7 +623,7 @@
           {% endif %}
           <div class="eyebrow" style="color: #0ea5e9">Live openings</div>
           <h2 style="margin-top: 0">Reserve a meet &amp; greet time</h2>
-          <p style="color: #475569">Pick the concierge visit that fits your schedule. We'll confirm instantly.</p>
+          <p style="color: #475569">Pick the visit that fits your schedule. I will confirm the details.</p>
           {% if meet_slots %}
           <div class="slots-grid" role="list">
             {% for slot in meet_slots %}
@@ -658,33 +658,33 @@
             {% endfor %}
           </div>
           {% else %}
-            <p class="empty-state">No meet &amp; greet slots are available at the moment. Check back soon or text us at (555) 014-7788 to be added to the priority list.</p>
+            <p class="empty-state">No meet &amp; greet slots are available at the moment. Please send an enquiry from the homepage.</p>
             {% endif %}
             <div class="booking-success hidden" id="bookingSuccess"></div>
         </section>
         <section>
           <div class="eyebrow" style="color: #f97316">Why it matters</div>
-          <h2 style="margin-top: 0">Meet &amp; greets keep pups confident and routines seamless.</h2>
+          <h2 style="margin-top: 0">Meet &amp; greets make the first walk easier.</h2>
           <p style="color: #475569; font-size: 1.05rem">
-            Think of it as a stress-free dress rehearsal. We learn your cues, your dog's energy, and the quirks that
-            make home feel safe so day-one walks feel like reunions instead of new introductions.
+            Think of it as a calm introduction. I learn your dog's energy, lead routine, access details,
+            and anything that helps them feel settled.
           </p>
           <div class="reason-grid">
             <article class="reason-card">
               <h4>Trust building</h4>
-              <p>Dogs relax faster when they've already exchanged sniffs and treats with their walker.</p>
+              <p>Dogs relax faster when they have met their walker before the first booking.</p>
             </article>
             <article class="reason-card">
               <h4>Home walkthrough</h4>
-              <p>Show us leashes, harnesses, treat drawers, and alarm panels so we can replicate your routine.</p>
+              <p>Show me leads, harnesses, treats, and access instructions so I can follow your routine.</p>
             </article>
             <article class="reason-card">
               <h4>Care planning</h4>
-              <p>We note meds, feeding cues, reactivity triggers, and preferred walking routes.</p>
+              <p>I note any medication, feeding cues, reactivity triggers, and preferred routes.</p>
             </article>
             <article class="reason-card">
-              <h4>Concierge touches</h4>
-              <p>Customize updates, post-walk rituals, and access preferences before the first booking.</p>
+              <h4>Clear updates</h4>
+              <p>We agree how you would like walk updates and post-walk notes to be handled.</p>
             </article>
           </div>
         </section>
@@ -699,18 +699,18 @@
               </div>
             <div class="timeline-step">
               <span>2</span>
-              <h3>Concierge confirmation</h3>
-              <p>We reply within the hour with a confirmed time plus the name and bio of your walker.</p>
+              <h3>Simple confirmation</h3>
+              <p>I reply with the confirmed time and any questions I need answered before arriving.</p>
             </div>
             <div class="timeline-step">
               <span>3</span>
               <h3>In-home visit</h3>
-              <p>We spend ~30 minutes meeting your pup, reviewing routines, and answering every question.</p>
+              <p>We spend around 30 minutes meeting your dog, reviewing routines, and answering questions.</p>
             </div>
             <div class="timeline-step">
               <span>4</span>
-              <h3>Ready for adventures</h3>
-              <p>Once we're aligned, we activate your profile so you can book walks with zero friction.</p>
+              <h3>Ready for walks</h3>
+              <p>Once everything is clear, you can book walks online or message me about regular times.</p>
             </div>
           </div>
         </section>
@@ -762,7 +762,7 @@
               <option value="" disabled selected>Select your area</option>
               {% for area in coverage_areas %}
               <option value="{{ area.id }}">
-                {{ area.name }}{% if area.travel_fee %} · +{{ format_price_label(area.travel_fee) }} travel{% endif %}
+                {{ area.name }}{% if area.travel_fee %} - +{{ format_price_label(area.travel_fee) }} travel{% endif %}
               </option>
               {% endfor %}
             </select>

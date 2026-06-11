@@ -1,0 +1,186 @@
+{
+  "version": 1,
+  "saved_at": "2026-06-08T21:29:56.598307",
+  "submissions": [],
+  "next_submission_id": 1,
+  "visitor_stats": {
+    "2a0a:ef40:16bb:8901:dd04:1938:79b7:e540": {
+      "visits": 90,
+      "first_visit": "2026-06-08T19:17:28.692734",
+      "last_visit": "2026-06-08T21:29:53.304502",
+      "location": "GB",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0",
+      "accept_language": "en-GB,en;q=0.9,en-US;q=0.8"
+    },
+    "2a06:98c0:3624:e122:74e5:a0bd:c74a:5801": {
+      "visits": 1,
+      "first_visit": "2026-06-08T20:20:43.977287",
+      "last_visit": "2026-06-08T20:20:43.977296",
+      "location": "US",
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36 (compatible; +https://developers.cloudflare.com/security-center/)",
+      "accept_language": "Unknown"
+    }
+  },
+  "blocked_ips": [],
+  "chat_conversations": {
+    "b549c84b-5f8b-4cc5-947a-40ea60cf067b": {
+      "visitor_id": "b549c84b-5f8b-4cc5-947a-40ea60cf067b",
+      "ip_address": "2a0a:ef40:16bb:8901:dd04:1938:79b7:e540",
+      "created_at": "2026-06-08T21:29:53.304620",
+      "last_message_at": "2026-06-08T21:29:53.304632",
+      "messages": [
+        {
+          "id": 1,
+          "sender": "visitor",
+          "body": "hi",
+          "timestamp": "2026-06-08T21:29:53.304624",
+          "seen_by_admin": false,
+          "visitor_id": "b549c84b-5f8b-4cc5-947a-40ea60cf067b",
+          "visitor_ip": "2a0a:ef40:16bb:8901:dd04:1938:79b7:e540"
+        }
+      ]
+    }
+  },
+  "next_chat_message_id": 2,
+  "appointment_slots": [
+    {
+      "id": 1,
+      "start": "2026-06-10T10:00:00",
+      "is_booked": false,
+      "workflow_status": "",
+      "visitor_name": null,
+      "visitor_email": null,
+      "visitor_dog_breed": null,
+      "visitor_service_area_id": null,
+      "visitor_service_area_name": null,
+      "visitor_travel_fee": null,
+      "booked_at": null,
+      "price": 10.0,
+      "service_type": "walk",
+      "weather": null
+    }
+  ],
+  "next_slot_id": 2,
+  "dog_breeds": [
+    {
+      "id": 1,
+      "name": "Golden Retriever"
+    },
+    {
+      "id": 2,
+      "name": "Labrador Retriever"
+    },
+    {
+      "id": 3,
+      "name": "Beagle"
+    },
+    {
+      "id": 4,
+      "name": "Poodle"
+    },
+    {
+      "id": 5,
+      "name": "Cavalier King Charles Spaniel"
+    },
+    {
+      "id": 6,
+      "name": "Boxer"
+    },
+    {
+      "id": 7,
+      "name": "Bulldog"
+    },
+    {
+      "id": 8,
+      "name": "Irish Setter"
+    },
+    {
+      "id": 9,
+      "name": "Collie"
+    },
+    {
+      "id": 10,
+      "name": "Newfoundland"
+    }
+  ],
+  "next_dog_breed_id": 11,
+  "coverage_areas": [
+    {
+      "id": 1,
+      "name": "Denton",
+      "description": "Leafy boulevards, museum blocks, and riverside dog runs.",
+      "travel_fee": 0.0
+    },
+    {
+      "id": 2,
+      "name": "Audenshaw",
+      "description": "Wide paths with plenty of shade and calm waterfront strolls.",
+      "travel_fee": 0.0
+    }
+  ],
+  "next_coverage_area_id": 4,
+  "certificates": [
+    {
+      "id": 1,
+      "title": "Level 3 Professional Dog Walker",
+      "issuer": "National Association of Pet Care",
+      "year": "2024",
+      "description": "Advanced canine body-language training, emergency planning, and ethical handling standards.",
+      "image_url": "https://images.unsplash.com/photo-1525253086316-d0c936c814f8?auto=format&fit=crop&w=600&q=80",
+      "link_url": "https://www.napps.org.uk/"
+    },
+    {
+      "id": 2,
+      "title": "Canine First Aid & CPR",
+      "issuer": "PetSaver Institute",
+      "year": "2023",
+      "description": "Annual recertification covering trail emergencies, paw triage, and on-lead incident management.",
+      "image_url": "https://images.unsplash.com/photo-1507149833265-60c372daea22?auto=format&fit=crop&w=600&q=80",
+      "link_url": "https://petsaver.co.uk/"
+    },
+    {
+      "id": 3,
+      "title": "Fear Free Dog Handling",
+      "issuer": "Fear Free Pets",
+      "year": "2022",
+      "description": "Techniques to reduce stress, create decompression breaks, and build trust with sensitive pups.",
+      "image_url": "https://images.unsplash.com/photo-1517423440428-a5a00ad493e8?auto=format&fit=crop&w=600&q=80",
+      "link_url": "https://fearfreepets.com/"
+    }
+  ],
+  "next_certificate_id": 4,
+  "breed_ai_suggestions": null,
+  "business_in_a_box": "Happy Trails Dog Walking is a turnkey business-in-a-box that provides daily dog walks, vacation pet sitting, and concierge-style updates for busy pet parents in town. We focus on reliable scheduling, GPS-tracked adventures, photo journals, and easy online booking. Let visitors know how we onboard pets, what areas we cover, pricing cues (premium yet friendly), and how to move from a chat to a booked meet-and-greet.",
+  "autopilot_enabled": true,
+  "autopilot_status": {
+    "state": "answered",
+    "last_run": "2026-06-08T21:29:53.305089",
+    "last_error": null,
+    "last_reply_preview": "Hello there! Welcome to Happy Trails Dog Walking. I'm Autopilot, your friendly concierge. It sounds like you're looking for some top-notch care for your furry family member, and you've come to the rig",
+    "last_visitor_id": "b549c84b-5f8b-4cc5-947a-40ea60cf067b"
+  },
+  "site_photos": {
+    "home_hero": "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=900&q=80",
+    "home_profile": "https://files.catbox.moe/986gie.jpg",
+    "bookings_hero": "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=1000&q=80",
+    "page_1_hero": "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=900&q=80",
+    "page_2_hero": "https://images.unsplash.com/photo-1518378188025-22bd89516ee2?auto=format&fit=crop&w=900&q=80",
+    "page_3_hero": "https://images.unsplash.com/photo-1507149833265-60c372daea22?auto=format&fit=crop&w=900&q=80",
+    "page_4_hero": "https://images.unsplash.com/photo-1507146426996-ef05306b995a?auto=format&fit=crop&w=900&q=80"
+  },
+  "service_notice": {
+    "enabled": true,
+    "message": "Website under construction - Do not place any bookings."
+  },
+  "meet_greet_enabled": true,
+  "auto_save_enabled": false,
+  "auto_save_last_run": null,
+  "backup_history": [],
+  "next_backup_history_id": 1,
+  "weather_settings": {
+    "api_key": null,
+    "blocked_conditions": [],
+    "max_temp_c": null
+  },
+  "deepseek_api_key_encrypted": "gAAAAABqJzOZi74JoPF1VjnF59lA_8snF6f2LVeOgpTWv_b-kgyEdFH5DDDxe53nbH03bQ9q0Dq1SLehgz_-daSl2mdY_tRE7ZQXJy6GX_9477gSsA3c5MOJCzJ-cUrQILDPBjhBlWY1"
+}

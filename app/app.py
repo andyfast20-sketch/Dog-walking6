@@ -1,6 +1,8 @@
 import json
 import os
 import queue
+import base64
+import hashlib
 import sqlite3
 import threading
 import urllib.error
@@ -13,6 +15,7 @@ from typing import Optional
 import boto3
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
+from cryptography.fernet import Fernet, InvalidToken
 
 from flask import (
     Flask,
@@ -79,33 +82,33 @@ PAGE_DEFINITIONS = {
     1: {
         "id": 1,
         "nav_key": "about",
-        "eyebrow": "Our story",
-        "title": "Who we are",
-        "lede": "Happy Trails Dog Walking is a concierge-style service inspired by the dogs who tugged us down these streets more than a decade ago.",
-        "highlight": "Neighbors trust us with their best friends because we blend attentive care with seamless tech.",
+        "eyebrow": "About Happy Trails",
+        "title": "Friendly local dog walking",
+        "lede": "Happy Trails Dog Walking offers simple, reliable walks for owners who want calm care and clear communication.",
+        "highlight": "Book online, meet your walker, and know your dog is looked after by someone trained in animal welfare and safe handling.",
         "hero_image": "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=900&q=80",
         "metrics": [
-            {"label": "Years caring for Leeds pups", "value": "12+"},
-            {"label": "Monthly walks delivered", "value": "320"},
-            {"label": "Handlers on our roster", "value": "8"},
+            {"label": "Meet and greet before first walk", "value": "Free"},
+            {"label": "Animal welfare and first aid training", "value": "Done"},
+            {"label": "Small, manageable walks", "value": "Yes"},
         ],
         "sections": [
             {
                 "title": "Our promise",
-                "body": "Safety-first adventures, thoughtful pacing, and photo updates every walk.",
+                "body": "Safe, steady walks with your dog's needs at the centre of each visit.",
                 "bullets": [
-                    "GPS tracking with live arrival estimates",
-                    "Solo walks for anxious pups",
-                    "Flexible meet-and-greet scheduling",
+                    "Lead, collar, and harness checks",
+                    "Water breaks and weather-aware routes",
+                    "Short updates after the walk",
                 ],
             },
             {
-                "title": "Meet the crew",
-                "body": "Handlers are certified in canine first aid, background checked, and mentored for three months before heading out solo.",
+                "title": "Meet Andy",
+                "body": "You will know who is walking your dog. I keep communication clear and take time to understand each dog's routine.",
                 "bullets": [
-                    "Monthly continuing education",
-                    "Neighborhood specialists",
-                    "Emergency support line",
+                    "Free introductory meet and greet",
+                    "Animal welfare training completed",
+                    "Canine first aid training completed",
                 ],
             },
         ],
@@ -114,27 +117,27 @@ PAGE_DEFINITIONS = {
         "id": 2,
         "nav_key": "services",
         "eyebrow": "What we do",
-        "title": "Tailored walking services",
-        "lede": "From quick relief breaks to half-day adventures, every outing is curated for your pup's personality and energy level.",
-        "highlight": "Pick a foundation service and layer on training refreshers, trail runs, or cuddle cooldowns.",
+        "title": "Dog walking services",
+        "lede": "Choose a straightforward walk that fits your dog's routine, from a short local walk to a longer outing.",
+        "highlight": "Start with a one-off booking or ask about regular weekly walks.",
         "hero_image": "https://images.unsplash.com/photo-1518378188025-22bd89516ee2?auto=format&fit=crop&w=900&q=80",
         "sections": [
             {
-                "title": "Daily essentials",
-                "body": "Perfect for consistent routines and midday wiggles.",
+                "title": "Walk options",
+                "body": "Simple walking support for everyday needs.",
                 "bullets": [
-                    "20-minute refresh walks",
-                    "45-minute neighborhood tours",
-                    "Weekend warrior playdates",
+                    "30-minute local dog walk",
+                    "60-minute longer dog walk",
+                    "Regular weekly walks by arrangement",
                 ],
             },
             {
-                "title": "Specialty add-ons",
-                "body": "Customize each visit with enrichment and concierge touches.",
+                "title": "Included with each walk",
+                "body": "The basics owners expect without making things complicated.",
                 "bullets": [
-                    "Training reinforcement",
-                    "Puppy socialization field trips",
-                    "Medication and meal support",
+                    "Doorstep collection and return",
+                    "Fresh water check",
+                    "A short update after the walk",
                 ],
             },
         ],
@@ -142,28 +145,28 @@ PAGE_DEFINITIONS = {
     3: {
         "id": 3,
         "nav_key": "prices",
-        "eyebrow": "Investment",
-        "title": "Transparent pricing",
-        "lede": "Premium care, clear rates, and no surprise fees. Bundle sessions or pay-as-you-go with digital receipts every Friday.",
-        "highlight": "Members save up to 15% with recurring walk packs and concierge perks.",
+        "eyebrow": "Prices",
+        "title": "Clear dog walking prices",
+        "lede": "Simple prices for simple walks. Final details are confirmed before your first booking.",
+        "highlight": "Meet and greets are free, so we can make sure the walk is right for your dog.",
         "hero_image": "https://images.unsplash.com/photo-1507149833265-60c372daea22?auto=format&fit=crop&w=900&q=80",
         "sections": [
             {
-                "title": "Core walk menu",
-                "body": "Choose the cadence that matches your schedule.",
+                "title": "Walk prices",
+                "body": "Choose the option that matches your dog and your routine.",
                 "bullets": [
-                    "Express (20 min) — $28",
-                    "Signature (45 min) — $42",
-                    "Adventure hour — $58",
+                    "30-minute walk - from GBP 12",
+                    "60-minute walk - from GBP 18",
+                    "Meet and greet - free",
                 ],
             },
             {
-                "title": "Membership perks",
-                "body": "Bundle more, save more, and unlock concierge extras.",
+                "title": "Regular walks",
+                "body": "If you need walks every week, we can agree a simple routine.",
                 "bullets": [
-                    "5-walk pack: save 5%",
-                    "10-walk pack: save 10%",
-                    "Unlimited month: includes free pup taxi",
+                    "Same walker whenever possible",
+                    "Consistent walk times",
+                    "Easy changes by message",
                 ],
             },
         ],
@@ -173,33 +176,31 @@ PAGE_DEFINITIONS = {
         "nav_key": "contact",
         "eyebrow": "Let's talk",
         "title": "Get in touch",
-        "lede": "Prefer a personal hello? Reach us the way that works for you and we'll respond within the hour.",
-        "highlight": "Dedicated concierge monitors calls, texts, and chat Monday–Saturday, 7am–9pm.",
+        "lede": "Ask a question, check your area, or arrange a free meet and greet before booking.",
+        "highlight": "Send the basics about your dog and I will reply as soon as I can.",
         "hero_image": "https://images.unsplash.com/photo-1507146426996-ef05306b995a?auto=format&fit=crop&w=900&q=80",
         "sections": [
             {
                 "title": "Direct contact",
-                "body": "We're real humans excited to help schedule walks and answer questions.",
+                "body": "Use the contact form on the homepage or call if you would rather talk it through.",
                 "bullets": [
-                    "Call: (555) 012-4455",
-                    "Text: (555) 014-7788",
-                    "Email: concierge@happytrails.dog",
+                    "Call: 07595 289669",
+                    "Ask about available times",
+                    "Tell me about your dog's routine",
                 ],
             },
             {
-                "title": "Visit us",
-                "body": "Stop by the studio to say hi and pick up pup merch.",
+                "title": "Before the first walk",
+                "body": "A short meet and greet helps everyone feel comfortable.",
                 "bullets": [
-                    "143 Riverwalk Ave, Suite 3",
-                    "Weekdays 10am–6pm",
-                    "Parking validated for clients",
+                    "Meet your dog at home or nearby",
+                    "Check lead, harness, and access details",
+                    "Agree the best walking routine",
                 ],
             },
         ],
     },
 }
-
-
 def _build_site_photo_defaults():
     defaults = {
         "home_hero": {
@@ -210,7 +211,7 @@ def _build_site_photo_defaults():
         },
         "home_profile": {
             "label": "Homepage profile photo",
-            "description": "Portrait used in the concierge walker spotlight on the homepage.",
+            "description": "Portrait used in the walker spotlight on the homepage.",
             "default_url": "https://files.catbox.moe/986gie.jpg",
             "group": "homepage",
         },
@@ -279,6 +280,7 @@ next_slot_id = 1
 WEATHER_LOCATION_QUERY = "Tameside, Manchester"
 WEATHER_ADMIN_PASSWORD = "891133kk"
 weather_api_key = None
+encrypted_deepseek_api_key = None
 dog_breeds = []
 next_dog_breed_id = 1
 breed_ai_suggestions = None
@@ -289,6 +291,7 @@ next_backup_history_id = 1
 ADMIN_VIEWS = {
     "menu",
     "autopilot",
+    "deepseek",
     "status",
     "backups",
     "coverage",
@@ -320,20 +323,20 @@ AUTOPILOT_MODEL_NAME = "deepseek-chat"
 DEFAULT_COVERAGE_AREAS = [
     {
         "id": 1,
-        "name": "Parkside & Cathedral Quarter",
-        "description": "Leafy boulevards, museum blocks, and riverside dog runs.",
+        "name": "Tameside local area",
+        "description": "Everyday local walks close to home, parks, and quieter streets.",
         "travel_fee": 0,
     },
     {
         "id": 2,
-        "name": "Meadow Lane + Riverside",
-        "description": "Wide paths with plenty of shade and calm waterfront strolls.",
+        "name": "Nearby neighbourhoods",
+        "description": "Doorstep collection for regular walks where travel time allows.",
         "travel_fee": 0,
     },
     {
         "id": 3,
-        "name": "Southbank & Market Streets",
-        "description": "Cobbled lanes, coffee stops, and pocket parks every few blocks.",
+        "name": "Just outside the area",
+        "description": "Send an enquiry and I will confirm whether I can cover your address.",
         "travel_fee": 0,
     },
 ]
@@ -367,11 +370,9 @@ DEFAULT_CERTIFICATES = [
     },
 ]
 BUSINESS_BOX_DEFAULT = (
-    "Happy Trails Dog Walking is a turnkey business-in-a-box that provides daily dog walks, "
-    "vacation pet sitting, and concierge-style updates for busy pet parents in town. We focus "
-    "on reliable scheduling, GPS-tracked adventures, photo journals, and easy online booking. "
-    "Let visitors know how we onboard pets, what areas we cover, pricing cues (premium yet "
-    "friendly), and how to move from a chat to a booked meet-and-greet."
+    "Happy Trails Dog Walking provides simple local dog walks for busy owners. We focus on "
+    "easy online booking, safe handling, animal welfare training, clear updates, service areas, "
+    "straightforward prices, and moving visitors from a quick question to a confirmed walk."
 )
 business_in_a_box = BUSINESS_BOX_DEFAULT
 coverage_areas = [dict(area) for area in DEFAULT_COVERAGE_AREAS]
@@ -1019,7 +1020,7 @@ def _parse_price(value):
     text_value = str(value).strip()
     if not text_value:
         return None
-    normalized = text_value.replace("$", "").replace(",", "")
+    normalized = text_value.replace("$", "").replace("£", "").replace("GBP", "").replace(",", "")
     try:
         return float(normalized)
     except (TypeError, ValueError):
@@ -1219,6 +1220,7 @@ def _serialize_state() -> dict:
         "backup_history": [_serialize_backup_history_entry(entry) for entry in backup_history],
         "next_backup_history_id": next_backup_history_id,
         "weather_api_key": weather_api_key,
+        "deepseek_api_key_encrypted": encrypted_deepseek_api_key,
     }
     return state
 
@@ -1232,7 +1234,7 @@ def _load_state(state: dict):
     global site_photos, site_service_notice, meet_greet_enabled
     global auto_save_enabled, auto_save_last_run
     global backup_history, next_backup_history_id
-    global weather_api_key
+    global weather_api_key, encrypted_deepseek_api_key
 
     submissions = [dict(row) for row in state.get("submissions", []) if isinstance(row, dict)]
     next_submission_id = _coerce_int(state.get("next_submission_id"), _next_id_from_rows(submissions))
@@ -1364,6 +1366,16 @@ def _load_state(state: dict):
         weather_api_key = stored_weather_key.strip() or None
     else:
         weather_api_key = None
+    stored_deepseek_key = state.get("deepseek_api_key_encrypted")
+    if isinstance(stored_deepseek_key, str):
+        encrypted_deepseek_api_key = stored_deepseek_key.strip() or None
+    else:
+        legacy_deepseek_key = state.get("deepseek_api_key")
+        encrypted_deepseek_api_key = (
+            _encrypt_secret(legacy_deepseek_key.strip())
+            if isinstance(legacy_deepseek_key, str) and legacy_deepseek_key.strip()
+            else None
+        )
 
     history_entries = []
     for payload in state.get("backup_history", []):
@@ -1486,7 +1498,7 @@ def _serialize_slot(slot: dict):
     service_label = _service_label(service_type)
     price_amount = _parse_price(slot.get("price"))
     price_label = _format_price_label(price_amount)
-    friendly_label = f"{service_label} · {long_date_label} at {time_label}"
+    friendly_label = f"{service_label} - {long_date_label} at {time_label}"
     if price_label:
         friendly_label = f"{friendly_label} ({price_label})"
     visitor_area_name = slot.get("visitor_service_area_name") or ""
@@ -1558,7 +1570,42 @@ def _should_ignore_user_agent(user_agent: str) -> bool:
 
 
 def _get_deepseek_api_key() -> Optional[str]:
+    stored_key = _decrypt_secret(encrypted_deepseek_api_key)
+    if stored_key:
+        return stored_key
     return os.environ.get("DEEPSEEK_API_KEY")
+
+
+def _deepseek_key_source() -> str:
+    if _decrypt_secret(encrypted_deepseek_api_key):
+        return "stored"
+    if os.environ.get("DEEPSEEK_API_KEY"):
+        return "environment"
+    return "missing"
+
+
+def _secret_cipher() -> Fernet:
+    secret = (
+        os.environ.get("DEEPSEEK_ENCRYPTION_SECRET")
+        or os.environ.get("FLASK_SECRET_KEY")
+        or app.secret_key
+    )
+    digest = hashlib.sha256(str(secret).encode("utf-8")).digest()
+    return Fernet(base64.urlsafe_b64encode(digest))
+
+
+def _encrypt_secret(value: str) -> str:
+    return _secret_cipher().encrypt(value.encode("utf-8")).decode("utf-8")
+
+
+def _decrypt_secret(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    try:
+        return _secret_cipher().decrypt(value.encode("utf-8")).decode("utf-8")
+    except (InvalidToken, ValueError):
+        app.logger.warning("Unable to decrypt stored DeepSeek API key")
+        return None
 
 
 def _build_autopilot_messages(conversation: dict):
@@ -1566,14 +1613,13 @@ def _build_autopilot_messages(conversation: dict):
     history = conversation.get("messages", [])
     trimmed_history = history[-12:]
     system_prompt = (
-        "You are Autopilot, a professional concierge for a dog walking and pet-care service. "
-        "Respond with warmth, actionable next steps, and remind visitors they can book a meet-"
-        "and-greet or slot from the site. Keep replies under 4 short paragraphs. You must follow "
-        "the business-in-a-box brief below for every factual detail, especially pricing, service "
-        "areas, onboarding steps, and offers—never invent information that is not in the brief. "
-        "If the brief does not include an answer (such as a price that was not provided), clearly "
-        "state that you'll connect them with a human instead of guessing. Reference the brief in "
-        "your replies so visitors know you are following it."
+        "You are Autopilot for a simple local dog walking service. Respond with warmth, "
+        "clear next steps, and remind visitors they can book a walk, request a free meet "
+        "and greet, or send an enquiry from the site. Keep replies under 4 short paragraphs. "
+        "You must follow the business-in-a-box brief below for every factual detail, especially "
+        "pricing, service areas, onboarding steps, and offers. Never invent information that is "
+        "not in the brief. If the brief does not include an answer, clearly state that you will "
+        "connect them with a human instead of guessing."
         f"\n\nBusiness-in-a-box brief:\n{business_in_a_box.strip()}"
     )
     messages = [{"role": "system", "content": system_prompt}]
@@ -2091,6 +2137,7 @@ def admin_page():
         business_in_a_box=business_in_a_box,
         autopilot_model=AUTOPILOT_MODEL_NAME,
         autopilot_api_key_missing=_get_deepseek_api_key() is None,
+        deepseek_api_key_source=_deepseek_key_source(),
         dog_breeds=_sorted_breeds(),
         breed_ai_suggestions=breed_ai_suggestions,
         new_enquiry_count=new_enquiry_count,
@@ -2325,6 +2372,34 @@ def toggle_autopilot():
     )
     _persist_state_change()
     return redirect(url_for("admin_page"))
+
+
+@app.route("/admin/deepseek/api-key", methods=["POST"])
+def save_deepseek_api_key():
+    global encrypted_deepseek_api_key
+
+    api_key = (request.form.get("api_key") or "").strip()
+    return_view = (request.form.get("return_view") or "deepseek").strip().lower()
+    if return_view not in ADMIN_VIEWS:
+        return_view = "deepseek"
+    if api_key:
+        encrypted_deepseek_api_key = _encrypt_secret(api_key)
+        if autopilot_status.get("last_error") == "Missing DEEPSEEK_API_KEY environment variable":
+            autopilot_status["last_error"] = None
+    _persist_state_change()
+    return redirect(url_for("admin_page", view=return_view))
+
+
+@app.route("/admin/deepseek/api-key/delete", methods=["POST"])
+def delete_deepseek_api_key():
+    global encrypted_deepseek_api_key
+
+    return_view = (request.form.get("return_view") or "deepseek").strip().lower()
+    if return_view not in ADMIN_VIEWS:
+        return_view = "deepseek"
+    encrypted_deepseek_api_key = None
+    _persist_state_change()
+    return redirect(url_for("admin_page", view=return_view))
 
 
 @app.route("/admin/service-notice", methods=["POST"])

@@ -57,3 +57,19 @@ def test_admin_page_handles_malformed_conversations():
     assert b"Admin" in response.data
     module.chat_conversations = {}
 
+
+def test_admin_can_save_encrypted_deepseek_api_key(monkeypatch):
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    module = importlib.reload(importlib.import_module("app.app"))
+    client = module.app.test_client()
+
+    response = client.post(
+        "/admin/deepseek/api-key",
+        data={"api_key": "sk-admin-secret"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert module.encrypted_deepseek_api_key
+    assert module.encrypted_deepseek_api_key != "sk-admin-secret"
+    assert module._get_deepseek_api_key() == "sk-admin-secret"
